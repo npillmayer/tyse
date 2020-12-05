@@ -1,2 +1,2 @@
-# tyse
+# TySE
 Experiments with formatting Text
