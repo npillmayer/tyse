@@ -137,7 +137,7 @@ func setupFFTest(t *testing.T, paragraph string, hyphens bool) (*khipu.Khipu, li
 	var dotfile io.Writer
 	var err error
 	if graphviz {
-		dotfile, err = ioutil.TempFile(".", "knuthplass-*.dot")
+		dotfile, err = ioutil.TempFile(".", "firstfit-*.dot")
 		if err != nil {
 			t.Errorf(err.Error())
 		}

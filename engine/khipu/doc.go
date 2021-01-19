@@ -39,6 +39,7 @@
 //
 // (3) Bi-directional text
 //
+// 	https://godoc.org/github.com/npillmayer/uax/bidi
 // 	https://godoc.org/golang.org/x/text/unicode/bidi
 // 	https://www.w3.org/International/articles/inline-bidi-markup/
 //

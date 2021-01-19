@@ -49,7 +49,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // KnotType is a type for the different flavours of knots.
 type KnotType int8
 
-// A Knot has a width and may be discardable
+// A Knot has a width and may be discardable at line-breaks.
 type Knot interface {
 	Type() KnotType      // type identifier of this knot
 	W() dimen.Dimen      // width

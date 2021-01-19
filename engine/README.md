@@ -13,13 +13,13 @@ by Lin Clark
 about the Firefox styling engine.
 I also very much enjoyed reading articles by 
  Mikito Takada:
-"[Learn CSS Layout the pedantic way](https://www.printfriendly.com/p/g/cnVHBX)."
+“[Learn CSS Layout the pedantic way](https://www.printfriendly.com/p/g/cnVHBX).”
  
 There is not very much open source Go code around for supporting us
 in implementing a styling and layout engine, except the great work of
 [Cascadia](https://godoc.org/github.com/andybalholm/cascadia).
 Therefore we will have to compromise
-on many feature in order to complete this in a realistic time frame.
+on many features in order to complete this in a realistic time frame.
 For a reminder of why that is, refer to
 [this video](https://www.youtube.com/watch?v=S68fcV09nGQ).
 
@@ -27,6 +27,6 @@ From a high level view the creation of documents from the internal
 representation looks something like this:
 
 <div style="width:480px;padding:5px;padding-bottom:10px">
-<img alt="gotype document creation flow overview" src="http://pillmayer.com/TySE-Notes/img/TySE-Concurrency-Overview.svg" width="480px">
+<img alt="gotype document creation flow overview" src="http://npillmayer.github.io/TySE-Blog/img/TySE-Concurrency-Overview.svg" width="480px">
 </div>
 

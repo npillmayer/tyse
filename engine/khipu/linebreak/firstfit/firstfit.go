@@ -37,6 +37,8 @@ What counts as a word is not so clear with international scripts. We rely on the
 khipukamayuq to insert appropriate penalties before line-breaking happens.
 Thus, we do not break automatically on spaces, but rather on penalties.
 
+________________________________________________________________________________
+
 BSD License
 
 Copyright (c) 2017–20, Norbert Pillmayer
@@ -142,7 +144,7 @@ func BreakParagraph(cursor linebreak.Cursor, parshape linebreak.ParShape,
 // (future line). If the space used by the fragment is longer than the line-length,
 // a line-break is created. For this, the algorithm has to walk back to the last
 // feasible breakpoint before the overflow. To avoid having to walk back, we set
-// checkpoints at feasible breakpoints and jumpt back, as soon as we have to create
+// checkpoints at feasible breakpoints and jump back, as soon as we have to create
 // a line-break.
 func (lb *linebreaker) FindBreakpoints() ([]khipu.Mark, error) {
 	breakpoints := make([]khipu.Mark, 1, 10)
