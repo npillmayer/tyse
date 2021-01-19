@@ -2,6 +2,9 @@ module github.com/npillmayer/tyse
 
 go 1.14
 
+replace github.com/npillmayer/uax => /Users/npi/prg/go/uax
+replace github.com/npillmayer/schuko => /Users/npi/prg/go/schuko
+
 require (
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.1.0

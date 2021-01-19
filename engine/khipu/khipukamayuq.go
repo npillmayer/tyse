@@ -39,13 +39,16 @@ import (
 	"bufio"
 	"io"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/npillmayer/tyse/core/dimen"
+	"github.com/npillmayer/tyse/core/locate"
 	params "github.com/npillmayer/tyse/core/parameters"
+	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax14"
 	"github.com/npillmayer/uax/uax29"
-	"github.com/npillmayer/tyse/core/locate"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -68,7 +71,8 @@ func KnotEncode(text io.Reader, pipeline *TypesettingPipeline, regs *params.Type
 	seg := pipeline.segmenter
 	for seg.Next() {
 		fragment := seg.Text()
-		CT().Debugf("next segment = '%s'\twith penalties %v", fragment, seg.Penalties())
+		p := penlty(seg.Penalties())
+		CT().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
 		k := createPartialKhipuFromSegment(seg, pipeline, regs)
 		if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
 			HyphenateTextBoxes(k, pipeline, regs)
@@ -87,41 +91,42 @@ func KnotEncode(text io.Reader, pipeline *TypesettingPipeline, regs *params.Type
 // arguments is invalid.
 //
 // Returns a khipu consisting of text-boxes, glues and penalties.
-func createPartialKhipuFromSegment(seg *segment.Segmenter, pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+func createPartialKhipuFromSegment(seg *segment.Segmenter, pipeline *TypesettingPipeline,
+	regs *params.TypesettingRegisters) *Khipu {
+	//
 	khipu := NewKhipu()
-	CT().Errorf("CREATE PARITAL KHIPU, PENALTIES=%v", seg.Penalties())
-	if seg.Penalties()[0] < 1000 { // broken by primary breaker // TODO: this API is aweful...
+	p := penlty(seg.Penalties())
+	CT().Errorf("CREATE PARITAL KHIPU, PENALTIES=%d|%d", p.p1, p.p2)
+	if p.primaryBreak() { // broken by primary breaker
 		// fragment is terminated by possible line wrap opportunity
-		if seg.Penalties()[1] < 1000 { // broken by secondary breaker, too
-			if seg.Penalties()[1] == segment.PenaltyAfterWhitespace {
-				g := NewGlue(5*dimen.BP, 1*dimen.BP, 2*dimen.BP)
-				p := Penalty(seg.Penalties()[1])
-				khipu.AppendKnot(g).AppendKnot(p)
+		if p.secondaryBreak() { // broken by secondary breaker, too
+			if isspace(seg) {
+				g := spaceglue(regs)
+				khipu.AppendKnot(g).AppendKnot(Penalty(p.p2))
 			} else {
 				b := NewTextBox(seg.Text())
-				p := Penalty(dimen.Infty)
-				khipu.AppendKnot(b).AppendKnot(p)
+				khipu.AppendKnot(b).AppendKnot(Penalty(dimen.Infty))
 			}
 		} else { // identified as a possible line break, but no space
 			// insert explicit discretionary '\-' penalty
 			b := NewTextBox(seg.Text())
-			p := Penalty(regs.N(params.P_HYPHENPENALTY))
-			khipu.AppendKnot(b).AppendKnot(p)
+			pen := Penalty(regs.N(params.P_HYPHENPENALTY))
+			khipu.AppendKnot(b).AppendKnot(pen)
 		}
-	} else { // segments is broken by secondary breaker
+	} else { // segment is broken by secondary breaker
 		// fragment is start or end of a span of whitespace
-		if seg.Penalties()[1] == segment.PenaltyBeforeWhitespace {
+		if isspace(seg) {
+			CT().Errorf("BROKEN BY SECONDARY BREAKER: WHITESPACE")
+			// close a span of whitespace
+			g := spaceglue(regs)
+			pen := Penalty(p.p2)
+			khipu.AppendKnot(g).AppendKnot(pen)
+		} else {
 			CT().Errorf("BROKEN BY SECONDARY BREAKER: TEXT_BOX")
 			// close a text box which is not a possible line wrap position
 			b := NewTextBox(seg.Text())
-			p := Penalty(dimen.Infty)
-			khipu.AppendKnot(b).AppendKnot(p)
-		} else {
-			CT().Errorf("BROKEN BY SECONDARY BREAKER: WHITESPACE")
-			// close a span of whitespace
-			g := NewGlue(5*dimen.PT, 1*dimen.PT, 2*dimen.PT)
-			p := Penalty(seg.Penalties()[1])
-			khipu.AppendKnot(g).AppendKnot(p)
+			pen := Penalty(dimen.Infty)
+			khipu.AppendKnot(b).AppendKnot(pen)
 		}
 	}
 	return khipu
@@ -130,9 +135,11 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, pipeline *Typesetting
 // HyphenateTextBoxes hypenates all the words in a khipu.
 // Words are contained inside TextBox knots.
 //
-// Hyphenation is governed by the typesetting registers provided.
+// Hyphenation is governed by the typesetting registers.
 // If regs is nil, no hyphenation is done.
-func HyphenateTextBoxes(khipu *Khipu, pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) {
+func HyphenateTextBoxes(khipu *Khipu, pipeline *TypesettingPipeline,
+	regs *params.TypesettingRegisters) {
+	//
 	if regs == nil || khipu == nil {
 		return
 	}
@@ -212,80 +219,35 @@ func HyphenateWord(word string, regs *params.TypesettingRegisters) ([]string, bo
 	return splitWord, ok
 }
 
-/*
-func UAX14LineWrap(text string, regs *params.TypesettingRegisters) *Khipu {
-	sread := strings.NewReader(text) // wrap a reader around the CDATA string
-	nfcread := norm.NFC.Reader(sread)
-	scanner := bufio.NewScanner(nfcread) // wrap a buffered scanner around it
-	scanner.Split(segment.SplitWords)    // split on words according to UAX#29
-	for scanner.Scan() {
-		tokenBytes := scanner.Bytes()
-		fmt.Printf("%s \n", tokenBytes)
-	}
-	if err := scanner.Err(); err != nil {
-		fmt.Printf("ERROR") // TODO
-	}
+// ---------------------------------------------------------------------------
 
-	// TODO: line wrap
-	// https://github.com/gorilla/i18n/blob/master/linebreak/linebreak.go
-
-	return nil
+type penalties struct {
+	p1, p2 int
 }
 
-
-// Simple Lösung. Unvollständig.
-// Erkennt Emoji-Zeichenketten nicht; nur Zeichen + diakr. Zeichen
-func grLen(s string) int { // length in terms of graphemes
-	if len(s) == 0 {
-		return 0
-	}
-	gr := 1
-	_, s1 := utf8.DecodeRuneInString(s)
-	for _, r := range s[s1:] {
-		if !unicode.Is(unicode.Mn, r) {
-			gr++
-		}
-	}
-	return gr
+func penlty(p1, p2 int) penalties {
+	return penalties{p1, p2}
 }
 
-func graphemes(s string) int {
-	n := 0
-	for len(s) > 0 {
-		r, size := utf8.DecodeRuneInString(s)
-		fmt.Printf("%c %v\n", r, size)
-		s = s[size:]
-		n++
-	}
-	return n
+func (p penalties) primaryBreak() bool {
+	return p.p1 < uax.InfinitePenalty
 }
 
-func iterateOverGraphemes(s string) {
-	var it norm.Iter
-	it.InitString(norm.NFC, s)
-	for !it.Done() {
-		b := it.Next()
-		r, size := utf8.DecodeRuneInString(string(b[:]))
-		fmt.Printf("%c %v\n", r, size)
-	}
+func (p penalties) secondaryBreak() bool {
+	return p.p2 < uax.InfinitePenalty
 }
-*/
 
-// https://github.com/blevesearch/segment
-/*
-A Go library for performing Unicode Text Segmentation as described in
-Unicode Standard Annex #29
-*/
-// Alternativen: https://github.com/go-ego/gse
-//
-/*
-func iterateOverWords(s *strings.Reader) {
-	segmenter := segment.NewWordSegmenter(s)
-	for segmenter.Segment() {
-		tokenBytes := segmenter.Bytes()
-		tokenType := segmenter.Type()
-		r := string(tokenBytes[:])
-		fmt.Printf("%s %v\n", r, tokenType)
+func isspace(seg *segment.Segmenter) bool {
+	if len(seg.Text()) == 0 {
+		return false
 	}
+	r, width := utf8.DecodeRuneInString(seg.Text())
+	if width == 0 || r == utf8.RuneError {
+		return false
+	}
+	return unicode.IsSpace(r)
 }
-*/
+
+func spaceglue(regs *params.TypesettingRegisters) Glue {
+	return NewGlue(5*dimen.PT, 1*dimen.PT, 2*dimen.PT)
+}

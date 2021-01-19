@@ -44,7 +44,7 @@ import (
 	"github.com/npillmayer/tyse/engine/khipu"
 )
 
-// T traces to the core tracer.
+// T traces to a global core tracer.
 func T() tracing.Trace {
 	return gtrace.CoreTracer
 }

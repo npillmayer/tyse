@@ -4,23 +4,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/configtestadapter"
-	"github.com/npillmayer/schuko/gconf"
 	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
 )
 
-func init() {
-	gconf.Initialize(configtestadapter.New())
-	gtrace.CoreTracer = gotestingadapter.New()
-	//gtrace.CoreTracer = gologadapter.New()
+// func init() {
+// 	gconf.Initialize(configtestadapter.New())
+// 	gtrace.CoreTracer = gotestingadapter.New()
+// 	//gtrace.CoreTracer = gologadapter.New()
+// }
+
+func config(t *testing.T) func() {
+	return testconfig.QuickConfig(t)
 }
 
 func TestDimen(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := config(t)
 	defer teardown()
 	if dimen.BP.String() != "65536sp" {
 		t.Error("a big point BP should be 65536 scaled points SP")
@@ -28,7 +30,7 @@ func TestDimen(t *testing.T) {
 }
 
 func TestKhipu(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := config(t)
 	defer teardown()
 	kh := NewKhipu()
 	kh.AppendKnot(NewKnot(KTKern)).AppendKnot(NewKnot(KTGlue))
@@ -40,7 +42,7 @@ func TestKhipu(t *testing.T) {
 }
 
 func TestBreaking1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := config(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	regs := parameters.NewTypesettingRegisters()
@@ -53,7 +55,7 @@ func TestBreaking1(t *testing.T) {
 }
 
 func TestBreaking2(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := config(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	regs := parameters.NewTypesettingRegisters()
@@ -66,7 +68,7 @@ func TestBreaking2(t *testing.T) {
 }
 
 func TestText(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := config(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	text := "The quick brown fox jumps over the lazy dog!"
@@ -81,7 +83,7 @@ func TestText(t *testing.T) {
 }
 
 func TestExHyphen(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := config(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	text := "lime-tree"
