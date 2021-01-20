@@ -1,6 +1,8 @@
 /*
 Package w3cdom defines an interface type for W3C Document Object Models.
 
+See also https://www.w3schools.com/XML/dom_intro.asp
+
 Status
 
 Early draft—API may change frequently. Please stay patient.
