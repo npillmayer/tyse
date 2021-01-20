@@ -7,6 +7,10 @@ import (
 
 // ReorderBoxTree reorders box nodes of a render tree to account for
 // "position" CSS properties.
+//
+// Currently this function moves boxes with positions 'fixed' or 'absolute' out of
+// the normal DOM hierarchy and re-attaches them to the document root or an ancestor
+// with non-static positioning, respectively.
 // In a future version, CSS regions will be supported as well.
 func ReorderBoxTree(boxRoot *PrincipalBox) error {
 	if boxRoot == nil {

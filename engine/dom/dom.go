@@ -428,6 +428,10 @@ func (nullStyles) GetPropertyValue(string) style.Property {
 	return style.NullStyle
 }
 
+func (nullStyles) Styles() *style.PropertyMap {
+	return nil
+}
+
 // --- NamedNodeMap ---------------------------------------------------------------
 
 // A W3CMap represents a key-value map

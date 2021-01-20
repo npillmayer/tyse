@@ -86,4 +86,5 @@ type NamedNodeMap interface {
 // ComputedStyles represents a CSS style
 type ComputedStyles interface {
 	GetPropertyValue(string) style.Property
+	Styles() *style.PropertyMap
 }

@@ -102,7 +102,7 @@ func shortText(box *cbox) string {
 	sym := disp.Symbol()
 	s := fmt.Sprintf("\"%s\u2000\\\"", sym)
 	if len(txt) > 10 {
-		s += txt[:10] + "...\\\"\""
+		s += txt[:10] + "…\\\"\""
 	} else {
 		s += txt + "\\\"\""
 	}

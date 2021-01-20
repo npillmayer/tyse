@@ -43,12 +43,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package textshaping
 
 import (
+	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/font"
 )
 
-// We trace to the commands-tracer. // TODO: create a font tracer?
-var T tracing.Trace = tracing.CommandTracer
+// T traces to the global core tracer.
+func T() tracing.Trace {
+	return gtrace.CoreTracer
+}
 
 // Script IDs are copied from Harfbuzz. We don't have any sensible
 // preference for IDs, thus there's no harm in being in sync with

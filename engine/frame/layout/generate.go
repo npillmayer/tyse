@@ -5,15 +5,15 @@ package layout
 // - which context the element should span for its children
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
 
-var errDOMRootIsNull = fmt.Errorf("DOM root is null")
-var errDOMNodeNotSuitable = fmt.Errorf("DOM node is not suited for layout")
+var errDOMRootIsNull = errors.New("DOM root is null")
+var errDOMNodeNotSuitable = errors.New("DOM node is not suited for layout")
 
 // BuildBoxTree creates a render box tree from a styled tree.
 func BuildBoxTree(domRoot *dom.W3CNode) (Container, error) {
@@ -46,6 +46,7 @@ func BuildBoxTree(domRoot *dom.W3CNode) (Container, error) {
 	return boxRoot, nil
 }
 
+// prepareBocCreator is an action function for concurrent tree-traversal.
 func prepareBoxCreator(dict *domToBoxAssoc) tree.Action {
 	dom2box := dict
 	action := func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {

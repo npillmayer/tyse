@@ -66,10 +66,10 @@ type NodeNavigator struct {
 }
 
 // NewNavigator creates a new xpath.NodeNavigator for a styled tree.
-func NewNavigator(styledtree *styledtree.StyNode) *NodeNavigator {
+func NewNavigator(node *styledtree.StyNode) *NodeNavigator {
 	return &NodeNavigator{
-		current: styledtree,
-		root:    styledtree,
+		current: node,
+		root:    node,
 		attr:    -1,
 	}
 }
@@ -87,7 +87,7 @@ func CurrentNode(nav xpath.NodeNavigator) (*tree.Node, error) {
 }
 
 func (nav *NodeNavigator) NodeType() xpath.NodeType {
-	switch nav.current.HtmlNode().Type {
+	switch nav.current.HTMLNode().Type {
 	case html.CommentNode:
 		return xpath.CommentNode
 	case html.TextNode:
@@ -103,14 +103,14 @@ func (nav *NodeNavigator) NodeType() xpath.NodeType {
 		// ignored <!DOCTYPE HTML> declare and as Root-Node type.
 		return xpath.RootNode
 	}
-	panic(fmt.Sprintf("unknown node type: %v", nav.current.HtmlNode().Type))
+	panic(fmt.Sprintf("unknown node type: %v", nav.current.HTMLNode().Type))
 }
 
 func (nav *NodeNavigator) LocalName() string {
 	if nav.attr != -1 {
-		return nav.current.HtmlNode().Attr[nav.attr].Key
+		return nav.current.HTMLNode().Attr[nav.attr].Key
 	}
-	return nav.current.HtmlNode().Data
+	return nav.current.HTMLNode().Data
 }
 
 func (*NodeNavigator) Prefix() string {
@@ -118,16 +118,16 @@ func (*NodeNavigator) Prefix() string {
 }
 
 func (nav *NodeNavigator) Value() string {
-	switch nav.current.HtmlNode().Type {
+	switch nav.current.HTMLNode().Type {
 	case html.CommentNode:
 		return "<comment nodes not supported>"
 	case html.ElementNode:
 		if nav.attr != -1 {
-			return nav.current.HtmlNode().Attr[nav.attr].Val
+			return nav.current.HTMLNode().Attr[nav.attr].Val
 		}
-		return innerText(nav.current.HtmlNode())
+		return innerText(nav.current.HTMLNode())
 	case html.TextNode:
-		return nav.current.HtmlNode().Data
+		return nav.current.HTMLNode().Data
 	}
 	return ""
 }
@@ -158,7 +158,7 @@ func (nav *NodeNavigator) MoveToParent() bool {
 }
 
 func (nav *NodeNavigator) MoveToNextAttribute() bool {
-	if nav.attr >= len(nav.current.HtmlNode().Attr)-1 {
+	if nav.attr >= len(nav.current.HTMLNode().Attr)-1 {
 		return false
 	}
 	nav.attr++
