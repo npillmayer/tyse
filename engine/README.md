@@ -21,7 +21,7 @@ in implementing a styling and layout engine, except the great work of
 Therefore we will have to compromise
 on many features in order to complete this in a realistic time frame.
 For a reminder of why that is, refer to
-[this discussion]https://stackoverflow.com/questions/598841/how-to-get-started-building-a-web-browser)
+[this discussion](https://stackoverflow.com/questions/598841/how-to-get-started-building-a-web-browser)
 at stackoverflow.
 
 From a high level view the creation of documents from the internal

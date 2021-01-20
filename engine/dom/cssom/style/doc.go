@@ -31,7 +31,9 @@ https://godoc.org/github.com/andybalholm/cascadia.
 Therefore we will have to compromise
 on many feature in order to complete this in a realistic time frame.
 For a reminder of why that is, refer to
-https://www.youtube.com/watch?v=S68fcV09nGQ .
+[this discussion](https://stackoverflow.com/questions/598841/how-to-get-started-building-a-web-browser)
+at stackoverflow.
+
 
 The styling engine produces a tree data structure, called "styled tree".
 Different web browser implementations call it differentyl ("render tree", ...).
