@@ -41,7 +41,7 @@ ________________________________________________________________________________
 
 BSD License
 
-Copyright (c) 2017–20, Norbert Pillmayer
+Copyright (c) 2017–21, Norbert Pillmayer
 
 All rights reserved.
 
@@ -149,7 +149,7 @@ func BreakParagraph(cursor linebreak.Cursor, parshape linebreak.ParShape,
 func (lb *linebreaker) FindBreakpoints() ([]khipu.Mark, error) {
 	breakpoints := make([]khipu.Mark, 1, 10)
 	breakpoints[0] = provisionalMark(-1) // first break is before first knot item
-	lineno := 0
+	lineno := int32(0)
 	spaceUsed := &segment{}
 	firstInLine := true
 	knot := lb.next() // we will iterate of every knot item in the khipu
@@ -162,7 +162,7 @@ func (lb *linebreaker) FindBreakpoints() ([]khipu.Mark, error) {
 			penalty := lb.penalty()
 			spaceUsed.append(knot)
 			segm := spaceUsed.width(lb.params)
-			if penalty.Demerits() < linebreak.InfinityDemerits {
+			if linebreak.Merits(penalty.Demerits()) < linebreak.InfinityDemerits {
 				T().Debugf("penalty %v is acceptable", penalty.Demerits())
 				T().Debugf("segm=%v", segm)
 				if segm.Min > linelen { // overshoot
@@ -222,7 +222,7 @@ func (lb *linebreaker) penalty() khipu.Penalty {
 				break // found a -10000 previously, now skipping
 			} else {
 				p := knot.(khipu.Penalty)
-				if p.Demerits() <= linebreak.InfinityMerits { // -10000 must break (like in TeX)
+				if linebreak.Merits(p.Demerits()) <= linebreak.InfinityMerits { // -10000 must break (like in TeX)
 					penalty = p
 					ignore = true // skip all further penalties
 				} else if p.Demerits() > penalty.Demerits() {
@@ -234,7 +234,7 @@ func (lb *linebreaker) penalty() khipu.Penalty {
 			ok = false
 		}
 	}
-	p := khipu.Penalty(linebreak.CapDemerits(penalty.Demerits()))
+	p := khipu.Penalty(linebreak.CapDemerits(linebreak.Merits(penalty.Demerits())))
 	return p
 }
 
@@ -385,7 +385,7 @@ func (lb *linebreaker) backtrack() khipu.Knot {
 // provisionalMark is used just for prepending the breakspoints slice with a
 // break for the beginning of the paragraph.
 // We will use it with a position index of -1.
-type provisionalMark int // provisional mark from an integer position
+type provisionalMark int64 // provisional mark from an integer position
 
-func (m provisionalMark) Position() int    { return int(m) }
+func (m provisionalMark) Position() int64  { return int64(m) }
 func (m provisionalMark) Knot() khipu.Knot { return khipu.Penalty(-10000) }

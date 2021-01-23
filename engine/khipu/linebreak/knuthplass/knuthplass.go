@@ -143,26 +143,26 @@ func (h *activeFeasibleBreakpoints) next() *feasibleBreakpoint {
 // retain all of them. Different line-count paths usually will have different costs.
 // We will hold some bookkeeping information to reflect active segments.
 type feasibleBreakpoint struct {
-	mark  khipu.Mark           // location of this breakpoint
-	books map[int]*bookkeeping // bookkeeping per linecount
+	mark  khipu.Mark             // location of this breakpoint
+	books map[int32]*bookkeeping // bookkeeping per linecount
 }
 
 type bookkeeping struct {
-	segment      linebreak.WSS // sum of widths from this breakpoint up to current knot
-	totalcost    int32         // sum of costs for segment up to this breakpoint
-	startDiscard linebreak.WSS // sum of discardable space at start of segment / line
-	breakDiscard linebreak.WSS // sum of discardable space while lookinf for next breakpoint
-	hasContent   bool          // does this segment contain non-discardable item?
+	segment      linebreak.WSS    // sum of widths from this breakpoint up to current knot
+	totalcost    linebreak.Merits // sum of costs for segment up to this breakpoint
+	startDiscard linebreak.WSS    // sum of discardable space at start of segment / line
+	breakDiscard linebreak.WSS    // sum of discardable space while lookinf for next breakpoint
+	hasContent   bool             // does this segment contain non-discardable item?
 }
 
 type cost struct {
-	badness  int32 // 0 <= b <= 10000
-	demerits int32 // -10000 <= d <= 10000
+	badness  linebreak.Merits // 0 <= b <= 10000
+	demerits linebreak.Merits // -10000 <= d <= 10000
 }
 
-type provisionalMark int // provisional mark from an integer position
+type provisionalMark int64 // provisional mark from an integer position
 
-func (m provisionalMark) Position() int    { return int(m) }
+func (m provisionalMark) Position() int64  { return int64(m) }
 func (m provisionalMark) Knot() khipu.Knot { return khipu.Penalty(-10000) }
 
 func (fb *feasibleBreakpoint) String() string {
@@ -179,12 +179,12 @@ func (fb *feasibleBreakpoint) String() string {
 	return b.String()
 }
 
-func (fb *feasibleBreakpoint) UpdateSegment(linecnt int, diff linebreak.WSS) {
+func (fb *feasibleBreakpoint) UpdateSegment(linecnt int32, diff linebreak.WSS) {
 	if fb.books == nil {
-		fb.books = make(map[int]*bookkeeping)
+		fb.books = make(map[int32]*bookkeeping)
 	}
 	segment := linebreak.WSS{}
-	total := int32(0)
+	total := linebreak.Merits(0)
 	book, ok := fb.books[linecnt]
 	if ok {
 		segment = book.segment
@@ -217,7 +217,7 @@ func (fb *feasibleBreakpoint) UpdateSegmentBookkeeping(mark khipu.Mark) {
 	}
 }
 
-func (fb *feasibleBreakpoint) Book(linecnt int) *bookkeeping {
+func (fb *feasibleBreakpoint) Book(linecnt int32) *bookkeeping {
 	b, ok := fb.books[linecnt]
 	if !ok {
 		fb.books[linecnt] = &bookkeeping{}
@@ -229,7 +229,7 @@ func (fb *feasibleBreakpoint) Book(linecnt int) *bookkeeping {
 func (kp *linebreaker) newBreakpointAtMark(mark khipu.Mark) *feasibleBreakpoint {
 	fb := &feasibleBreakpoint{
 		mark:  mark,
-		books: make(map[int]*bookkeeping),
+		books: make(map[int32]*bookkeeping),
 	}
 	kp.Add(fb)
 	return fb
@@ -242,7 +242,7 @@ func (kp *linebreaker) findBreakpointAtMark(mark khipu.Mark) *feasibleBreakpoint
 	return kp.Breakpoint(mark.Position()) // may be nil
 }
 
-func (kp *linebreaker) findPredecessorsWithLinecount(fb *feasibleBreakpoint, linecnt int) []*feasibleBreakpoint {
+func (kp *linebreaker) findPredecessorsWithLinecount(fb *feasibleBreakpoint, linecnt int32) []*feasibleBreakpoint {
 	var predecessors []*feasibleBreakpoint
 	edges := kp.EdgesTo(fb).WithLabel(linecnt)
 	for _, edge := range edges {
@@ -269,8 +269,8 @@ func (kp *linebreaker) findPredecessorsWithLinecount(fb *feasibleBreakpoint, lin
 // any existing segments (for the same line-count). If its cost is cheaper
 // than the exising one, the new segment replaces the old one
 // (just one segment between the two breakpoints can exist with pruning).
-func (kp *linebreaker) newFeasibleLine(fb *feasibleBreakpoint, mark khipu.Mark, cost int32,
-	linecnt int) *feasibleBreakpoint {
+func (kp *linebreaker) newFeasibleLine(fb *feasibleBreakpoint, mark khipu.Mark,
+	cost linebreak.Merits, linecnt int32) *feasibleBreakpoint {
 	//
 	newfb := kp.findBreakpointAtMark(mark)
 	if newfb == nil { // breakpoint not yet existent => create one
@@ -291,8 +291,8 @@ func (kp *linebreaker) newFeasibleLine(fb *feasibleBreakpoint, mark khipu.Mark, 
 // isCheapestSurvivor calculates the total cost for a new segment, and compares it
 // to all existing segments. If the new segment would be cheaper,
 // the others will die.
-func (kp *linebreaker) isCheapestSurvivor(fb *feasibleBreakpoint, totalcost int32,
-	linecnt int) bool {
+func (kp *linebreaker) isCheapestSurvivor(fb *feasibleBreakpoint, totalcost linebreak.Merits,
+	linecnt int32) bool {
 	//
 	var predecessor *feasibleBreakpoint          // predecessor breakpoint position
 	mintotal := linebreak.InfinityDemerits * 100 // pre-set to hyper-infinity
@@ -334,10 +334,10 @@ func (kp *linebreaker) isCheapestSurvivor(fb *feasibleBreakpoint, totalcost int3
 // infeasible (demerits >= infinity) or having a positive (demerits) or negative
 // (merits) cost/benefit.
 func (fb *feasibleBreakpoint) calculateCostsTo(penalty khipu.Penalty, parshape linebreak.ParShape,
-	params *linebreak.Parameters) (map[int]cost, bool) {
+	params *linebreak.Parameters) (map[int32]cost, bool) {
 	//
 	T().Debugf("### calculateCostsTo(%v)", penalty)
-	var costs = make(map[int]cost) // linecount => cost, i.e. costs for different line targets
+	var costs = make(map[int32]cost) // linecount => cost, i.e. costs for different line targets
 	cannotReachIt := 0
 	for linecnt := range fb.books {
 		T().Debugf(" ## checking cost at linecnt=%d", linecnt)
@@ -386,7 +386,7 @@ func (fb *feasibleBreakpoint) calculateCostsTo(penalty khipu.Penalty, parshape l
 // items at the start of the segment and at the end (= possible breakpoint).
 //
 // TODO This is the location to use params.LeftSkip & RightSkip
-func (fb *feasibleBreakpoint) segmentWidth(linecnt int, params *linebreak.Parameters) linebreak.WSS {
+func (fb *feasibleBreakpoint) segmentWidth(linecnt int32, params *linebreak.Parameters) linebreak.WSS {
 	segw := fb.books[linecnt].segment
 	segw = segw.Subtract(fb.books[linecnt].startDiscard)
 	segw = segw.Subtract(fb.books[linecnt].breakDiscard)
@@ -399,16 +399,16 @@ func (fb *feasibleBreakpoint) segmentWidth(linecnt int, params *linebreak.Parame
 
 // Currently we try to replicated logic of TeX.
 func calculateDemerits(segwss linebreak.WSS, stretch dimen.Dimen, penalty khipu.Penalty,
-	params *linebreak.Parameters) (d int32, b int32) {
+	params *linebreak.Parameters) (d linebreak.Merits, b linebreak.Merits) {
 	//
-	p := linebreak.CapDemerits(penalty.Demerits())
+	p := linebreak.CapDemerits(linebreak.Merits(penalty.Demerits()))
 	//p2 := p * p
 	p2 := abs(p) // seems to work better for now; related to segmenter behaviour
 	s, m := float64(stretch), float64(absD(segwss.Max-segwss.W))
-	m = maxF(1.0, m)                          // avoid division by 0
-	sm := minF(10000.0, s/m*s/m)              // avoid huge intermediate numbers
-	sm = sm * s / m                           // in total: sm = (s/m)^3
-	badness := int32(minF(sm, 100.0) * 100.0) // TeX's formula for badness
+	m = maxF(1.0, m)                                     // avoid division by 0
+	sm := minF(10000.0, s/m*s/m)                         // avoid huge intermediate numbers
+	sm = sm * s / m                                      // in total: sm = (s/m)^3
+	badness := linebreak.Merits(minF(sm, 100.0) * 100.0) // TeX's formula for badness
 	// T().Debugf("sm=%.3f", sm)
 	// T().Debugf("s=%.3f, m=%.3f, b=%d", s, m, badness)
 	b = (params.LinePenalty + badness)
@@ -425,7 +425,7 @@ func calculateDemerits(segwss linebreak.WSS, stretch dimen.Dimen, penalty khipu.
 	return d, badness
 }
 
-func demeritsString(d int32) string {
+func demeritsString(d linebreak.Merits) string {
 	if d >= linebreak.InfinityDemerits {
 		return "\u221e"
 	} else if d <= linebreak.InfinityMerits {
@@ -457,7 +457,7 @@ func penaltyAt(cursor linebreak.Cursor) (khipu.Penalty, khipu.Mark) {
 				break // just skip over adjacent penalties
 			}
 			p := knot.(khipu.Penalty)
-			if p.Demerits() <= linebreak.InfinityMerits { // -10000 must break (like in TeX)
+			if linebreak.Merits(p.Demerits()) <= linebreak.InfinityMerits { // -10000 must break (like in TeX)
 				penalty = p
 				ignore = true
 			} else if p.Demerits() > penalty.Demerits() {
@@ -468,7 +468,7 @@ func penaltyAt(cursor linebreak.Cursor) (khipu.Penalty, khipu.Mark) {
 			ok = false
 		}
 	}
-	p := khipu.Penalty(linebreak.CapDemerits(penalty.Demerits()))
+	p := khipu.Penalty(linebreak.CapDemerits(linebreak.Merits(penalty.Demerits())))
 	return p, cursor.Mark()
 }
 
@@ -511,7 +511,7 @@ func BreakParagraph(cursor linebreak.Cursor, parshape linebreak.ParShape,
 //
 // For a more convenient API, see BreakParagraph.
 func FindBreakpoints(cursor linebreak.Cursor, parshape linebreak.ParShape, params *linebreak.Parameters,
-	dotfile io.Writer) ([]int, map[int][]khipu.Mark, error) {
+	dotfile io.Writer) ([]int32, map[int32][]khipu.Mark, error) {
 	//
 	kp, err := setupLinebreaker(cursor, parshape, params)
 	if err != nil {
@@ -570,7 +570,7 @@ func (kp *linebreaker) constructBreakpointGraph(cursor linebreak.Cursor, parshap
 				costs, stillreachable := fb.calculateCostsTo(penalty, parshape, kp.params)
 				if stillreachable { // yes, position may have been reached in this iteration
 					for linecnt, cost := range costs { // check for every linecount alternative
-						if penalty.Demerits() <= linebreak.InfinityMerits { // forced break
+						if linebreak.Merits(penalty.Demerits()) <= linebreak.InfinityMerits { // forced break
 							if cost.badness > kp.params.Tolerance {
 								T().Infof("Underfull box at line %d, b=%d, d=%d", linecnt+1, cost.badness, cost.demerits)
 							}
@@ -614,10 +614,10 @@ func (kp *linebreaker) constructBreakpointGraph(cursor linebreak.Cursor, parshap
 
 // Collecting breakpoints, backwards from last
 func (kp *linebreaker) collectFeasibleBreakpoints(last *feasibleBreakpoint) (
-	[]int, map[int][]khipu.Mark) {
-	breakpoints := make(map[int][]khipu.Mark)       // list of breakpoints per linecount-variant
-	costDict := make(map[int]int32)                 // list of total-costs per linecount-variant
-	lineVariants := make([]int, 0, len(last.books)) // will become sorted list of linecount-variants
+	[]int32, map[int32][]khipu.Mark) {
+	breakpoints := make(map[int32][]khipu.Mark)       // list of breakpoints per linecount-variant
+	costDict := make(map[int32]linebreak.Merits)      // list of total-costs per linecount-variant
+	lineVariants := make([]int32, 0, len(last.books)) // will become sorted list of linecount-variants
 	for linecnt, book := range last.books {
 		costDict[linecnt] = book.totalcost
 		i := len(lineVariants)
@@ -664,7 +664,7 @@ func absD(n dimen.Dimen) dimen.Dimen {
 	return n
 }
 
-func abs(n int32) int32 {
+func abs(n linebreak.Merits) linebreak.Merits {
 	if n < 0 {
 		return -n
 	}
@@ -692,7 +692,7 @@ func maxF(n, m float64) float64 {
 	return m
 }
 
-func insert(s []int, i, n int) []int {
+func insert(s []int32, i int, n int32) []int32 {
 	s = append(s, 0)
 	copy(s[i+1:], s[i:])
 	s[i] = n

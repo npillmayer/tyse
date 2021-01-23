@@ -54,6 +54,15 @@ func collectText(n w3cdom.Node, b *cords.CordBuilder) {
 	}
 }
 
+// https://www.w3schools.com/cssref/pr_text_white-space.asp
+//
+// TODO soll whitespace entsprechend dem white-space property behandelt
+// werden und entsprechend im cord liegen ?
+// oder soll dies in späteren schritten passieren? Wie wird die Position
+// zugeordnet; z.B. im Vergleich zu bidi ?
+// Ich denke, der Rohtext muss erst mal erhalten bleiben und das WS-collapsing
+// findet während der Knotenknüpfung statt.
+
 // ---------------------------------------------------------------------------
 
 // Leaf is the leaf type created for cords from calls to html.InnerText(…).

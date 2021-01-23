@@ -49,17 +49,20 @@ func T() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
+type Merits int32
+type CharPos int64
+
 // ----------------------------------------------------------------------
 
 // Parameters is a collection of configuration parameters for line-breaking.
 type Parameters struct {
-	Tolerance            int32       // acceptable demerits
-	PreTolerance         int32       // acceptabale demerits for first (rough) pass
-	LinePenalty          int32       // penalty for an additional line
-	HyphenPenalty        int32       // penalty for hyphenating words
-	ExHyphenPenalty      int32       // penalty for explicit words
-	DoubleHyphenDemerits int32       // demerits for consecutive hyphens
-	FinalHyphenDemerits  int32       // demerits for hyphen in the last line
+	Tolerance            Merits      // acceptable demerits
+	PreTolerance         Merits      // acceptabale demerits for first (rough) pass
+	LinePenalty          Merits      // penalty for an additional line
+	HyphenPenalty        Merits      // penalty for hyphenating words
+	ExHyphenPenalty      Merits      // penalty for explicit words
+	DoubleHyphenDemerits Merits      // demerits for consecutive hyphens
+	FinalHyphenDemerits  Merits      // demerits for hyphen in the last line
 	EmergencyStretch     dimen.Dimen // stretching acceptable when desperate
 	LeftSkip             khipu.Glue  // glue at left edge of paragraphs
 	RightSkip            khipu.Glue  // glue at right edge of paragraphs
@@ -136,13 +139,13 @@ func (wss WSS) String() string {
 }
 
 // InfinityDemerits is the worst demerit value possible.
-const InfinityDemerits int32 = 10000
+const InfinityDemerits Merits = 10000
 
 // InfinityMerits is the best (most desirable) demerit value possible.
-const InfinityMerits int32 = -10000
+const InfinityMerits Merits = -10000
 
 // CapDemerits caps a demerit value at infinity.
-func CapDemerits(d int32) int32 {
+func CapDemerits(d Merits) Merits {
 	if d > InfinityDemerits {
 		d = InfinityDemerits
 	} else if d < InfinityMerits-1000 {
@@ -164,12 +167,12 @@ type Cursor interface {
 
 // ParShape is a type to return the line length for a given line number.
 type ParShape interface {
-	LineLength(int) dimen.Dimen
+	LineLength(int32) dimen.Dimen
 }
 
 type rectParShape dimen.Dimen
 
-func (r rectParShape) LineLength(int) dimen.Dimen {
+func (r rectParShape) LineLength(int32) dimen.Dimen {
 	return dimen.Dimen(r)
 }
 

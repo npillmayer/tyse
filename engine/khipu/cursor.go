@@ -11,16 +11,16 @@ var (
 
 // Mark is a type for a position within a khipu.
 type Mark interface {
-	Position() int
+	Position() int64
 	Knot() Knot
 }
 
 type mark struct {
-	pos  int
+	pos  int64
 	knot Knot
 }
 
-func (m mark) Position() int {
+func (m mark) Position() int64 {
 	return m.pos
 }
 
@@ -31,7 +31,7 @@ func (m mark) Knot() Knot {
 // A Cursor navigates over the knots of a khipu
 type Cursor struct {
 	khipu *Khipu
-	inx   int
+	inx   int64
 }
 
 // NewCursor creates a cursor for a given khipu.
@@ -45,7 +45,7 @@ func (c Cursor) String() string {
 }
 
 // Position returns the current position within the khipu as an integer.
-func (c *Cursor) Position() int {
+func (c *Cursor) Position() int64 {
 	return c.inx
 }
 
@@ -53,7 +53,7 @@ func (c *Cursor) Position() int {
 // Returns true if the cursor is still at a valid position, false otherwise.
 func (c *Cursor) Next() bool {
 	c.inx++
-	return c.inx < len(c.khipu.knots)
+	return c.inx < int64(len(c.khipu.knots))
 }
 
 // Prev moves the cursor one knot back.
@@ -73,7 +73,7 @@ func (c *Cursor) Knot() Knot {
 // Returns true if the lookahead is at a valid position, false otherwise.
 func (c *Cursor) Peek() (Knot, bool) {
 	if c.inx >= 0 {
-		if c.inx+1 < len(c.khipu.knots) {
+		if c.inx+1 < int64(len(c.khipu.knots)) {
 			k := c.khipu.knots[c.inx+1]
 			return k, true
 		}
@@ -103,7 +103,7 @@ func (c *Cursor) Khipu() *Khipu {
 // IsValidPosition returns true, if the cursor is located at a
 // a valid position, false otherwise.
 func (c Cursor) IsValidPosition() bool {
-	return c.inx >= 0 && c.inx < len(c.khipu.knots)
+	return c.inx >= 0 && c.inx < int64(len(c.khipu.knots))
 }
 
 // ReplaceKnot replaces the knot under the cursor, if any.

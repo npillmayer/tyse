@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/npillmayer/tyse/engine/khipu"
+	"github.com/npillmayer/tyse/engine/khipu/linebreak"
 )
 
 // Parameters for GraphViz drawing.
@@ -13,10 +14,10 @@ type graphParamsType struct {
 	Fontname string
 }
 
-func allBreakpointBoxes(kp *linebreaker, kh *khipu.Khipu, optimal map[int][]khipu.Mark,
-	boxT *template.Template, w io.Writer) map[int]*n {
+func allBreakpointBoxes(kp *linebreaker, kh *khipu.Khipu, optimal map[int32][]khipu.Mark,
+	boxT *template.Template, w io.Writer) map[int64]*n {
 	//
-	breakBoxes := make(map[int]*n)
+	breakBoxes := make(map[int64]*n)
 	for _, fb := range kp.nodes {
 		box := makeBox(fb, kh)
 		if ok, _ := isOptimal(fb.mark, optimal); ok {
@@ -30,7 +31,7 @@ func allBreakpointBoxes(kp *linebreaker, kh *khipu.Khipu, optimal map[int][]khip
 	return breakBoxes
 }
 
-func allEdges(kp *linebreaker, kh *khipu.Khipu, boxes map[int]*n, edgeT *template.Template,
+func allEdges(kp *linebreaker, kh *khipu.Khipu, boxes map[int64]*n, edgeT *template.Template,
 	w io.Writer) {
 	//
 	for _, edge := range kp.Edges(true) {
@@ -41,7 +42,7 @@ func allEdges(kp *linebreaker, kh *khipu.Khipu, boxes map[int]*n, edgeT *templat
 		e.Cost = edge.cost
 		e.Total = edge.total
 		e.Line = edge.linecount
-		start := 0
+		start := int64(0)
 		if edge.from >= 0 {
 			start = edge.from
 		}
@@ -52,7 +53,7 @@ func allEdges(kp *linebreaker, kh *khipu.Khipu, boxes map[int]*n, edgeT *templat
 	}
 }
 
-func isOptimal(mark khipu.Mark, results map[int][]khipu.Mark) (bool, int) {
+func isOptimal(mark khipu.Mark, results map[int32][]khipu.Mark) (bool, int32) {
 	for l, breaks := range results {
 		if contains(breaks, mark) {
 			return true, l
@@ -87,7 +88,7 @@ func makeBox(fb *feasibleBreakpoint, kh *khipu.Khipu) *n {
 	return box
 }
 
-func (kp *linebreaker) toGraphViz(cursor *khipu.Cursor, results map[int][]khipu.Mark,
+func (kp *linebreaker) toGraphViz(cursor *khipu.Cursor, results map[int32][]khipu.Mark,
 	w io.Writer) {
 	//
 	tmpl, _ := template.New("graph").Parse(graphHeader)
@@ -111,8 +112,8 @@ type n struct {
 
 type e struct {
 	N1, N2      *n
-	Cost, Total int32
-	Line        int
+	Cost, Total linebreak.Merits
+	Line        int32
 	Text        string
 	Color       string
 }
@@ -139,7 +140,7 @@ func getText(n *n) string {
 	}
 	cursor := khipu.NewCursor(n.khipu)
 	// walk cursor to mark
-	for i := 0; i <= n.Mark.Position(); i++ {
+	for i := int64(0); i <= n.Mark.Position(); i++ {
 		cursor.Next()
 	}
 	// walk back until a box is found

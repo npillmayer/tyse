@@ -69,7 +69,7 @@ func TestKPUnderfull(t *testing.T) {
 	t.Logf("%d linebreaking-variants for empty line found, error = %v", len(v), err)
 	for linecnt, breakpoints := range breaks {
 		t.Logf("# Paragraph with %d lines: %v", linecnt, breakpoints)
-		j := 0
+		j := int64(0)
 		for i := 1; i < len(v); i++ {
 			t.Logf(": %s", kh.Text(j, breakpoints[i].Position()))
 			j = breakpoints[i].Position()
@@ -92,7 +92,7 @@ func TestKPExactFit(t *testing.T) {
 	t.Logf("%d linebreaking-variants found, error = %v", len(v), err)
 	for linecnt, breakpoints := range breaks {
 		t.Logf("# Paragraph with %d lines: %v", linecnt, breakpoints)
-		j := 0
+		j := int64(0)
 		for i := 1; i < len(v); i++ {
 			t.Logf(": %s", kh.Text(j, breakpoints[i].Position()))
 			j = breakpoints[i].Position()
@@ -118,7 +118,7 @@ func TestKPOverfull(t *testing.T) {
 	t.Logf("%d linebreaking-variants found, error = %v", len(v), err)
 	for linecnt, breakpoints := range breaks {
 		t.Logf("# Paragraph with %d lines: %v", linecnt, breakpoints)
-		j := 0
+		j := int64(0)
 		for i := 1; i < len(v); i++ {
 			t.Logf(": %s", kh.Text(j, breakpoints[i].Position()))
 			j = breakpoints[i].Position()
@@ -147,7 +147,7 @@ func TestKPParaKing(t *testing.T) {
 	t.Logf("%d linebreaking-variants found, error = %v", len(v), err)
 	for linecnt, breakpoints := range breaks {
 		t.Logf("# Paragraph with %d lines: %v", linecnt, breakpoints)
-		j := 0
+		j := int64(0)
 		for i := 1; i < len(v); i++ {
 			t.Logf(": %s", kh.Text(j, breakpoints[i].Position()))
 			j = breakpoints[i].Position()
@@ -175,7 +175,7 @@ func TestKPParaPrincess(t *testing.T) {
 	//t.Logf("%d linebreaking-variants found, error = %v", len(v), err)
 	t.Logf("# Paragraph with %d lines: %v", len(breakpoints)-1, breakpoints)
 	t.Logf("    |---------+---------+---------+---------+-----|")
-	j := 0
+	j := int64(0)
 	for i := 1; i < len(breakpoints); i++ {
 		//	t.Logf("%3d: %s", i, kh.Text(j, breakpoints[i].Position()))
 		text := kh.Text(j, breakpoints[i].Position())

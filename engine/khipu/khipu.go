@@ -353,8 +353,8 @@ func NewKhipu() *Khipu {
 }
 
 // Length gives the number of knots in the list.
-func (kh *Khipu) Length() int {
-	return len(kh.knots)
+func (kh *Khipu) Length() int64 {
+	return int64(len(kh.knots))
 }
 
 // AppendKnot appends a knot at the end of the list.
@@ -373,8 +373,8 @@ func (kh *Khipu) AppendKhipu(k *Khipu) *Khipu {
 // index for the khipu, nothing is done.
 //
 // Returns the current knot at position inx.
-func (kh *Khipu) ReplaceKnot(inx int, knot Knot) Knot {
-	if inx >= 0 && inx < len(kh.knots) {
+func (kh *Khipu) ReplaceKnot(inx int64, knot Knot) Knot {
+	if inx >= 0 && inx < int64(len(kh.knots)) {
 		k := kh.knots[inx]
 		kh.knots[inx] = knot
 		return k
@@ -385,9 +385,9 @@ func (kh *Khipu) ReplaceKnot(inx int, knot Knot) Knot {
 // Measure returns the widths of a subset of this knot list. The subset runs from
 // index [from ... to-1]. The method returns natural, maximum and minimum
 // width.
-func (kh *Khipu) Measure(from, to int) (dimen.Dimen, dimen.Dimen, dimen.Dimen) {
+func (kh *Khipu) Measure(from, to int64) (dimen.Dimen, dimen.Dimen, dimen.Dimen) {
 	var w, max, min dimen.Dimen
-	to = iMax(to, len(kh.knots))
+	to = iMax(to, int64(len(kh.knots)))
 	for i := from; i < to; i++ {
 		knot := kh.knots[i]
 		w += knot.W()
@@ -421,8 +421,8 @@ func (kh *Khipu) Reach(start int, distance dimen.Dimen) (int, int) {
 }
 
 // MaxWidth finds the maximum width of the knots in the range [from ... to-1].
-func (kh *Khipu) MaxWidth(from, to int) dimen.Dimen {
-	to = iMax(to, len(kh.knots))
+func (kh *Khipu) MaxWidth(from, to int64) dimen.Dimen {
+	to = iMax(to, int64(len(kh.knots)))
 	var w dimen.Dimen
 	for i := from; i < to; i++ {
 		knot := kh.knots[i]
@@ -436,8 +436,8 @@ func (kh *Khipu) MaxWidth(from, to int) dimen.Dimen {
 // MaxHeightAndDepth finds the maximum height and depth of the knots in the range
 // [from ... to-1].
 // Only knots of type TextBox are considered.
-func (kh *Khipu) MaxHeightAndDepth(from, to int) (dimen.Dimen, dimen.Dimen) {
-	to = iMax(from, iMin(to, len(kh.knots)))
+func (kh *Khipu) MaxHeightAndDepth(from, to int64) (dimen.Dimen, dimen.Dimen) {
+	to = iMax(from, iMin(to, int64(len(kh.knots))))
 	var h, d dimen.Dimen
 	for i := from; i < to; i++ {
 		if knot, ok := kh.knots[i].(*TextBox); ok {
@@ -453,9 +453,9 @@ func (kh *Khipu) MaxHeightAndDepth(from, to int) (dimen.Dimen, dimen.Dimen) {
 }
 
 // Text returns the text contents of a khipu segment.
-func (kh *Khipu) Text(from, to int) string {
+func (kh *Khipu) Text(from, to int64) string {
 	var b bytes.Buffer
-	to = iMax(from, iMin(to, len(kh.knots)))
+	to = iMax(from, iMin(to, int64(len(kh.knots))))
 	spacecnt := 0
 	for i := from; i < to; i++ {
 		knot := kh.knots[i]
@@ -502,14 +502,14 @@ func (kh *Khipu) String() string {
 
 // ----------------------------------------------------------------------
 
-func iMin(x, y int) int {
+func iMin(x, y int64) int64 {
 	if x < y {
 		return x
 	}
 	return y
 }
 
-func iMax(x, y int) int {
+func iMax(x, y int64) int64 {
 	if x > y {
 		return x
 	}

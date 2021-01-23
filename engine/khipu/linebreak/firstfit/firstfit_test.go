@@ -72,7 +72,7 @@ func TestLinebreak(t *testing.T) {
 	}
 	t.Logf("# Paragraph with %d lines: %v", len(breakpoints)-1, breakpoints)
 	t.Logf("    |---------+---------+---------+|")
-	j := 0
+	j := int64(0)
 	for i := 1; i < len(breakpoints); i++ {
 		//	t.Logf("%3d: %s", i, kh.Text(j, breakpoints[i].Position()))
 		text := kh.Text(j, breakpoints[i].Position())
@@ -99,7 +99,7 @@ func TestPrincess(t *testing.T) {
 	}
 	t.Logf("# Paragraph with %d lines: %v", len(breakpoints)-1, breakpoints)
 	t.Logf("     |---------+---------+---------+---------+-----|")
-	j := 0
+	j := int64(0)
 	for i := 1; i < len(breakpoints); i++ {
 		//	t.Logf("%3d: %s", i, kh.Text(j, breakpoints[i].Position()))
 		text := kh.Text(j, breakpoints[i].Position())

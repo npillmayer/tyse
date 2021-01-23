@@ -55,7 +55,7 @@ import (
 // Its implementation is inspired by the great Gonum packages. However, Gonum
 // is in some respects too restrictive and in others too much of an overkill
 // for our needs. Moreover, it panics in certain error conditions.
-// We taylor it heavily to fit our specific needs.
+// We taylor its concepts heavily to fit our specific needs.
 //
 // A node in the graph refers to a numeric position within an input text.
 // The text is represented by a khipu (see package khipu), which is something
@@ -72,27 +72,27 @@ import (
 // (cost, linecount). A breakpoint may be reached by more than one edge
 // if either cost or linecount differ.
 type fbGraph struct {
-	nodes map[int]*feasibleBreakpoint
+	nodes map[int64]*feasibleBreakpoint
 	//from    map[int]map[int][]wEdge
-	edgesTo     map[int]map[int]map[int]wEdge // edge to, from, with linecount
-	prunedEdges map[int]map[int]map[int]wEdge // we conserve deleted edges
+	edgesTo     map[int64]map[int64]map[int32]wEdge // edge to, from, with linecount
+	prunedEdges map[int64]map[int64]map[int32]wEdge // we conserve deleted edges
 }
 
 // newFBGraph returns a fbGraph with the specified self and absent
 // edge weight values.
 func newFBGraph() *fbGraph {
 	return &fbGraph{
-		nodes:       make(map[int]*feasibleBreakpoint),
-		edgesTo:     make(map[int]map[int]map[int]wEdge),
-		prunedEdges: make(map[int]map[int]map[int]wEdge),
+		nodes:       make(map[int64]*feasibleBreakpoint),
+		edgesTo:     make(map[int64]map[int64]map[int32]wEdge),
+		prunedEdges: make(map[int64]map[int64]map[int32]wEdge),
 	}
 }
 
 type wEdge struct {
-	from, to  int // this is an edge between two text-positions
-	cost      int32
-	total     int32
-	linecount int
+	from, to  int64 // this is an edge between two text-positions
+	cost      linebreak.Merits
+	total     linebreak.Merits
+	linecount int32
 }
 
 // nullEdge denotes an edge that is not present in a graph.
@@ -106,7 +106,7 @@ func (e wEdge) isNull() bool {
 // newWEdge returns a new weighted edge from one breakpoint to another,
 // given two breakpoints and a label-key.
 // It is not yet inserted into a graph.
-func newWEdge(from, to *feasibleBreakpoint, cost int32, total int32, linecnt int) wEdge {
+func newWEdge(from, to *feasibleBreakpoint, cost, total linebreak.Merits, linecnt int32) wEdge {
 	if from.books[linecnt-1] == nil {
 		panic(fmt.Errorf("startpoint of new line %d seems to have incorrent books: %v", linecnt, from))
 	}
@@ -136,7 +136,7 @@ func (g *fbGraph) Add(fb *feasibleBreakpoint) error {
 // Edge returns the edge (from,to), if such an edge exists,
 // otherwise it returns nullEdge.
 // The to-node must be directly reachable from the from-node.
-func (g *fbGraph) Edge(from, to *feasibleBreakpoint, linecnt int) wEdge {
+func (g *fbGraph) Edge(from, to *feasibleBreakpoint, linecnt int32) wEdge {
 	edges, ok := g.edgesTo[to.mark.Position()][from.mark.Position()]
 	if !ok {
 		return nullEdge
@@ -182,7 +182,7 @@ func (g *fbGraph) Edges(includePruned bool) []wEdge {
 
 // Breakpoint returns the feasible breakpoint at the given position if it exists in the graph,
 // and nil otherwise.
-func (g *fbGraph) Breakpoint(position int) *feasibleBreakpoint {
+func (g *fbGraph) Breakpoint(position int64) *feasibleBreakpoint {
 	return g.nodes[position]
 }
 
@@ -191,7 +191,7 @@ func (g *fbGraph) Breakpoint(position int) *feasibleBreakpoint {
 // If the edge does not exist, this is a no-op.
 //
 // Deleted edges are conserved and may be collected with g.Edges(true).
-func (g *fbGraph) RemoveEdge(from, to *feasibleBreakpoint, linecnt int) {
+func (g *fbGraph) RemoveEdge(from, to *feasibleBreakpoint, linecnt int32) {
 	if _, ok := g.nodes[from.mark.Position()]; !ok {
 		return
 	}
@@ -204,13 +204,13 @@ func (g *fbGraph) RemoveEdge(from, to *feasibleBreakpoint, linecnt int) {
 				if t, ok := g.prunedEdges[to.mark.Position()]; ok { // 'to' dict exists
 					edges := t[from.mark.Position()]
 					if edges == nil {
-						edges = make(map[int]wEdge)
+						edges = make(map[int32]wEdge)
 						t[from.mark.Position()] = edges
 					}
 					edges[linecnt] = e
 				} else {
-					edges := map[int]wEdge{linecnt: e}
-					g.prunedEdges[to.mark.Position()] = map[int]map[int]wEdge{from.mark.Position(): edges}
+					edges := map[int32]wEdge{linecnt: e}
+					g.prunedEdges[to.mark.Position()] = map[int64]map[int32]wEdge{from.mark.Position(): edges}
 					//g.prunedEdges[to.mark.Position()][from.mark.Position()][linecnt] = e
 				}
 			}
@@ -225,7 +225,7 @@ func (g *fbGraph) RemoveEdge(from, to *feasibleBreakpoint, linecnt int) {
 // AddEdge adds a weighted edge from one node to another. Endpoints which are
 // not yet contained in the graph are added.
 // Does nothing if from=to.
-func (g *fbGraph) AddEdge(from, to *feasibleBreakpoint, cost int32, total int32, linecnt int) {
+func (g *fbGraph) AddEdge(from, to *feasibleBreakpoint, cost, total linebreak.Merits, linecnt int32) {
 	if from.mark.Position() == to.mark.Position() {
 		return
 	}
@@ -237,13 +237,13 @@ func (g *fbGraph) AddEdge(from, to *feasibleBreakpoint, cost int32, total int32,
 		if t, ok := g.edgesTo[to.mark.Position()]; ok {
 			edges := t[from.mark.Position()]
 			if edges == nil {
-				edges = make(map[int]wEdge)
+				edges = make(map[int32]wEdge)
 				t[from.mark.Position()] = edges
 			}
 			edges[linecnt] = edge
 		} else {
-			edges := map[int]wEdge{linecnt: edge}
-			g.edgesTo[to.mark.Position()] = map[int]map[int]wEdge{from.mark.Position(): edges}
+			edges := map[int32]wEdge{linecnt: edge}
+			g.edgesTo[to.mark.Position()] = map[int64]map[int32]wEdge{from.mark.Position(): edges}
 		}
 	}
 }
@@ -259,10 +259,10 @@ func (g *fbGraph) EdgesTo(fb *feasibleBreakpoint) edgesDict {
 
 type edgesDict struct {
 	g         *fbGraph
-	edgesFrom map[int]map[int]wEdge
+	edgesFrom map[int64]map[int32]wEdge
 }
 
-func (dict edgesDict) SelectFrom(fb *feasibleBreakpoint, linecnt int) wEdge {
+func (dict edgesDict) SelectFrom(fb *feasibleBreakpoint, linecnt int32) wEdge {
 	if edges, ok := dict.edgesFrom[fb.mark.Position()]; ok {
 		if edge, ok := edges[linecnt]; ok {
 			return edge
@@ -271,7 +271,7 @@ func (dict edgesDict) SelectFrom(fb *feasibleBreakpoint, linecnt int) wEdge {
 	return nullEdge
 }
 
-func (dict edgesDict) WithLabel(linecnt int) []wEdge {
+func (dict edgesDict) WithLabel(linecnt int32) []wEdge {
 	var r []wEdge
 	for _, edges := range dict.edgesFrom {
 		if edge, ok := edges[linecnt]; ok {
@@ -321,7 +321,7 @@ func (s breakpointSorter) Swap(i, j int) {
 // If from and to are the same node or if there is no edge (from,to),
 // a pseudo-label with infinite cost is returned.
 // Cost returns true if an edge (from,to) exists, false otherwise.
-func (g *fbGraph) Cost(from, to *feasibleBreakpoint, linecnt int) (int32, bool) {
+func (g *fbGraph) Cost(from, to *feasibleBreakpoint, linecnt int32) (linebreak.Merits, bool) {
 	if from == to {
 		return linebreak.InfinityDemerits, false
 	}
