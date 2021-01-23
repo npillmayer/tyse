@@ -39,7 +39,7 @@ func setupKPTest(t *testing.T, paragraph string, hyphens bool) (*khipu.Khipu, li
 	} else {
 		regs.Push(parameters.P_MINHYPHENLENGTH, 100) // inhibit hyphenation
 	}
-	kh := khipu.KnotEncode(strings.NewReader(paragraph), nil, regs)
+	kh := khipu.KnotEncode(strings.NewReader(paragraph), 0, nil, regs)
 	if kh == nil {
 		t.Errorf("no Khipu to test; input is %s", paragraph)
 	}

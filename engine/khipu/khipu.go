@@ -237,17 +237,17 @@ func (d Discretionary) IsDiscardable() bool {
 
 // A TextBox is a fixed unit of text
 type TextBox struct {
-	Width  dimen.Dimen // width
-	Height dimen.Dimen // height
-	Depth  dimen.Dimen // depth
-	text   string      // text, if available
+	Width    dimen.Dimen // width
+	Height   dimen.Dimen // height
+	Depth    dimen.Dimen // depth
+	Position uint64      // start position in text
+	text     string      // text, if available
 	//knotlist Khipu // content, if available
 }
 
 // NewTextBox creates a text box.
-func NewTextBox(s string) *TextBox {
-	box := &TextBox{}
-	box.text = s
+func NewTextBox(s string, textpos uint64) *TextBox {
+	box := &TextBox{Position: textpos, text: s}
 	return box
 }
 

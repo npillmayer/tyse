@@ -62,18 +62,21 @@ type TypesettingPipeline struct {
 }
 
 // KnotEncode transforms an input text into a khipu.
-func KnotEncode(text io.Reader, pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+func KnotEncode(text io.Reader, startpos uint64, pipeline *TypesettingPipeline,
+	regs *params.TypesettingRegisters) *Khipu {
+	//
 	if regs == nil {
 		regs = params.NewTypesettingRegisters()
 	}
 	pipeline = PrepareTypesettingPipeline(text, pipeline)
+	textpos := startpos
 	khipu := NewKhipu()
 	seg := pipeline.segmenter
 	for seg.Next() {
 		fragment := seg.Text()
 		p := penlty(seg.Penalties())
 		CT().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
-		k := createPartialKhipuFromSegment(seg, pipeline, regs)
+		k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
 		if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
 			HyphenateTextBoxes(k, pipeline, regs)
 		}
@@ -91,7 +94,7 @@ func KnotEncode(text io.Reader, pipeline *TypesettingPipeline, regs *params.Type
 // arguments is invalid.
 //
 // Returns a khipu consisting of text-boxes, glues and penalties.
-func createPartialKhipuFromSegment(seg *segment.Segmenter, pipeline *TypesettingPipeline,
+func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipeline *TypesettingPipeline,
 	regs *params.TypesettingRegisters) *Khipu {
 	//
 	khipu := NewKhipu()
@@ -104,12 +107,12 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, pipeline *Typesetting
 				g := spaceglue(regs)
 				khipu.AppendKnot(g).AppendKnot(Penalty(p.p2))
 			} else {
-				b := NewTextBox(seg.Text())
+				b := NewTextBox(seg.Text(), textpos)
 				khipu.AppendKnot(b).AppendKnot(Penalty(dimen.Infty))
 			}
 		} else { // identified as a possible line break, but no space
 			// insert explicit discretionary '\-' penalty
-			b := NewTextBox(seg.Text())
+			b := NewTextBox(seg.Text(), textpos)
 			pen := Penalty(regs.N(params.P_HYPHENPENALTY))
 			khipu.AppendKnot(b).AppendKnot(pen)
 		}
@@ -124,7 +127,7 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, pipeline *Typesetting
 		} else {
 			CT().Errorf("BROKEN BY SECONDARY BREAKER: TEXT_BOX")
 			// close a text box which is not a possible line wrap position
-			b := NewTextBox(seg.Text())
+			b := NewTextBox(seg.Text(), textpos)
 			pen := Penalty(dimen.Infty)
 			khipu.AppendKnot(b).AppendKnot(pen)
 		}
@@ -151,7 +154,9 @@ func HyphenateTextBoxes(khipu *Khipu, pipeline *TypesettingPipeline,
 			continue
 		}
 		CT().Debugf("knot = %v | %v", iterator.Knot(), iterator.Knot())
-		text := iterator.AsTextBox().text
+		textbox := iterator.AsTextBox()
+		textpos := textbox.Position
+		text := textbox.text
 		pipeline.words.Init(strings.NewReader(text))
 		for pipeline.words.Next() {
 			word := pipeline.words.Text()
@@ -161,20 +166,23 @@ func HyphenateTextBoxes(khipu *Khipu, pipeline *TypesettingPipeline,
 			if len(word) >= regs.N(params.P_MINHYPHENLENGTH) {
 				if syllables, isHyphenated = HyphenateWord(word, regs); isHyphenated {
 					hyphen := NewKnot(KTDiscretionary)
+					pos := textpos
 					for _, sy := range syllables[:len(syllables)-1] {
-						k = append(k, NewTextBox(sy))
+						k = append(k, NewTextBox(sy, pos))
 						k = append(k, hyphen)
+						pos += uint64(len(sy))
 					}
-					k = append(k, NewTextBox(syllables[len(syllables)-1]))
+					k = append(k, NewTextBox(syllables[len(syllables)-1], pos))
 				}
 			}
 			if !isHyphenated {
 				if word == text {
 					k = append(k, iterator.Knot())
 				} else {
-					k = append(k, NewTextBox(word))
+					k = append(k, NewTextBox(word, textpos))
 				}
 			}
+			textpos += uint64(len(word))
 		}
 	}
 	khipu.knots = k
