@@ -6,5 +6,6 @@
 *.dot
 *.pdf
 *.code-workspace
+*.swp
 generator
 engine/frame/lines/experiments/experiments
