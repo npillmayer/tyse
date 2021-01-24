@@ -42,9 +42,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/locate"
 	params "github.com/npillmayer/tyse/core/parameters"
+	"github.com/npillmayer/tyse/engine/text"
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax14"
@@ -59,6 +61,11 @@ type TypesettingPipeline struct {
 	wordbreaker *uax29.WordBreaker
 	segmenter   *segment.Segmenter
 	words       *segment.Segmenter
+}
+
+func EncodeParagraph(text styled.Text, startpos uint64, shaper *text.Shaper, pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+	//
+	return nil
 }
 
 // KnotEncode transforms an input text into a khipu.

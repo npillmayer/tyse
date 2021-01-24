@@ -1,4 +1,4 @@
-package lines
+package styled
 
 import (
 	"fmt"
@@ -11,14 +11,14 @@ import (
 
 	"github.com/npillmayer/cords"
 	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
 	"golang.org/x/net/html"
 )
 
-var dot bool = false
+var dot bool = true
 
 var myhtml = `
 	<!DOCTYPE html>
@@ -31,14 +31,13 @@ var myhtml = `
 `
 
 func TestDOMSimple(t *testing.T) {
-	//gtrace.EngineTracer = gologadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelInfo)
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	domroot := buildDOM(myhtml, t)
 	if domroot == nil {
-		t.Errorf("DOM root is nil")
+		t.Fatalf("DOM root is nil")
 	}
 	//
 	if dot {
@@ -48,7 +47,7 @@ func TestDOMSimple(t *testing.T) {
 	//
 	text, err := InnerText(domroot)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
 	if text.IsVoid() {
 		t.Fatalf("expected text to be non-nil")
@@ -56,11 +55,29 @@ func TestDOMSimple(t *testing.T) {
 	if dot {
 		cordsdotty(text, t)
 	}
-	text.EachLeaf(func(leaf cords.Leaf) error {
+	text.EachLeaf(func(leaf cords.Leaf, pos uint64) error {
 		l := leaf.(*Leaf)
 		t.Logf("leaf = %v", l.dbgString())
 		return nil
 	})
+}
+
+func TestParaCreate(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	domroot := buildDOM(myhtml, t)
+	para, err := ParaFromNode(domroot)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if para.Text.Raw().IsVoid() {
+		t.Errorf("inner text of para is void, should not be")
+	}
+	f := cordsdotty(cords.Cord(para.Text.Styles()), t)
+	defer f.Close()
+	//t.Fail()
 }
 
 // ---------------------------------------------------------------------------
