@@ -6,13 +6,13 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/aymerick/douceur/parser"
+	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/logrusadapter"
 	"github.com/npillmayer/tyse/engine/dom/cssom"
 	"github.com/npillmayer/tyse/engine/dom/cssom/douceuradapter"
 	"github.com/npillmayer/tyse/engine/dom/cssom/style"
 	"github.com/npillmayer/tyse/engine/dom/styledtree"
-	"github.com/npillmayer/tyse/engine/dom/styledtree/builder"
 	"github.com/npillmayer/tyse/engine/dom/styledtree/xpathadapter"
 	"github.com/npillmayer/tyse/engine/dom/xpath"
 	"github.com/npillmayer/tyse/engine/tree"
@@ -30,9 +30,9 @@ const (
 )
 
 func Test0(t *testing.T) {
-	tracing.EngineTracer = logrusadapter.New()
-	tracing.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-	T = tracing.EngineTracer
+	gtrace.EngineTracer = logrusadapter.New()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	T = gtrace.EngineTracer
 }
 
 func Test1(t *testing.T) {
@@ -74,13 +74,13 @@ func setupTest(htmlStr string, cssStr string) (*goquery.Document, *styledtree.St
 	css := getTestCSS(cssStr)
 	styler := cssom.NewCSSOM(nil)
 	styler.AddStylesForScope(nil, css, cssom.Author)
-	styledTree, err := styler.Style(dom, builder.Builder{})
+	styledTree, err := styler.Style(dom, styledtree.Creator())
 	if err != nil {
 		T.Errorf("error: %s", err)
 		return nil, nil
 	}
 	doc := goquery.NewDocumentFromNode(dom)
-	return doc, styledTree.(*styledtree.StyNode)
+	return doc, styledtree.Node(styledTree)
 }
 
 func findNodesFor(xpstr string, doc *goquery.Document, tree *tree.Node) []*tree.Node {

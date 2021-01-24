@@ -112,7 +112,7 @@ func (c creator) SetStyles(n *tree.Node, m *style.PropertyMap) {
 // ----------------------------------------------------------------------
 
 // HTMLNode gets the HTML DOM node corresponding to this styled node.
-func (sn StyNode) HTMLNode() *html.Node {
+func (sn *StyNode) HTMLNode() *html.Node {
 	return sn.Payload.(*StyNode).htmlNode
 }
 
@@ -165,7 +165,7 @@ func (sn StyNode) ChildNode(n int) style.TreeNode {
 // ----------------------------------------------------------------------
 
 // Styles is part of interface style.Styler.
-func (sn StyNode) Styles() *style.PropertyMap {
+func (sn *StyNode) Styles() *style.PropertyMap {
 	return sn.computedStyles
 }
 
