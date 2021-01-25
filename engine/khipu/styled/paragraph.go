@@ -11,13 +11,17 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Paragraph represents a styled paragraph of text, from a W3C DOM.
 type Paragraph struct {
 	*sty.Text
 }
 
-func ParaFromNode(node w3cdom.Node) (*Paragraph, error) {
+// InnerParagraphText creates a Paragraph instance holding the text content
+// of a W3C DOM node as a styled text.
+// node should be a paragraph-level HTML node, but this is not enforced.
+func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
 	para := &Paragraph{}
-	innerText, err := InnerText(node)
+	innerText, err := innerText(node)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +34,7 @@ func ParaFromNode(node w3cdom.Node) (*Paragraph, error) {
 		// }
 		// cnt++
 		T().Debugf("creating a style leaf for '%s'", l.String())
-		leaf := l.(*Leaf)
+		leaf := l.(*pLeaf)
 		styles := leaf.element.ComputedStyles().Styles()
 		styleset := Set{styles: styles}
 		para.Text.Style(styleset, pos, pos+l.Weight())
@@ -39,7 +43,45 @@ func ParaFromNode(node w3cdom.Node) (*Paragraph, error) {
 	return para, nil
 }
 
-// InnerText creates a text cord for the textual content of an HTML element and all
+// ForEachStyleRun applies a function to each run of the same style set
+// for a paragraph's text.
+func (p *Paragraph) ForEachStyleRun(f func(run Run) error) error {
+	err := p.Text.EachStyleRun(func(content string, style sty.Style, pos uint64) error {
+		r := Run{
+			Text:     content,
+			Position: pos,
+		}
+		set, ok := style.(Set)
+		if !ok {
+			T().Errorf("paragraph each style: style is not a CSS style set")
+			return cords.ErrIllegalArguments
+		}
+		r.StyleSet = set
+		return f(r)
+	})
+	return err
+}
+
+// StyleAt returns the active style at text position pos, together with an
+// index relative to the start of the style run.
+//
+// Overwrites StyleAt from cords.styled.Text
+func (p *Paragraph) StyleAt(pos uint64) (Set, uint64, error) {
+	sty, i, err := p.Text.StyleAt(pos)
+	if err != nil {
+		return Set{}, pos, err
+	}
+	return sty.(Set), i, nil
+}
+
+// Run is a simple container type to hold a run of text with equal style.
+type Run struct {
+	Text     string
+	Position uint64
+	StyleSet Set
+}
+
+// innerText creates a text cord for the textual content of an HTML element and all
 // its descendents. It resembles the text produced by
 //
 //      document.getElementById("myNode").innerText
@@ -50,7 +92,7 @@ func ParaFromNode(node w3cdom.Node) (*Paragraph, error) {
 // The fragment organization of the resulting cord will reflect the hierarchy of
 // the element node's descendents.
 //
-func InnerText(n w3cdom.Node) (cords.Cord, error) {
+func innerText(n w3cdom.Node) (cords.Cord, error) {
 	if n == nil {
 		return cords.Cord{}, cords.ErrIllegalArguments
 	}
@@ -70,7 +112,7 @@ func collectText(n w3cdom.Node, b *cords.CordBuilder) {
 		}
 		T().Debugf("parent of text node = %v", parent)
 		value := n.NodeValue()
-		leaf := &Leaf{
+		leaf := &pLeaf{
 			element: parent,
 			length:  uint64(len(value)),
 			content: value,
@@ -95,30 +137,35 @@ func collectText(n w3cdom.Node, b *cords.CordBuilder) {
 
 // ---------------------------------------------------------------------------
 
-// Leaf is the leaf type created for cords from calls to html.InnerText(…).
-type Leaf struct {
+// pLeaf is the leaf type for cords from a paragraph of text.
+// Not intended for client usage.
+type pLeaf struct {
 	element w3cdom.Node
 	length  uint64
 	content string
 }
 
-// Weight of a leaf is its string length in bytes.
-func (l Leaf) Weight() uint64 {
+// Weight is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l pLeaf) Weight() uint64 {
 	return l.length
 }
 
-func (l Leaf) String() string {
+// String is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l pLeaf) String() string {
 	return l.content
 }
 
-// Split splits a leaf at position i, resulting in 2 new leafs.
-func (l Leaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
-	left := &Leaf{
+// Split is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l pLeaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
+	left := &pLeaf{
 		element: l.element,
 		length:  l.length,
 		content: l.content[:i],
 	}
-	right := &Leaf{
+	right := &pLeaf{
 		element: l.element,
 		length:  l.length,
 		content: l.content[i:],
@@ -126,14 +173,15 @@ func (l Leaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
 	return left, right
 }
 
-// Substring returns a string segment of the leaf's text fragment.
-func (l Leaf) Substring(i, j uint64) []byte {
+// Substring is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l pLeaf) Substring(i, j uint64) []byte {
 	return []byte(l.content)[i:j]
 }
 
-var _ cords.Leaf = Leaf{}
+var _ cords.Leaf = pLeaf{}
 
-func (l Leaf) dbgString() string {
+func (l pLeaf) dbgString() string {
 	e := l.element
 	estr := "?"
 	if e != nil {
@@ -143,19 +191,20 @@ func (l Leaf) dbgString() string {
 	return fmt.Sprintf("{<%s> \"%s\"}", estr, cont)
 }
 
-var _ cords.Leaf = Leaf{}
+// --- Styles pLeaf------------------------------------------------------------
 
-// --- Styles Leaf------------------------------------------------------------
-
+// Set is a type to hold CSS styles/properties for runs of text of a Paragraph.
 type Set struct {
 	styles *style.PropertyMap
 }
 
+// String is part of interface cords.styled.Style.
 func (set Set) String() string {
 	return "<style>"
 }
 
-func (set Set) Equals(other sty.Format) bool {
+// Equals is part of interface cords.styled.Style, not intended for client usage.
+func (set Set) Equals(other sty.Style) bool {
 	if o, ok := other.(Set); ok {
 		if o.styles == set.styles {
 			return true
@@ -164,4 +213,4 @@ func (set Set) Equals(other sty.Format) bool {
 	return false
 }
 
-var _ sty.Format = Set{}
+var _ sty.Style = Set{}

@@ -1,14 +1,9 @@
+package text
+
 /*
-Package textshaping implements the task of selecting glyphs for
-Unicode characters.
-
-To understand what a text shaper does, please have a look at
-http://www.manpagez.com/html/harfbuzz/harfbuzz-/what-is-harfbuzz.php
-
-
 BSD License
 
-Copyright (c) 2017-2018, Norbert Pillmayer
+Copyright (c) 2017-2021, Norbert Pillmayer
 
 All rights reserved.
 
@@ -40,20 +35,12 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
-package textshaping
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/font"
 )
 
-// T traces to the global core tracer.
-func T() tracing.Trace {
-	return gtrace.CoreTracer
-}
-
-// Script IDs are copied from Harfbuzz. We don't have any sensible
+// ScriptID numbers are copied from Harfbuzz. We don't have any sensible
 // preference for IDs, thus there's no harm in being in sync with
 // our main shaping engine.  Just do not rely on it outside of
 // Harfbuzz's scope.
@@ -167,7 +154,7 @@ const (
 	Unknown               ScriptID = 1517976186
 )
 
-// Direction to typeset text in.
+// TextDirection is the direction to typeset text in.
 type TextDirection int
 
 // Direction to typeset text in. We use a generator to produce a stringer
@@ -181,7 +168,7 @@ const (
 	BottomToTop               = 3
 )
 
-// Interface for single glyphs in a glyph sequence.
+// GlyphInfo is an interface type for single glyphs in a glyph sequence.
 // The 'cluster' field corresponds to the code-point position within the
 // original string.
 type GlyphInfo interface {
@@ -193,19 +180,19 @@ type GlyphInfo interface {
 	YPosition() float64 // should be internal typesetter dimen
 }
 
-// Interface for a sequence of glyphs as returned by a text shaper.
+// GlyphSequence is a type for a sequence of glyphs as returned by a text shaper.
 type GlyphSequence interface {
 	GlyphCount() int
 	GetGlyphInfoAt(pos int) GlyphInfo
 }
 
-// A text shaper creates a sequence of glyphs from a sequence of
+// A Shaper creates a sequence of glyphs from a sequence of
 // Unicode code-points. Glyphs are taken from a font (a set of
 // of sorts from a type case), with specific dimens.
 //
 // Sometimes the shaping of text depends on the language in use.
 // Shapers may be able to react to this kind of information.
-type TextShaper interface {
+type Shaper interface {
 	Shape(text string, typecase *font.TypeCase) GlyphSequence
 	SetScript(scr ScriptID)
 	SetDirection(dir TextDirection)

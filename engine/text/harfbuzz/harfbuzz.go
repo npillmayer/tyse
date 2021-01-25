@@ -1,5 +1,5 @@
 /*
-CGo wrapper for the Harfbuzz text shaping library.
+Package harfbuzz is a CGo wrapper for the Harfbuzz text shaping library.
 
 ----------------------------------------------------------------------
 
@@ -38,12 +38,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ----------------------------------------------------------------------
 */
-package textshaping
+package harfbuzz
 
 import (
 	"fmt"
 
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/engine/text"
 )
 
 // Harfbuzz is the de-facto standard for text shaping.
@@ -60,19 +61,19 @@ import (
 // The downside of this is the need to free() memory whenever we
 // hand a Harfbuzz-shaper to GC.
 type Harfbuzz struct {
-	buffer    uintptr       // central data structure for Harfbuzz
-	direction TextDirection // L-to-R, R-to-L, T-to-B
-	script    ScriptID      // i.e., Latin, Arabic, Korean, ...
+	buffer    uintptr            // central data structure for Harfbuzz
+	direction text.TextDirection // L-to-R, R-to-L, T-to-B
+	script    text.ScriptID      // i.e., Latin, Arabic, Korean, ...
 }
 
-// Create a new Harfbuzz text shaper, fully initialized.
+// NewHarfbuzz creates a new Harfbuzz text shaper, fully initialized.
 // Defaults are for Latin script, left-to-right.
 func NewHarfbuzz() *Harfbuzz {
 	hb := &Harfbuzz{}
 	hb.buffer = allocHBBuffer()
-	hb.direction = LeftToRight
+	hb.direction = text.LeftToRight
 	setHBBufferDirection(hb.buffer, hb.direction)
-	hb.script = Latin
+	hb.script = text.Latin
 	setHBBufferScript(hb.buffer, hb.script)
 	return hb
 }
@@ -97,26 +98,26 @@ func (hb *Harfbuzz) findFont(typecase *font.TypeCase) uintptr {
 	return hbfont
 }
 
-// Implement TextShaper interface.
-func (hb *Harfbuzz) SetScript(scr ScriptID) {
+// SetScript is part of TextShaper interface.
+func (hb *Harfbuzz) SetScript(scr text.ScriptID) {
 	setHBBufferScript(hb.buffer, scr)
 }
 
-// Implement TextShaper interface.
-func (hb *Harfbuzz) SetDirection(dir TextDirection) {
+// SetDirection is part of TextShaper interface.
+func (hb *Harfbuzz) SetDirection(dir text.TextDirection) {
 	setHBBufferDirection(hb.buffer, dir)
 }
 
-// Implement TextShaper interface.
+// SetLanguage is part of interface TextShaper.
 // Harfbuzz doesn't evaluate a language parameter; method is a NOP.
 func (hb *Harfbuzz) SetLanguage() {
 }
 
-// Implement TextShaper interface.
+// Shape is part of the  TextShaper interface.
 //
 // This is where all the heavy lifting is done. We input a font and a
 // string of Unicode code-points, and receive a list of glyphs.
-func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) GlyphSequence {
+func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) text.GlyphSequence {
 	var hbfont uintptr
 	hbfont = hb.findFont(typecase)
 	if hbfont == 0 {
@@ -128,7 +129,7 @@ func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) GlyphSequence {
 	return seq
 }
 
-func (hb *Harfbuzz) GlyphSequenceString(typecase *font.TypeCase, seq GlyphSequence) string {
+func (hb *Harfbuzz) GlyphSequenceString(typecase *font.TypeCase, seq text.GlyphSequence) string {
 	var hbfont uintptr
 	hbfont = hb.findFont(typecase)
 	if hbfont == 0 {
@@ -139,4 +140,4 @@ func (hb *Harfbuzz) GlyphSequenceString(typecase *font.TypeCase, seq GlyphSequen
 	return s
 }
 
-var _ = TextShaper(&Harfbuzz{})
+var _ text.Shaper = &Harfbuzz{}

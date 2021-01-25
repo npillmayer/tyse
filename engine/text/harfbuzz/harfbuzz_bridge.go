@@ -1,4 +1,4 @@
-package textshaping
+package harfbuzz
 
 //#cgo CPPFLAGS: -I/usr/local/include/harfbuzz
 //#cgo LDFLAGS: -L/usr/local/lib -lharfbuzz
@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/engine/text"
 )
 
 /*
@@ -27,7 +28,7 @@ import (
 
 BSD License
 
-Copyright (c) 2017-2018, Norbert Pillmayer
+Copyright (c) 2017-2021, Norbert Pillmayer
 
 All rights reserved.
 
@@ -166,7 +167,7 @@ type hbGlyphInfo struct {
 }
 
 // Implement the GlyphSequence interface
-func (seq *hbGlyphSequence) GetGlyphInfoAt(i int) GlyphInfo {
+func (seq *hbGlyphSequence) GetGlyphInfoAt(i int) text.GlyphInfo {
 	gi := &hbGlyphInfo{}
 	info := C.get_glyph_info_at(seq.info, C.int(i))
 	pos := C.get_glyph_position_at(seq.pos, C.int(i))

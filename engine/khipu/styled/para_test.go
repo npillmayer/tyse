@@ -45,7 +45,7 @@ func TestDOMSimple(t *testing.T) {
 		defer tmpfile.Close()
 	}
 	//
-	text, err := InnerText(domroot)
+	text, err := innerText(domroot)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -56,7 +56,7 @@ func TestDOMSimple(t *testing.T) {
 		cordsdotty(text, t)
 	}
 	text.EachLeaf(func(leaf cords.Leaf, pos uint64) error {
-		l := leaf.(*Leaf)
+		l := leaf.(*pLeaf)
 		t.Logf("leaf = %v", l.dbgString())
 		return nil
 	})
@@ -69,7 +69,7 @@ func TestParaCreate(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	domroot := buildDOM(myhtml, t)
-	para, err := ParaFromNode(domroot)
+	para, err := InnerParagraphText(domroot)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

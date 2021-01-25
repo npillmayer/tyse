@@ -1,4 +1,4 @@
-package textshaping
+package harfbuzz
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/core/locate"
+	"github.com/npillmayer/tyse/engine/text"
 )
 
 func TestOpenHarfbuzzFontCreation(t *testing.T) {
@@ -44,7 +45,7 @@ func TestHarfbuzzShape(t *testing.T) {
 }
 
 func TestHarfbuzzShapeResult(t *testing.T) {
-	var seq GlyphSequence
+	var seq text.GlyphSequence
 	fontpath := locate.FileResource("GentiumPlus-R.ttf", "font")
 	if f, err := font.LoadOpenTypeFont(fontpath); err == nil {
 		if tc, err2 := f.PrepareCase(12.0); err2 == nil {
