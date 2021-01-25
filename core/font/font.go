@@ -95,6 +95,11 @@ type TypeCase struct {
 	// language
 }
 
+func NullTypeCase() *TypeCase {
+	panic("NullTypecase TODO")
+	//return nil
+}
+
 func LoadOpenTypeFont(fontfile string) (*ScalableFont, error) {
 	ff := &ScalableFont{}
 	ff.Fontname = filepath.Base(fontfile)
