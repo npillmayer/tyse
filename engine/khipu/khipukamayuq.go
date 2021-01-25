@@ -42,10 +42,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/locate"
 	params "github.com/npillmayer/tyse/core/parameters"
+	"github.com/npillmayer/tyse/engine/khipu/styled"
 	"github.com/npillmayer/tyse/engine/text"
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/segment"
@@ -63,9 +63,84 @@ type TypesettingPipeline struct {
 	words       *segment.Segmenter
 }
 
-func EncodeParagraph(text styled.Text, startpos uint64, shaper *text.Shaper, pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper,
+	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
 	//
-	return nil
+	if regs == nil {
+		regs = params.NewTypesettingRegisters()
+	}
+	var result *Khipu = NewKhipu()
+	para.ForEachStyleRun(func(run styled.Run) error {
+		text := strings.NewReader(run.Text)
+		k, err := encodeRun(text, startpos, shaper, run.StyleSet, pipeline, regs)
+		if err != nil {
+			return err
+		}
+		result = result.AppendKhipu(k)
+		return nil
+	})
+	return result, nil
+}
+
+func encodeRun(text io.Reader, startpos uint64, shaper text.Shaper, styles styled.Set,
+	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
+	//
+	pipeline = PrepareTypesettingPipeline(text, pipeline)
+	k := NewKhipu()
+	textpos := startpos
+	seg := pipeline.segmenter
+	for seg.Next() {
+		fragment := seg.Text()
+		p := penlty(seg.Penalties())
+		CT().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
+		//k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
+		kfrag, err := encodeSegment(fragment, p, textpos, shaper, styles, pipeline, regs)
+		// if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
+		// 	HyphenateTextBoxes(k, pipeline, regs)
+		// }
+		if err != nil {
+			return nil, err
+		}
+		k = k.AppendKhipu(kfrag)
+	}
+	return k, nil
+}
+
+func encodeSegment(fragm string, p penalties, pos uint64, shaper text.Shaper, styles styled.Set,
+	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
+	//
+	if p.breakSpace() && isspace(fragm) {
+		return encodeSpace(fragm, p, styles, pipeline, regs), nil
+	}
+	if p.lineWrap() && p.breakSpace() {
+		// line wrap at space
+		// b := NewTextBox(seg.Text(), textpos)
+		// khipu.AppendKnot(b).AppendKnot(Penalty(dimen.Infty))
+	}
+	if p.lineWrap() { // line wrap without space
+		// identified as a possible line break, but no space
+		// insert explicit discretionary '\-' penalty
+	}
+	// no line wrap and no break at space: inhibit break with infinite penalty
+	// close a text box which is not a possible line wrap position
+	// b := NewTextBox(seg.Text(), textpos)
+	// pen := Penalty(dimen.Infty)
+	// khipu.AppendKnot(b).AppendKnot(pen)
+	b := encodeText(fragm, pos, shaper, styles, pipeline, regs)
+	b.AppendKnot(Penalty(dimen.Infty))
+	return b, nil
+}
+
+func encodeSpace(fragm string, p penalties, styles styled.Set,
+	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+	//
+	panic("encodeSpace TODO")
+}
+
+func encodeText(fragm string, pos uint64, shaper text.Shaper, styles styled.Set,
+	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+	//
+	panic("encodeText TODO")
 }
 
 // KnotEncode transforms an input text into a khipu.
@@ -107,10 +182,10 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 	khipu := NewKhipu()
 	p := penlty(seg.Penalties())
 	CT().Errorf("CREATE PARITAL KHIPU, PENALTIES=%d|%d", p.p1, p.p2)
-	if p.primaryBreak() { // broken by primary breaker
+	if p.lineWrap() { // broken by primary breaker
 		// fragment is terminated by possible line wrap opportunity
-		if p.secondaryBreak() { // broken by secondary breaker, too
-			if isspace(seg) {
+		if p.breakSpace() { // broken by secondary breaker, too
+			if isspace(seg.Text()) {
 				g := spaceglue(regs)
 				khipu.AppendKnot(g).AppendKnot(Penalty(p.p2))
 			} else {
@@ -125,7 +200,7 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 		}
 	} else { // segment is broken by secondary breaker
 		// fragment is start or end of a span of whitespace
-		if isspace(seg) {
+		if isspace(seg.Text()) {
 			CT().Errorf("BROKEN BY SECONDARY BREAKER: WHITESPACE")
 			// close a span of whitespace
 			g := spaceglue(regs)
@@ -248,15 +323,19 @@ func (p penalties) primaryBreak() bool {
 	return p.p1 < uax.InfinitePenalty
 }
 
-func (p penalties) secondaryBreak() bool {
+func (p penalties) lineWrap() bool {
+	return p.p1 < uax.InfinitePenalty
+}
+
+func (p penalties) breakSpace() bool {
 	return p.p2 < uax.InfinitePenalty
 }
 
-func isspace(seg *segment.Segmenter) bool {
-	if len(seg.Text()) == 0 {
+func isspace(text string) bool {
+	if len(text) == 0 {
 		return false
 	}
-	r, width := utf8.DecodeRuneInString(seg.Text())
+	r, width := utf8.DecodeRuneInString(text)
 	if width == 0 || r == utf8.RuneError {
 		return false
 	}
