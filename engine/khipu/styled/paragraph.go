@@ -22,7 +22,13 @@ func ParaFromNode(node w3cdom.Node) (*Paragraph, error) {
 		return nil, err
 	}
 	para.Text = sty.TextFromCord(innerText)
+	T().Debugf("######################################")
+	//cnt := 0
 	para.Text.Raw().EachLeaf(func(l cords.Leaf, pos uint64) error {
+		// if cnt > 2 {
+		// 	return nil
+		// }
+		// cnt++
 		T().Debugf("creating a style leaf for '%s'", l.String())
 		leaf := l.(*Leaf)
 		styles := leaf.element.ComputedStyles().Styles()

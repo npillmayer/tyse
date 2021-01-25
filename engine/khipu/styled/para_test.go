@@ -66,6 +66,7 @@ func TestParaCreate(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	domroot := buildDOM(myhtml, t)
 	para, err := ParaFromNode(domroot)
@@ -75,9 +76,10 @@ func TestParaCreate(t *testing.T) {
 	if para.Text.Raw().IsVoid() {
 		t.Errorf("inner text of para is void, should not be")
 	}
-	f := cordsdotty(cords.Cord(para.Text.Styles()), t)
+	//f := cordsdotty(cords.Cord(para.Text.Styles()), t)
+	f := cordsdotty(para.Text.Raw(), t)
 	defer f.Close()
-	//t.Fail()
+	t.Fail()
 }
 
 // ---------------------------------------------------------------------------
