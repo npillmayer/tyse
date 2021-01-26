@@ -4,6 +4,7 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/text"
 )
 
 /*
@@ -82,6 +83,10 @@ func (set Set) Space() (dimen.Dimen, dimen.Dimen, dimen.Dimen) {
 
 func (set Set) Whitespace(ws string) string {
 	return " "
+}
+
+func (set Set) BidiDir() text.TextDirection {
+	return text.LeftToRight
 }
 
 func (set Set) Font() *font.TypeCase {

@@ -75,28 +75,28 @@ func freeHBBuffer(buf uintptr) {
 }
 
 // Helper: convert a Textdirection enum into a flag suited for Harfbuzz
-func dir2hbdir(textdir TextDirection) int32 {
+func dir2hbdir(textdir text.TextDirection) int32 {
 	switch textdir {
-	case LeftToRight:
+	case text.LeftToRight:
 		return 4
-	case RightToLeft:
+	case text.RightToLeft:
 		return 5
-	case TopToBottom:
+	case text.TopToBottom:
 		return 6
-	case BottomToTop:
+	case text.BottomToTop:
 		return 7
 	}
 	return 4
 }
 
 // Set the text direction flag for a Harfbuzz buffer.
-func setHBBufferDirection(hbbuf uintptr, dir TextDirection) {
+func setHBBufferDirection(hbbuf uintptr, dir text.TextDirection) {
 	ptr := (*C.struct_hb_buffer_t)(unsafe.Pointer(hbbuf))
 	C.hb_buffer_set_direction(ptr, C.hb_direction_t(dir2hbdir(dir)))
 }
 
 // Set the script info for a Harfbuzz buffer.
-func setHBBufferScript(hbbuf uintptr, script ScriptID) {
+func setHBBufferScript(hbbuf uintptr, script text.ScriptID) {
 	ptr := (*C.struct_hb_buffer_t)(unsafe.Pointer(hbbuf))
 	C.hb_buffer_set_script(ptr, C.hb_script_t(script))
 }

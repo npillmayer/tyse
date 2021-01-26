@@ -8,12 +8,14 @@ import (
 	sty "github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/tyse/engine/dom/cssom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
+	"github.com/npillmayer/uax/bidi"
 	"golang.org/x/net/html"
 )
 
 // Paragraph represents a styled paragraph of text, from a W3C DOM.
 type Paragraph struct {
 	*sty.Text
+	eBidiDir bidi.Direction // embedding bidi text direction
 }
 
 // InnerParagraphText creates a Paragraph instance holding the text content
@@ -26,20 +28,16 @@ func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
 		return nil, err
 	}
 	para.Text = sty.TextFromCord(innerText)
-	T().Debugf("######################################")
-	//cnt := 0
 	para.Text.Raw().EachLeaf(func(l cords.Leaf, pos uint64) error {
-		// if cnt > 2 {
-		// 	return nil
-		// }
-		// cnt++
-		T().Debugf("creating a style leaf for '%s'", l.String())
+		T().Debugf("styled paragraph: creating a style leaf for '%s'", l.String())
 		leaf := l.(*pLeaf)
 		styles := leaf.element.ComputedStyles().Styles()
 		styleset := Set{styles: styles}
+		styleset.eBidiDir = findEmbeddingBidiDirection(leaf.element)
 		para.Text.Style(styleset, pos, pos+l.Weight())
 		return nil
 	})
+	para.eBidiDir = findEmbeddingBidiDirection(node)
 	return para, nil
 }
 
@@ -103,14 +101,14 @@ func innerText(n w3cdom.Node) (cords.Cord, error) {
 
 func collectText(n w3cdom.Node, b *cords.CordBuilder) {
 	if n.NodeType() == html.ElementNode {
-		T().Debugf("<%s>", n.NodeValue)
+		T().Debugf("styled paragraph: collect text of <%s>", n.NodeValue)
 	} else if n.NodeType() == html.TextNode {
-		T().Debugf("text = %s", n.NodeValue())
+		//T().Debugf("text = %s", n.NodeValue())
 		parent := n.ParentNode()
 		for parent != nil && parent.NodeType() != html.ElementNode {
 			parent = parent.ParentNode()
 		}
-		T().Debugf("parent of text node = %v", parent)
+		//T().Debugf("parent of text node = %v", parent)
 		value := n.NodeValue()
 		leaf := &pLeaf{
 			element: parent,
@@ -134,6 +132,30 @@ func collectText(n w3cdom.Node, b *cords.CordBuilder) {
 // zugeordnet; z.B. im Vergleich zu bidi ?
 // Ich denke, der Rohtext muss erst mal erhalten bleiben und das WS-collapsing
 // findet während der Knotenknüpfung statt.
+
+// findEmbeddingBidiDirection finds out style settings which determine the
+// embedding text direction for this HTML node.
+// Bidi directions in HTML may either be set with an attribute `dir` (highest
+// priority) or with CSS property `direction`. We treat L2R as the default,
+// only switching it for explicit setting of R2L.
+func findEmbeddingBidiDirection(pnode w3cdom.Node) bidi.Direction {
+	eBidiDir := bidi.LeftToRight
+	attrset := false
+	if pnode.HasAttributes() {
+		dirattr := pnode.Attributes().GetNamedItem("dir")
+		attrset = true
+		if dirattr.Value() == "rtl" {
+			eBidiDir = bidi.RightToLeft
+		}
+	}
+	if !attrset {
+		textDir := pnode.ComputedStyles().GetPropertyValue("direction")
+		if textDir == "rtl" {
+			eBidiDir = bidi.RightToLeft
+		}
+	}
+	return eBidiDir
+}
 
 // ---------------------------------------------------------------------------
 
@@ -191,11 +213,12 @@ func (l pLeaf) dbgString() string {
 	return fmt.Sprintf("{<%s> \"%s\"}", estr, cont)
 }
 
-// --- Styles pLeaf------------------------------------------------------------
+// --- Styles -----------------------------------------------------------------
 
 // Set is a type to hold CSS styles/properties for runs of text of a Paragraph.
 type Set struct {
-	styles *style.PropertyMap
+	styles   *style.PropertyMap
+	eBidiDir bidi.Direction // embedding bidi text direction
 }
 
 // String is part of interface cords.styled.Style.

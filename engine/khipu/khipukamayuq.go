@@ -110,7 +110,7 @@ func encodeSegment(fragm string, p penalties, pos uint64, shaper text.Shaper, st
 	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
 	//
 	if p.breakSpace() && isspace(fragm) {
-		return encodeSpace(fragm, p, styles, pipeline, regs), nil
+		return encodeSpace(fragm, p, styles, regs), nil
 	}
 	if p.lineWrap() && p.breakSpace() {
 		// line wrap at space
@@ -132,7 +132,7 @@ func encodeSegment(fragm string, p penalties, pos uint64, shaper text.Shaper, st
 }
 
 func encodeSpace(fragm string, p penalties, styles styled.Set,
-	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+	regs *params.TypesettingRegisters) *Khipu {
 	//
 	panic("encodeSpace TODO")
 }
@@ -141,6 +141,20 @@ func encodeText(fragm string, pos uint64, shaper text.Shaper, styles styled.Set,
 	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
 	//
 	panic("encodeText TODO")
+	//
+	k := NewKhipu()
+	// 1. break fragment into words by UAX#29
+	pipeline.words.Init(strings.NewReader(fragm))
+	for pipeline.words.Next() {
+		word := pipeline.words.Text()
+		CT().Debugf("encode text: word = '%s'", word)
+		//bidiDir := styles.BidiDir()
+		pos += uint64(len(word))
+	}
+	// 2. do NOT hyphenate => leave this to line breaker
+	// 3. attach glyph sequences to text boxes
+	// 4. measure text of glyph sequence
+	return k
 }
 
 // KnotEncode transforms an input text into a khipu.
