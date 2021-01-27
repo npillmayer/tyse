@@ -14,30 +14,42 @@ import (
 
 // Paragraph represents a styled paragraph of text, from a W3C DOM.
 type Paragraph struct {
-	*sty.Text
-	eBidiDir bidi.Direction // embedding bidi text direction
+	*sty.Text                           // a Paragraph is a styled text
+	eBidiDir  bidi.Direction            // embedding bidi text direction
+	levels    *bidi.ResolvedLevels      // levels from UAX#9 algorithm
+	irsElems  map[uint64]bidi.Direction // text position ⇒ explicit bidi dir
+	pdis      map[uint64]bool           // text position ⇒ PDI
 }
 
 // InnerParagraphText creates a Paragraph instance holding the text content
 // of a W3C DOM node as a styled text.
 // node should be a paragraph-level HTML node, but this is not enforced.
 func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
-	para := &Paragraph{}
+	para := &Paragraph{
+		irsElems: make(map[uint64]bidi.Direction),
+	}
 	innerText, err := innerText(node)
 	if err != nil {
 		return nil, err
 	}
+	var explicit bool
 	para.Text = sty.TextFromCord(innerText)
 	para.Text.Raw().EachLeaf(func(l cords.Leaf, pos uint64) error {
 		T().Debugf("styled paragraph: creating a style leaf for '%s'", l.String())
 		leaf := l.(*pLeaf)
 		styles := leaf.element.ComputedStyles().Styles()
 		styleset := Set{styles: styles}
-		styleset.eBidiDir = findEmbeddingBidiDirection(leaf.element)
+		styleset.eBidiDir, explicit = findEmbeddingBidiDirection(leaf.element)
 		para.Text.Style(styleset, pos, pos+l.Weight())
+		if explicit {
+			para.irsElems[pos] = styleset.eBidiDir
+			para.pdis[pos+l.Weight()] = true
+		}
 		return nil
 	})
-	para.eBidiDir = findEmbeddingBidiDirection(node)
+	para.eBidiDir, _ = findEmbeddingBidiDirection(node)
+	para.levels = bidi.ResolveParagraph(innerText.Reader(), para.bidiMarkup(),
+		bidi.DefaultDirection(para.eBidiDir))
 	return para, nil
 }
 
@@ -138,23 +150,43 @@ func collectText(n w3cdom.Node, b *cords.CordBuilder) {
 // Bidi directions in HTML may either be set with an attribute `dir` (highest
 // priority) or with CSS property `direction`. We treat L2R as the default,
 // only switching it for explicit setting of R2L.
-func findEmbeddingBidiDirection(pnode w3cdom.Node) bidi.Direction {
-	eBidiDir := bidi.LeftToRight
+func findEmbeddingBidiDirection(pnode w3cdom.Node) (bidi.Direction, bool) {
+	eBidiDir, explicit := bidi.LeftToRight, false
 	attrset := false
 	if pnode.HasAttributes() {
 		dirattr := pnode.Attributes().GetNamedItem("dir")
-		attrset = true
+		attrset, explicit = true, true
 		if dirattr.Value() == "rtl" {
 			eBidiDir = bidi.RightToLeft
 		}
 	}
 	if !attrset {
-		textDir := pnode.ComputedStyles().GetPropertyValue("direction")
+		propmap := pnode.ComputedStyles().Styles()
+		var textDir style.Property
+		textDir, explicit = style.GetLocalProperty(propmap, "direction")
+		//textDir := pnode.ComputedStyles().GetPropertyValue("direction")
 		if textDir == "rtl" {
 			eBidiDir = bidi.RightToLeft
+			explicit = true // TODO only set if property is local to pnode
 		}
 	}
-	return eBidiDir
+	return eBidiDir, explicit
+}
+
+func (p *Paragraph) bidiMarkup() bidi.OutOfLineBidiMarkup {
+	irs, pdis := p.irsElems, p.pdis
+	return func(pos uint64) int {
+		if i, ok := irs[pos]; ok {
+			if i == bidi.LeftToRight {
+				return int(bidi.MarkupLRI)
+			}
+			return int(bidi.MarkupRLI)
+		}
+		if pdi := pdis[pos]; pdi {
+			return int(bidi.MarkupPDI)
+		}
+		return 0
+	}
 }
 
 // ---------------------------------------------------------------------------

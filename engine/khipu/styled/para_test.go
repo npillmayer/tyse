@@ -76,9 +76,11 @@ func TestParaCreate(t *testing.T) {
 	if para.Text.Raw().IsVoid() {
 		t.Errorf("inner text of para is void, should not be")
 	}
+	t.Logf("inner text = (%s)", para.Text.Raw().String())
+	t.Logf("levels = %v", para.levels)
 	//f := cordsdotty(cords.Cord(para.Text.Styles()), t)
-	f := cordsdotty(para.Text.Raw(), t)
-	defer f.Close()
+	// f := cordsdotty(para.Text.Raw(), t)
+	// defer f.Close()
 	t.Fail()
 }
 
