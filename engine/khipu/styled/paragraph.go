@@ -53,6 +53,10 @@ func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
 	return para, nil
 }
 
+func (p *Paragraph) Levels() *bidi.ResolvedLevels {
+	return p.levels
+}
+
 // ForEachStyleRun applies a function to each run of the same style set
 // for a paragraph's text.
 func (p *Paragraph) ForEachStyleRun(f func(run Run) error) error {

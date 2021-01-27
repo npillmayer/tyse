@@ -48,6 +48,7 @@ import (
 	"github.com/npillmayer/tyse/engine/khipu/styled"
 	"github.com/npillmayer/tyse/engine/text"
 	"github.com/npillmayer/uax"
+	"github.com/npillmayer/uax/bidi"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax14"
 	"github.com/npillmayer/uax/uax29"
@@ -72,7 +73,7 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper
 	var result *Khipu = NewKhipu()
 	para.ForEachStyleRun(func(run styled.Run) error {
 		text := strings.NewReader(run.Text)
-		k, err := encodeRun(text, startpos, shaper, run.StyleSet, pipeline, regs)
+		k, err := encodeRun(text, startpos, run.StyleSet, para.Levels(), shaper, pipeline, regs)
 		if err != nil {
 			return err
 		}
@@ -82,7 +83,7 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper
 	return result, nil
 }
 
-func encodeRun(text io.Reader, startpos uint64, shaper text.Shaper, styles styled.Set,
+func encodeRun(text io.Reader, startpos uint64, styles styled.Set, levels *bidi.ResolvedLevels, shaper text.Shaper,
 	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
 	//
 	pipeline = PrepareTypesettingPipeline(text, pipeline)
@@ -94,7 +95,7 @@ func encodeRun(text io.Reader, startpos uint64, shaper text.Shaper, styles style
 		p := penlty(seg.Penalties())
 		CT().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
 		//k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
-		kfrag, err := encodeSegment(fragment, p, textpos, shaper, styles, pipeline, regs)
+		kfrag, err := encodeSegment(fragment, p, textpos, levels, styles, shaper, pipeline, regs)
 		// if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
 		// 	HyphenateTextBoxes(k, pipeline, regs)
 		// }
@@ -106,7 +107,7 @@ func encodeRun(text io.Reader, startpos uint64, shaper text.Shaper, styles style
 	return k, nil
 }
 
-func encodeSegment(fragm string, p penalties, pos uint64, shaper text.Shaper, styles styled.Set,
+func encodeSegment(fragm string, p penalties, pos uint64, levels *bidi.ResolvedLevels, styles styled.Set, shaper text.Shaper,
 	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
 	//
 	if p.breakSpace() && isspace(fragm) {
@@ -126,7 +127,7 @@ func encodeSegment(fragm string, p penalties, pos uint64, shaper text.Shaper, st
 	// b := NewTextBox(seg.Text(), textpos)
 	// pen := Penalty(dimen.Infty)
 	// khipu.AppendKnot(b).AppendKnot(pen)
-	b := encodeText(fragm, pos, shaper, styles, pipeline, regs)
+	b := encodeText(fragm, pos, levels, styles, shaper, pipeline, regs)
 	b.AppendKnot(Penalty(dimen.Infty))
 	return b, nil
 }
@@ -137,24 +138,44 @@ func encodeSpace(fragm string, p penalties, styles styled.Set,
 	panic("encodeSpace TODO")
 }
 
-func encodeText(fragm string, pos uint64, shaper text.Shaper, styles styled.Set,
-	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) *Khipu {
+func encodeText(fragm string, pos uint64, levels *bidi.ResolvedLevels, styles styled.Set, shaper text.Shaper,
+	pipeline *TypesettingPipeline,
+	regs *params.TypesettingRegisters) *Khipu {
 	//
-	panic("encodeText TODO")
-	//
-	k := NewKhipu()
+	wordsKhipu := NewKhipu()
 	// 1. break fragment into words by UAX#29
 	pipeline.words.Init(strings.NewReader(fragm))
 	for pipeline.words.Next() {
 		word := pipeline.words.Text()
+		if len(word) == 0 { // should never happen, but be careful not to panic
+			continue
+		}
+		end := pos + uint64(len(word))
 		CT().Debugf("encode text: word = '%s'", word)
-		//bidiDir := styles.BidiDir()
-		pos += uint64(len(word))
+		bidiDir := levels.DirectionAt(pos)
+		bidiEnd := levels.DirectionAt(end - 1)
+		if bidiDir != bidiEnd {
+			panic("bidi-level changes mid-word")
+			// TODO: iterate over word and bidi-level until point of change
+			// or: have an API for this in bidi.ResolvedLevels
+		}
+		shaper.SetDirection(directionForText(styles, bidiDir, regs))
+		shaper.SetScript(scriptForText(styles, regs))
 	}
 	// 2. do NOT hyphenate => leave this to line breaker
 	// 3. attach glyph sequences to text boxes
 	// 4. measure text of glyph sequence
-	return k
+	return wordsKhipu
+}
+
+func directionForText(styles styled.Set, dir bidi.Direction,
+	regs *params.TypesettingRegisters) text.TextDirection {
+	//
+	return text.LeftToRight
+}
+
+func scriptForText(styles styled.Set, regs *params.TypesettingRegisters) text.ScriptID {
+	return text.Latin
 }
 
 // KnotEncode transforms an input text into a khipu.

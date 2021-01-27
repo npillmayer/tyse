@@ -5,6 +5,9 @@ import (
 	"github.com/npillmayer/tyse/engine/text"
 )
 
+// Package intended for a home-grown shaper for easy cases where we can
+// afford to not rely on HarfBuzz.
+
 type glyphing struct {
 	dir    text.TextDirection
 	script text.ScriptID
