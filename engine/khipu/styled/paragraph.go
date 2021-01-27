@@ -49,7 +49,7 @@ func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
 	})
 	para.eBidiDir, _ = findEmbeddingBidiDirection(node)
 	para.levels = bidi.ResolveParagraph(innerText.Reader(), para.bidiMarkup(),
-		bidi.DefaultDirection(para.eBidiDir))
+		bidi.DefaultDirection(para.eBidiDir), bidi.IgnoreParagraphSeparators(true))
 	return para, nil
 }
 
