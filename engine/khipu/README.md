@@ -21,17 +21,19 @@ times, tasked with encoding tax figures and other administrative
 information in knots.
 We will use this analogy to call typesetting items “khipus” or “knots,”
 and objects which produce khipus will be “Khipukamayuq”s (I admit this is a tough one).
-Knots implement items for typesetting paragraphs. We will use a
-box-and-glue model and the various knot types more or less implement the corresponding
-node types from the TeX typesetting system.
-
-A Khipukamayuq is part of a typsetting pipeline and will transform text into khipus.
-Khipus are the input for linebreakers. The overall process of creating
-them and the interaction with line breaking looks like this:
+Knots implement items for typesetting paragraphs.
 
 ## Create Khipus from Text
 
-This is an approximation of the overall task flow for typesetting a single paragraph:
+A Khipukamayuq is part of a typsetting pipeline and will transform text into khipus.
+Khipus are the input for linebreakers. The overall process of creating
+them and the interaction with line breaking is fairly complicated, especially if
+one considers international scripts.
+
+We will use a box-and-glue model and the various knot types more or less
+implement the corresponding node types from the TeX typesetting system.
+The diagram below depicts an approximation of the overall task flow for typesetting
+a single paragraph.
 
 <div style="width:480px;padding:5px;padding-bottom:10px">
 <img alt="typeset a single paragraph" src="http://npillmayer.github.io/TySE/images/khipukamayuq.svg" width="480px">
