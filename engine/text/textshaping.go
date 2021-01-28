@@ -37,6 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
+	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
 )
 
@@ -154,18 +155,32 @@ const (
 	Unknown               ScriptID = 1517976186
 )
 
-// TextDirection is the direction to typeset text in.
-type TextDirection int
+// ScriptByName returns a script id from a script name, given as a string.
+// Currently implements just a small subset, and returns Unknown otherwise.
+func ScriptByName(name string) ScriptID {
+	switch name {
+	case "Latin":
+		return Latin
+	case "Arabic":
+		return Arabic
+	case "Hebrew":
+		return Hebrew
+	}
+	return Unknown
+}
+
+// Direction is the direction to typeset text in.
+type Direction int
 
 // Direction to typeset text in. We use a generator to produce a stringer
 // for this enum.
 //
-//go:generate stringer -type=TextDirection
+//go:generate stringer -type=Direction
 const (
-	LeftToRight TextDirection = 0
-	RightToLeft               = 1
-	TopToBottom               = 2
-	BottomToTop               = 3
+	LeftToRight Direction = 0
+	RightToLeft           = 1
+	TopToBottom           = 2
+	BottomToTop           = 3
 )
 
 // GlyphInfo is an interface type for single glyphs in a glyph sequence.
@@ -174,16 +189,17 @@ const (
 type GlyphInfo interface {
 	Glyph() rune
 	Cluster() int
-	XAdvance() float64  // should be internal typesetter dimen
-	YAdvance() float64  // should be internal typesetter dimen
-	XPosition() float64 // should be internal typesetter dimen
-	YPosition() float64 // should be internal typesetter dimen
+	XAdvance() dimen.Dimen
+	YAdvance() dimen.Dimen
+	XPosition() dimen.Dimen
+	YPosition() dimen.Dimen
 }
 
 // GlyphSequence is a type for a sequence of glyphs as returned by a text shaper.
 type GlyphSequence interface {
 	GlyphCount() int
 	GetGlyphInfoAt(pos int) GlyphInfo
+	BBoxDimens() (dimen.Dimen, dimen.Dimen, dimen.Dimen) // w, h, d
 }
 
 // A Shaper creates a sequence of glyphs from a sequence of
@@ -195,6 +211,14 @@ type GlyphSequence interface {
 type Shaper interface {
 	Shape(text string, typecase *font.TypeCase) GlyphSequence
 	SetScript(scr ScriptID)
-	SetDirection(dir TextDirection)
-	SetLanguage() // TODO: what is a language in Go?
+	SetDirection(dir Direction)
+	SetLanguage(string) // TODO: what is a language in Go?
+}
+
+// ---------------------------------------------------------------------------
+
+// Float2Dimen is a supporting function to convert a floating point dimension
+// as handled by HarfBuzz into an internal TySE dimension.
+func Float2Dimen(f float64) dimen.Dimen {
+	panic("do not know yet how to best implement this in a general (non-Harfbuzz) way")
 }

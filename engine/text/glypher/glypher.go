@@ -9,11 +9,11 @@ import (
 // afford to not rely on HarfBuzz.
 
 type glyphing struct {
-	dir    text.TextDirection
+	dir    text.Direction
 	script text.ScriptID
 }
 
-func Instance(dir text.TextDirection, script text.ScriptID) text.Shaper {
+func Instance(dir text.Direction, script text.ScriptID) text.Shaper {
 	return &glyphing{
 		dir:    dir,
 		script: script,
@@ -28,10 +28,10 @@ func (g *glyphing) SetScript(scr text.ScriptID) {
 	g.script = scr
 }
 
-func (g *glyphing) SetDirection(dir text.TextDirection) {
+func (g *glyphing) SetDirection(dir text.Direction) {
 	g.dir = dir
 }
 
-func (g *glyphing) SetLanguage() {
+func (g *glyphing) SetLanguage(string) {
 	//
 }

@@ -47,6 +47,8 @@ import (
 	"github.com/npillmayer/tyse/engine/text"
 )
 
+// https://harfbuzz.github.io/shaping-and-shape-plans.html
+
 // Harfbuzz is the de-facto standard for text shaping.
 // For further information see
 // https://www.freedesktop.org/wiki/Software/HarfBuzz .
@@ -61,9 +63,9 @@ import (
 // The downside of this is the need to free() memory whenever we
 // hand a Harfbuzz-shaper to GC.
 type Harfbuzz struct {
-	buffer    uintptr            // central data structure for Harfbuzz
-	direction text.TextDirection // L-to-R, R-to-L, T-to-B
-	script    text.ScriptID      // i.e., Latin, Arabic, Korean, ...
+	buffer    uintptr        // central data structure for Harfbuzz
+	direction text.Direction // L-to-R, R-to-L, T-to-B
+	script    text.ScriptID  // i.e., Latin, Arabic, Korean, ...
 }
 
 // NewHarfbuzz creates a new Harfbuzz text shaper, fully initialized.
@@ -104,13 +106,13 @@ func (hb *Harfbuzz) SetScript(scr text.ScriptID) {
 }
 
 // SetDirection is part of TextShaper interface.
-func (hb *Harfbuzz) SetDirection(dir text.TextDirection) {
+func (hb *Harfbuzz) SetDirection(dir text.Direction) {
 	setHBBufferDirection(hb.buffer, dir)
 }
 
 // SetLanguage is part of interface TextShaper.
 // Harfbuzz doesn't evaluate a language parameter; method is a NOP.
-func (hb *Harfbuzz) SetLanguage() {
+func (hb *Harfbuzz) SetLanguage(string) {
 }
 
 // Shape is part of the  TextShaper interface.

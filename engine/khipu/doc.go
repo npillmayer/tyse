@@ -100,6 +100,6 @@ import (
 )
 
 // CT traces to the core-tracer.
-func CT() tracing.Trace {
+func T() tracing.Trace {
 	return gtrace.CoreTracer
 }

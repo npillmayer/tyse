@@ -85,7 +85,7 @@ func (set Set) Whitespace(ws string) string {
 	return " "
 }
 
-func (set Set) BidiDir() text.TextDirection {
+func (set Set) BidiDir() text.Direction {
 	return text.LeftToRight
 }
 

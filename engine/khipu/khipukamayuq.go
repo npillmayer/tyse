@@ -93,7 +93,7 @@ func encodeRun(text io.Reader, startpos uint64, styles styled.Set, levels *bidi.
 	for seg.Next() {
 		fragment := seg.Text()
 		p := penlty(seg.Penalties())
-		CT().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
+		T().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
 		//k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
 		kfrag, err := encodeSegment(fragment, p, textpos, levels, styles, shaper, pipeline, regs)
 		// if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
@@ -135,7 +135,10 @@ func encodeSegment(fragm string, p penalties, pos uint64, levels *bidi.ResolvedL
 func encodeSpace(fragm string, p penalties, styles styled.Set,
 	regs *params.TypesettingRegisters) *Khipu {
 	//
-	panic("encodeSpace TODO")
+	k := NewKhipu()
+	g := spaceglue(regs)
+	k.AppendKnot(g).AppendKnot(Penalty(p.p2))
+	return k
 }
 
 func encodeText(fragm string, pos uint64, levels *bidi.ResolvedLevels, styles styled.Set, shaper text.Shaper,
@@ -151,7 +154,7 @@ func encodeText(fragm string, pos uint64, levels *bidi.ResolvedLevels, styles st
 			continue
 		}
 		end := pos + uint64(len(word))
-		CT().Debugf("encode text: word = '%s'", word)
+		T().Debugf("encode text: word = '%s'", word)
 		bidiDir := levels.DirectionAt(pos)
 		bidiEnd := levels.DirectionAt(end - 1)
 		if bidiDir != bidiEnd {
@@ -159,23 +162,42 @@ func encodeText(fragm string, pos uint64, levels *bidi.ResolvedLevels, styles st
 			// TODO: iterate over word and bidi-level until point of change
 			// or: have an API for this in bidi.ResolvedLevels
 		}
+		// 2. configure shaper
 		shaper.SetDirection(directionForText(styles, bidiDir, regs))
 		shaper.SetScript(scriptForText(styles, regs))
+		shaper.SetLanguage(regs.S(params.P_LANGUAGE))
+		// 3. do NOT hyphenate => leave this to line breaker
+		// 4. attach glyph sequences to text boxes
+		box := NewTextBox(word, pos)
+		box.glyphs = shaper.Shape(word, styles.Font())
+		T().Errorf("khipukamayuq: TODO h and d not yet calculated")
+		// 5. measure text of glyph sequence
+		box.Width, _, _ = box.glyphs.BBoxDimens()
+		pos = end
+		wordsKhipu.AppendKnot(box)
 	}
-	// 2. do NOT hyphenate => leave this to line breaker
-	// 3. attach glyph sequences to text boxes
-	// 4. measure text of glyph sequence
 	return wordsKhipu
 }
 
 func directionForText(styles styled.Set, dir bidi.Direction,
-	regs *params.TypesettingRegisters) text.TextDirection {
+	regs *params.TypesettingRegisters) text.Direction {
 	//
+	switch dir {
+	case bidi.LeftToRight:
+		return text.LeftToRight
+	case bidi.RightToLeft:
+		return text.RightToLeft
+	}
+	T().Infof("khipukamayuq: vertical text directions not yet implemented")
 	return text.LeftToRight
 }
 
 func scriptForText(styles styled.Set, regs *params.TypesettingRegisters) text.ScriptID {
-	return text.Latin
+	scr := regs.S(params.P_SCRIPT)
+	if scr == "" {
+		return text.Latin
+	}
+	return text.ScriptByName(scr)
 }
 
 // KnotEncode transforms an input text into a khipu.
@@ -192,14 +214,14 @@ func KnotEncode(text io.Reader, startpos uint64, pipeline *TypesettingPipeline,
 	for seg.Next() {
 		fragment := seg.Text()
 		p := penlty(seg.Penalties())
-		CT().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
+		T().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
 		k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
 		if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
 			HyphenateTextBoxes(k, pipeline, regs)
 		}
 		khipu.AppendKhipu(k)
 	}
-	CT().Infof("resulting khipu = %s", khipu)
+	T().Infof("resulting khipu = %s", khipu)
 	return khipu
 }
 
@@ -216,7 +238,7 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 	//
 	khipu := NewKhipu()
 	p := penlty(seg.Penalties())
-	CT().Errorf("CREATE PARITAL KHIPU, PENALTIES=%d|%d", p.p1, p.p2)
+	T().Errorf("CREATE PARITAL KHIPU, PENALTIES=%d|%d", p.p1, p.p2)
 	if p.lineWrap() { // broken by primary breaker
 		// fragment is terminated by possible line wrap opportunity
 		if p.breakSpace() { // broken by secondary breaker, too
@@ -236,13 +258,13 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 	} else { // segment is broken by secondary breaker
 		// fragment is start or end of a span of whitespace
 		if isspace(seg.Text()) {
-			CT().Errorf("BROKEN BY SECONDARY BREAKER: WHITESPACE")
+			T().Errorf("BROKEN BY SECONDARY BREAKER: WHITESPACE")
 			// close a span of whitespace
 			g := spaceglue(regs)
 			pen := Penalty(p.p2)
 			khipu.AppendKnot(g).AppendKnot(pen)
 		} else {
-			CT().Errorf("BROKEN BY SECONDARY BREAKER: TEXT_BOX")
+			T().Errorf("BROKEN BY SECONDARY BREAKER: TEXT_BOX")
 			// close a text box which is not a possible line wrap position
 			b := NewTextBox(seg.Text(), textpos)
 			pen := Penalty(dimen.Infty)
@@ -270,14 +292,14 @@ func HyphenateTextBoxes(khipu *Khipu, pipeline *TypesettingPipeline,
 			k = append(k, iterator.Knot())
 			continue
 		}
-		CT().Debugf("knot = %v | %v", iterator.Knot(), iterator.Knot())
+		T().Debugf("knot = %v | %v", iterator.Knot(), iterator.Knot())
 		textbox := iterator.AsTextBox()
 		textpos := textbox.Position
 		text := textbox.text
 		pipeline.words.Init(strings.NewReader(text))
 		for pipeline.words.Next() {
 			word := pipeline.words.Text()
-			CT().Debugf("   word = '%s'", word)
+			T().Debugf("   word = '%s'", word)
 			var syllables []string
 			isHyphenated := false
 			if len(word) >= regs.N(params.P_MINHYPHENLENGTH) {
@@ -335,12 +357,12 @@ func HyphenateWord(word string, regs *params.TypesettingRegisters) ([]string, bo
 	if dict == nil {
 		panic("TODO not yet implemented: find dictionnary for language")
 	}
-	CT().Debugf("   will try to hyphenate word")
+	T().Debugf("   will try to hyphenate word")
 	splitWord := dict.Hyphenate(word)
 	if len(splitWord) > 1 {
 		ok = true
 	}
-	CT().Debugf("   %v", splitWord)
+	T().Debugf("   %v", splitWord)
 	return splitWord, ok
 }
 

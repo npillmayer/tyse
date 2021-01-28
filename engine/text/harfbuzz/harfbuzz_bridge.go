@@ -19,6 +19,7 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/engine/text"
 )
@@ -75,7 +76,7 @@ func freeHBBuffer(buf uintptr) {
 }
 
 // Helper: convert a Textdirection enum into a flag suited for Harfbuzz
-func dir2hbdir(textdir text.TextDirection) int32 {
+func dir2hbdir(textdir text.Direction) int32 {
 	switch textdir {
 	case text.LeftToRight:
 		return 4
@@ -90,7 +91,7 @@ func dir2hbdir(textdir text.TextDirection) int32 {
 }
 
 // Set the text direction flag for a Harfbuzz buffer.
-func setHBBufferDirection(hbbuf uintptr, dir text.TextDirection) {
+func setHBBufferDirection(hbbuf uintptr, dir text.Direction) {
 	ptr := (*C.struct_hb_buffer_t)(unsafe.Pointer(hbbuf))
 	C.hb_buffer_set_direction(ptr, C.hb_direction_t(dir2hbdir(dir)))
 }
@@ -157,6 +158,17 @@ func (seq *hbGlyphSequence) GlyphCount() int {
 	return seq.length
 }
 
+func (seq *hbGlyphSequence) BBoxDimens() (dimen.Dimen, dimen.Dimen, dimen.Dimen) {
+	l := seq.GlyphCount()
+	var w dimen.Dimen
+	for i := 0; i < l; i++ {
+		info := seq.GetGlyphInfoAt(i)
+		w += info.XAdvance()
+	}
+	// TODO find h and d from font
+	return w, 0, 0
+}
+
 type hbGlyphInfo struct {
 	glyph    rune
 	cluster  int
@@ -191,23 +203,23 @@ func (gi *hbGlyphInfo) Cluster() int {
 }
 
 // Implement the GlyphInfo interface
-func (gi *hbGlyphInfo) XAdvance() float64 {
-	return gi.xadvance
+func (gi *hbGlyphInfo) XAdvance() dimen.Dimen {
+	return text.Float2Dimen(gi.xadvance)
 }
 
 // Implement the GlyphInfo interface
-func (gi *hbGlyphInfo) YAdvance() float64 {
-	return gi.yadvance
+func (gi *hbGlyphInfo) YAdvance() dimen.Dimen {
+	return text.Float2Dimen(gi.yadvance)
 }
 
 // Implement the GlyphInfo interface
-func (gi *hbGlyphInfo) XPosition() float64 {
-	return gi.x
+func (gi *hbGlyphInfo) XPosition() dimen.Dimen {
+	return text.Float2Dimen(gi.x)
 }
 
 // Implement the GlyphInfo interface
-func (gi *hbGlyphInfo) YPosition() float64 {
-	return gi.y
+func (gi *hbGlyphInfo) YPosition() dimen.Dimen {
+	return text.Float2Dimen(gi.y)
 }
 
 // For debugging purposes: string representation of a glyph sequence,
