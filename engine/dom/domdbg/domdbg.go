@@ -42,7 +42,7 @@ import (
 	"text/template"
 
 	"github.com/npillmayer/tyse/engine/dom"
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"golang.org/x/net/html"
 )
 

@@ -38,8 +38,8 @@ package douceuradapter
 import (
 	"github.com/aymerick/douceur/css"
 	"github.com/aymerick/douceur/parser"
-	"github.com/npillmayer/tyse/engine/dom/cssom"
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/style/cssom"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )

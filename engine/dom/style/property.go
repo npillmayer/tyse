@@ -45,7 +45,7 @@ import (
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
-// T returns a global tracer. We trace to the EngineTracer
+// T traces to a global engine tracer.
 func T() tracing.Trace {
 	return gtrace.EngineTracer
 }
@@ -259,18 +259,18 @@ var groupNameFromPropertyKey = map[string]string{
 	"border-top-right-radius":    "Border",
 	"border-bottom-left-radius":  "Border",
 	"border-bottom-right-radius": "Border",
-	"width":      "Dimension", // Dimension
-	"height":     "Dimension",
-	"min-width":  "Dimension",
-	"min-height": "Dimension",
-	"max-width":  "Dimension",
-	"max-height": "Dimension",
-	"display":    PGDisplay, // Display
-	"float":      PGDisplay,
-	"visibility": PGDisplay,
-	"position":   PGDisplay,
-	"flow-into":  PGRegion,
-	"flow-from":  PGRegion,
+	"width":                      "Dimension", // Dimension
+	"height":                     "Dimension",
+	"min-width":                  "Dimension",
+	"min-height":                 "Dimension",
+	"max-width":                  "Dimension",
+	"max-height":                 "Dimension",
+	"display":                    PGDisplay, // Display
+	"float":                      PGDisplay,
+	"visibility":                 PGDisplay,
+	"position":                   PGDisplay,
+	"flow-into":                  PGRegion,
+	"flow-from":                  PGRegion,
 }
 
 // isCascading returns wether the standard behaviour for a propery is to be

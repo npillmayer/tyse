@@ -10,7 +10,7 @@ import (
 	"github.com/andybalholm/cascadia"
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -102,7 +102,7 @@ func (cssom CSSOM) AddStylesForScope(scope *html.Node, css StyleSheet, source Pr
 	if css == nil {
 		return errors.New("Style sheet is nil")
 	}
-	cssom.rulesTree.StoreStylesheetForHtmlNode(scope, css, source)
+	cssom.rulesTree.StoreStylesheetForHTMLNode(scope, css, source)
 	return nil
 }
 
@@ -133,9 +133,9 @@ func newRulesTree() *rulesTreeType {
 	return rt
 }
 
-// StylesheetsForHtmlNode retrieves all style sheets registered for
+// StylesheetsForHTMLNode retrieves all style sheets registered for
 // an html node. If h is nil it is interpreted as the root scope.
-func (rt rulesTreeType) StylesheetsForHtmlNode(h *html.Node) []stylesheetType {
+func (rt rulesTreeType) StylesheetsForHTMLNode(h *html.Node) []stylesheetType {
 	if h == nil {
 		h = rootElement
 	}
@@ -146,18 +146,18 @@ func (rt rulesTreeType) StylesheetsForHtmlNode(h *html.Node) []stylesheetType {
 	return sheets.([]stylesheetType)
 }
 
-// StoreStylesheetForHtmlNode registers a style sheet for
+// StoreStylesheetForHTMLNode registers a style sheet for
 // an html node. If h is nil it is interpreted as the root scope.
-func (rt rulesTreeType) StoreStylesheetForHtmlNode(h *html.Node, sheet StyleSheet,
+func (rt rulesTreeType) StoreStylesheetForHTMLNode(h *html.Node, sheet StyleSheet,
 	source PropertySource) {
 	//
 	if h == nil {
 		h = rootElement
 	}
-	sheets := rt.StylesheetsForHtmlNode(h)
+	sheets := rt.StylesheetsForHTMLNode(h)
 	if sheets == nil {
 		T().Debugf("Adding first style sheet for HTML node %v", h)
-		rt.stylesheets.Store(h, []stylesheetType{stylesheetType{sheet, source}})
+		rt.stylesheets.Store(h, []stylesheetType{{sheet, source}})
 	} else {
 		T().Debugf("Adding another style sheet for HTML node %v", h)
 		sheets = append(sheets, stylesheetType{sheet, source})
@@ -180,7 +180,8 @@ func (rt *rulesTreeType) Empty() bool {
 	return csscnt == 0
 }
 
-// Compound properties are properties which abbreviate the
+// CompoundPropertiesSplitter splits compound properties into atomic properties.
+// Compunt properties are properties which abbreviate the
 // setting of more fine grained propertes. An example is
 //    padding: 10px 20px
 // which sets the following detail properties:
@@ -202,11 +203,14 @@ func (cssom CSSOM) RegisterCompoundSplitter(splitter CompoundPropertiesSplitter)
 
 // --- Style Rule Matching ----------------------------------------------
 
-// Properties may be defined at different places in HTML: as a sytlesheet
-// reference link, within a <script> element in the HTML file, or in an
+// PropertySource denotes where CSS properties come from and therewith determines
+// the specifity of properties. Properties may be defined at different places in HTML:
+// as a sytlesheet reference link, within a <script> element in the HTML file, or in an
 // attribute value.
 //
-// PropertySource affects the specifity of rules.
+// PropertySource affects the specifity of rules: attribute values bind the closest,
+// then come script elements within the HTML source, then external style sheets and
+// finally global (user-agent level) default properties.
 type PropertySource uint8
 
 // Values for property sources, used when adding style sheets.
@@ -233,16 +237,16 @@ type matchesList struct {
 
 // Rule-matchings are collected from more than one stylesheet. Matching
 // rules from these stylesheets will be merged to one list.
-func (mlist *matchesList) mergeMatchesWith(m *matchesList) *matchesList {
-	if mlist == nil {
+func (matches *matchesList) mergeMatchesWith(m *matchesList) *matchesList {
+	if matches == nil {
 		return m
 	}
 	if m != nil {
 		for _, r := range m.matchingRules {
-			mlist.matchingRules = append(mlist.matchingRules, r)
+			matches.matchingRules = append(matches.matchingRules, r)
 		}
 	}
-	return mlist
+	return matches
 }
 
 // Rule-matchings have to be sorted by specifity. We'll sort the highest
@@ -257,10 +261,10 @@ func (sp byHighestSpecifity) Swap(i, j int)      { sp[i], sp[j] = sp[j], sp[i] }
 func (sp byHighestSpecifity) Less(i, j int) bool { return sp[i].spec > sp[j].spec }
 
 // This is a small helper to print out a table with rule-matches for a node.
-func (m *matchesList) String() string {
-	s := fmt.Sprintf("match of %d rules:\n", len(m.matchingRules))
+func (matches *matchesList) String() string {
+	s := fmt.Sprintf("match of %d rules:\n", len(matches.matchingRules))
 	s += "Src +-- Spec. --+------------- Key --------------+------- Value ---------------\n"
-	for _, sp := range m.propertiesTable {
+	for _, sp := range matches.propertiesTable {
 		s += fmt.Sprintf("%3d | %9d | %30s | %s\n", sp.source, sp.spec, sp.propertyKey, sp.propertyValue)
 	}
 	return s
@@ -275,21 +279,21 @@ func (m *matchesList) String() string {
 func (rt *rulesTreeType) FilterMatchesFor(h *html.Node) *matchesList {
 	//list := &matchesList{}
 	matchingRules := make([]Rule, 0, 3)
-	sheets := rt.StylesheetsForHtmlNode(rootElement)
+	sheets := rt.StylesheetsForHTMLNode(rootElement)
 	for _, s := range sheets {
 		rules := s.stylesheet.Rules()
 		T().Debugf("Stylesheet has %d rules", len(rules))
 		for _, rule := range rules {
 			T().Debugf("Now try to match for HTML = %v", h.Data)
-			if rt.matchRuleForHtmlNode(h, rule) {
+			if rt.matchRuleForHTMLNode(h, rule) {
 				matchingRules = append(matchingRules, rule)
 			}
 		}
 	}
-	sheets = rt.StylesheetsForHtmlNode(h)
+	sheets = rt.StylesheetsForHTMLNode(h)
 	for _, s := range sheets {
 		for _, rule := range s.stylesheet.Rules() {
-			if rt.matchRuleForHtmlNode(h, rule) {
+			if rt.matchRuleForHTMLNode(h, rule) {
 				matchingRules = append(matchingRules, rule)
 			}
 		}
@@ -297,7 +301,7 @@ func (rt *rulesTreeType) FilterMatchesFor(h *html.Node) *matchesList {
 	return &matchesList{matchingRules, nil}
 }
 
-func (rt *rulesTreeType) matchRuleForHtmlNode(h *html.Node, rule Rule) bool {
+func (rt *rulesTreeType) matchRuleForHTMLNode(h *html.Node, rule Rule) bool {
 	selectorString := rule.Selector()
 	if selectorString == "" { // style-attribute local for this HTML node
 		//matchingRules = append(matchingRules, rule)
@@ -406,7 +410,7 @@ func (sp *propertyPlusSpecifityType) calcSpecifity(no int) {
 // --- Style Property Groups --------------------------------------------
 
 func (matches *matchesList) createStyleGroups(parent *tree.Node,
-	creator style.Creator) *style.PropertyMap {
+	creator style.NodeCreator) *style.PropertyMap {
 	//
 	pmap := style.NewPropertyMap()
 	done := make(map[string]bool, len(matches.propertiesTable))
@@ -450,7 +454,7 @@ func (matches *matchesList) createStyleGroups(parent *tree.Node,
 // setupStyledNodeTree sets up the root nodes of the style tree.
 // It creates a "root" node and a node for the HTML-document-node as its child.
 func setupStyledNodeTree(domRoot *html.Node, defaults *style.PropertyMap,
-	creator style.Creator) *tree.Node {
+	creator style.NodeCreator) *tree.Node {
 	//
 	rootNode := creator.StyleForHTMLNode(domRoot)
 	creator.SetStyles(rootNode, defaults)
@@ -462,7 +466,7 @@ func setupStyledNodeTree(domRoot *html.Node, defaults *style.PropertyMap,
 
 //func findAncestorWithPropertyGroup(sn StyledNode, group string, builder StyledTreeBuilder) (StyledNode, *style.PropertyGroup) {
 func findAncestorWithPropertyGroup(sn *tree.Node, group string,
-	creator style.Creator) (*tree.Node, *style.PropertyGroup) {
+	creator style.NodeCreator) (*tree.Node, *style.PropertyGroup) {
 	//
 	var pg *style.PropertyGroup
 	if sn == nil {
@@ -499,7 +503,7 @@ func findAncestorWithPropertyGroup(sn *tree.Node, group string,
 // https://limpet.net/mbrubeck/2014/08/23/toy-layout-engine-4-style.html
 //
 // If either dom or creator are nil, no tree is returned (but an error).
-func (cssom CSSOM) Style(dom *html.Node, creator style.Creator) (*tree.Node, error) {
+func (cssom CSSOM) Style(dom *html.Node, creator style.NodeCreator) (*tree.Node, error) {
 	if dom == nil {
 		return nil, errors.New("Nothing to style: empty document")
 	}
@@ -544,7 +548,7 @@ func (cssom CSSOM) Style(dom *html.Node, creator style.Creator) (*tree.Node, err
 // Pre-condition: sn has been styled and points to an HTML node.
 // Now iterate through the HTML children and create styled nodes for each.
 func createStyledChildren(parent *tree.Node, rulesTree *rulesTreeType,
-	creator style.Creator) (*tree.Node, error) {
+	creator style.NodeCreator) (*tree.Node, error) {
 	//
 	domnode := creator.ToStyler(parent)
 	//domnode := dom.NewRONode(parent, creator.ToStyler) // interface RODomNode
@@ -561,7 +565,7 @@ func createStyledChildren(parent *tree.Node, rulesTree *rulesTreeType,
 				parent.AddChild(sn) // sn will be sent to next pipeline stage
 				if styleAttr := getStyleAttribute(ch); styleAttr != nil {
 					// attach local style attributes
-					rulesTree.StoreStylesheetForHtmlNode(ch, styleAttr, Attribute)
+					rulesTree.StoreStylesheetForHTMLNode(ch, styleAttr, Attribute)
 				}
 			}
 			ch = ch.NextSibling
@@ -602,7 +606,7 @@ func isStylable(a atom.Atom) bool {
 	return false
 }
 
-func createStylesForNode(node *tree.Node, rulesTree *rulesTreeType, creator style.Creator,
+func createStylesForNode(node *tree.Node, rulesTree *rulesTreeType, creator style.NodeCreator,
 	splitters []CompoundPropertiesSplitter) (*tree.Node, error) {
 	//
 	styler := creator.ToStyler(node)
@@ -731,7 +735,7 @@ func newLocalPseudoRule(styleAttr string) localPseudoRuleType {
 			} else {
 				k := strings.TrimSpace(s[0])
 				v := strings.TrimSpace(s[1])
-				kv = append(kv, style.KeyValue{k, style.Property(v)})
+				kv = append(kv, style.KeyValue{Key: k, Value: style.Property(v)})
 			}
 		}
 	}
@@ -765,7 +769,10 @@ func (pseudorule localPseudoRuleType) IsImportant(string) bool {
 func (pseudosheet *localPseudoStylesheetType) AppendRules(s StyleSheet) {
 	for _, r := range s.Rules() {
 		for _, k := range r.Properties() {
-			pseudosheet.rule = append(pseudosheet.rule, style.KeyValue{k, r.Value(k)})
+			pseudosheet.rule = append(pseudosheet.rule, style.KeyValue{
+				Key:   k,
+				Value: r.Value(k),
+			})
 		}
 	}
 }

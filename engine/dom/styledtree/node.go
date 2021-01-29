@@ -51,7 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // https://godoc.org/github.com/jiangmitiao/ebook-go
 
 import (
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
@@ -91,7 +91,7 @@ func (sn *StyNode) AsStyler() style.Styler {
 }
 
 // Creator returns a style-creator for use in CSSOM
-func Creator() style.Creator {
+func Creator() style.NodeCreator {
 	return creator{}
 }
 

@@ -1,6 +1,6 @@
 package cssom
 
-import "github.com/npillmayer/tyse/engine/dom/cssom/style"
+import "github.com/npillmayer/tyse/engine/dom/style"
 
 /* -----------------------------------------------------------------
 BSD License

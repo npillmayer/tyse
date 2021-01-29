@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/npillmayer/tyse/engine/dom/cssom"
-	"github.com/npillmayer/tyse/engine/dom/cssom/douceuradapter"
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/style/cssom"
+	"github.com/npillmayer/tyse/engine/dom/style/cssom/douceuradapter"
 	"github.com/npillmayer/tyse/engine/dom/styledtree"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
 	"github.com/npillmayer/tyse/engine/tree"
