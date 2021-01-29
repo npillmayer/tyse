@@ -3,7 +3,7 @@ package styled
 import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/text"
 )
 

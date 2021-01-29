@@ -6,7 +6,7 @@ import (
 
 	"github.com/npillmayer/cords"
 	sty "github.com/npillmayer/cords/styled"
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
 	"github.com/npillmayer/uax/bidi"
 	"golang.org/x/net/html"

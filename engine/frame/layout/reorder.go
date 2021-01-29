@@ -1,7 +1,7 @@
 package layout
 
 import (
-	"github.com/npillmayer/tyse/engine/dom/cssom/style"
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
