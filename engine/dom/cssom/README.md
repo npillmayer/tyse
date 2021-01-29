@@ -3,14 +3,13 @@
 We strive to separate content from presentation. In typesetting, this is
 probably an impossible claim, but we'll try anyway. Presentation
 is governed with CSS (Cascading Style Sheets). CSS uses a box model more
-complex than TeX's, which is well described here:
+complex than that of the TeX typesetting system and is well described here:
 
    https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS/Box_model
 
 If you think about it: a typesetter using the HTML/CSS box model is
 effectively a browser with output type PDF.
 We therefore employ styling of HTML nodes like a web browser does.
-
 A good explanation of styling may be found in
 
    https://hacks.mozilla.org/2017/08/inside-a-super-fast-css-engine-quantum-css-aka-stylo/
@@ -33,7 +32,7 @@ and a style sheet like this:
     	padding-top: 20pt;
     }
 
-a styling engine wil produce a tree like this (simpified version – the
+a styling engine wil produce a tree like this (simplified version – the
 real data structures are more involved):
 
 ![styling](https://user-images.githubusercontent.com/4531688/52282401-a4ccdf80-2960-11e9-8ede-0ceee394b6ab.png)
@@ -49,8 +48,6 @@ in implementing a styling engine, except the great work of
 https://godoc.org/github.com/andybalholm/cascadia.
 Therefore we will have to compromise
 on many features in order to complete this in a realistic time frame.
-For a reminder of why that is, refer to
-https://www.youtube.com/watch?v=S68fcV09nGQ .
 
 This package relies on just one non-standard external library: cascadia.
 CSS handling is de-coupled by introducing appropriate interfaces
