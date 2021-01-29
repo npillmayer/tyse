@@ -56,5 +56,5 @@ of package style.
 
 ## Status
 
-This is a very first draft. It is unstable and the API will change without
+This is a first draft. It is unstable and the API will change without
 notice. Please be patient.
