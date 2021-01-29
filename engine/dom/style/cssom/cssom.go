@@ -19,7 +19,7 @@ import (
 /* -----------------------------------------------------------------
 BSD License
 
-Copyright (c) 2017–18, Norbert Pillmayer
+Copyright (c) 2017–21, Norbert Pillmayer
 
 All rights reserved.
 
@@ -34,7 +34,7 @@ notice, this list of conditions and the following disclaimer.
 notice, this list of conditions and the following disclaimer in the
 documentation and/or other materials provided with the distribution.
 
-3. Neither the name of Norbert Pillmayer nor the names of its contributors
+3. Neither the name of this software nor the names of its contributors
 may be used to endorse or promote products derived from this software
 without specific prior written permission.
 
@@ -51,7 +51,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ----------------------------------------------------------------- */
 
-// T returns a global tracer. We trace to EngineTracer.
+// T returns a global tracer. We trace to the engine tracer.
 func T() tracing.Trace {
 	return gtrace.EngineTracer
 }
