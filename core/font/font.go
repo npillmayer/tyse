@@ -96,8 +96,10 @@ type TypeCase struct {
 }
 
 func NullTypeCase() *TypeCase {
-	panic("NullTypecase TODO")
-	//return nil
+	return &TypeCase{
+		font: nil,
+		size: 10,
+	}
 }
 
 func LoadOpenTypeFont(fontfile string) (*ScalableFont, error) {

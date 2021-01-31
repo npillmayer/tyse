@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/khipu/styled"
-	"github.com/npillmayer/tyse/engine/text"
-	"github.com/npillmayer/tyse/engine/text/glypher"
+	"github.com/npillmayer/tyse/engine/text/monospace"
+	"github.com/npillmayer/uax/grapheme"
 	"golang.org/x/net/html"
 )
 
@@ -26,19 +27,22 @@ func TestBasic(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	//
+	grapheme.SetupGraphemeClasses()
 	dom := buildDOM(myhtml, t)
 	para, err := styled.InnerParagraphText(dom)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	t.Logf("inner text of DOM = '%s'", para.Raw().String())
-	k, err := EncodeParagraph(para, 0, glypher.Instance(text.LeftToRight, text.Latin), nil, nil)
+	k, err := EncodeParagraph(para, 0, monospace.Shaper(11*dimen.PT, nil), nil, nil)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	if k == nil {
 		t.Fatalf("resulting khipu is nil, should not be")
 	}
+	t.Logf("k = %v", k)
+	t.Fail()
 }
 
 // --- Helpers ---------------------------------------------------------------

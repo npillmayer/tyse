@@ -53,9 +53,9 @@ func (ms msshape) Shape(text string, typecase *font.TypeCase) text.GlyphSequence
 		grphm := []byte(gstr.Nth(i))
 		w := uax11.Width(grphm, ms.context)
 		g := msglyph{
-			cluster: grphm,
-			pos:     i,
-			w:       dimen.Dimen(w) * ms.em,
+			grapheme: grphm,
+			pos:      i,
+			w:        dimen.Dimen(w) * ms.em,
 		}
 		seq.glyphs = append(seq.glyphs, g)
 		seq.w += g.w
@@ -106,10 +106,10 @@ func (gseq msglyphseq) String() string {
 var _ text.GlyphSequence = msglyphseq{}
 
 type msglyph struct {
-	glyph   rune
-	cluster []byte
-	pos     int
-	w       dimen.Dimen
+	glyph    rune
+	grapheme []byte
+	pos      int
+	w        dimen.Dimen
 }
 
 func (g msglyph) Glyph() rune {
