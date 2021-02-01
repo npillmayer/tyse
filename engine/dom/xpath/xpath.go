@@ -39,8 +39,15 @@ import (
 	"errors"
 
 	"github.com/antchfx/xpath"
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/engine/tree"
 )
+
+// T traces to a global core tracer.
+func T() tracing.Trace {
+	return gtrace.CoreTracer
+}
 
 var errInvalidXPathExpr = errors.New("Invalid XPath expression")
 var errNavigator = errors.New("Invalid XPath tree navigator")
@@ -61,11 +68,13 @@ type NodeExtractorFunc func(xpath.NodeNavigator) (*tree.Node, error)
 // the NodeNavigator. The extract function is required to be able to handle a
 // NodeNavigator of the type underlying nav.
 func NewXPath(nav xpath.NodeNavigator, extract NodeExtractorFunc) (*XPath, error) {
-	xp := &XPath{}
 	if nav == nil {
 		return nil, errNavigator
 	}
-	xp.navigator = nav
+	xp := &XPath{
+		navigator: nav,
+		extractor: extract,
+	}
 	return xp, nil
 }
 
@@ -79,9 +88,11 @@ func (xp *XPath) Find(xpathexpr string) ([]*tree.Node, error) {
 		return nil, errInvalidXPathExpr
 	}
 	t := compiled.Select(xp.navigator)
+	T().Errorf("select returns t = %v", t)
 	var lasterr error
 	for t.MoveNext() {
 		node, err := xp.getCurrentNode(t)
+		T().Errorf("move to next, node = %v", node)
 		if err != nil {
 			lasterr = err
 		} else {

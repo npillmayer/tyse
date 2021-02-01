@@ -54,10 +54,17 @@ import (
 	"fmt"
 
 	"github.com/antchfx/xpath"
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/engine/dom/styledtree"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
+
+// T traces to a global core tracer.
+func T() tracing.Trace {
+	return gtrace.CoreTracer
+}
 
 type NodeNavigator struct {
 	root, current *styledtree.StyNode
@@ -87,17 +94,20 @@ func CurrentNode(nav xpath.NodeNavigator) (*tree.Node, error) {
 }
 
 func (nav *NodeNavigator) NodeType() xpath.NodeType {
+	//T().Errorf("get node type (current = %v)", nav.current)
 	switch nav.current.HTMLNode().Type {
 	case html.CommentNode:
 		return xpath.CommentNode
 	case html.TextNode:
 		return xpath.TextNode
 	case html.DocumentNode:
+		//T().Errorf("    node type (current = %v) is document", nav.current)
 		return xpath.RootNode
 	case html.ElementNode:
 		if nav.attr != -1 {
 			return xpath.AttributeNode
 		}
+		//T().Errorf("    node type (current = %v) is element", nav.current)
 		return xpath.ElementNode
 	case html.DoctypeNode:
 		// ignored <!DOCTYPE HTML> declare and as Root-Node type.
@@ -107,9 +117,11 @@ func (nav *NodeNavigator) NodeType() xpath.NodeType {
 }
 
 func (nav *NodeNavigator) LocalName() string {
+	//T().Errorf("get local name (current = %v)", nav.current)
 	if nav.attr != -1 {
 		return nav.current.HTMLNode().Attr[nav.attr].Key
 	}
+	//T().Errorf("    local name (current = %v) is %v", nav.current, nav.current.HTMLNode().Data)
 	return nav.current.HTMLNode().Data
 }
 
@@ -118,6 +130,7 @@ func (*NodeNavigator) Prefix() string {
 }
 
 func (nav *NodeNavigator) Value() string {
+	//T().Errorf("get value (current = %v)", nav.current)
 	switch nav.current.HTMLNode().Type {
 	case html.CommentNode:
 		return "<comment nodes not supported>"
@@ -133,15 +146,19 @@ func (nav *NodeNavigator) Value() string {
 }
 
 func (nav *NodeNavigator) Copy() xpath.NodeNavigator {
+	//T().Errorf("copy nav (current = %v)", nav.current)
 	n := *nav
 	return &n
 }
 
 func (nav *NodeNavigator) MoveToRoot() {
+	//T().Errorf("move to root (current = %v)", nav.current)
 	nav.current = nav.root
 }
 
 func (nav *NodeNavigator) MoveToParent() bool {
+	//T().Errorf("move to parent (current = %v)", nav.current)
+	//cname := nav.current.HTMLNode().Data
 	if nav.attr != -1 {
 		nav.attr = -1 // move from attributes to element
 		return true
@@ -153,6 +170,7 @@ func (nav *NodeNavigator) MoveToParent() bool {
 	if nav.current == nil {
 		return false
 	}
+	//T().Errorf("------ node=%v, parent=%v", cname, nav.current.HTMLNode().Data)
 	nav.chinx = 0
 	return true
 }
@@ -166,10 +184,13 @@ func (nav *NodeNavigator) MoveToNextAttribute() bool {
 }
 
 func (nav *NodeNavigator) MoveToChild() bool {
+	//T().Errorf("move to child (current = %v)", nav.current)
+	//cname := nav.current.HTMLNode().Data
 	if nav.attr != -1 {
 		return false
 	}
 	if nav.current.ChildCount() == 0 {
+		//T().Errorf("      0 children (current = %v)", nav.current)
 		return false
 	}
 	nav.chinx = 0
@@ -177,11 +198,14 @@ func (nav *NodeNavigator) MoveToChild() bool {
 	child, ok := nav.current.Child(0)
 	if ok {
 		nav.current = styledtree.Node(child)
+		//T().Errorf("move OK, child = %v", nav.current)
+		//T().Errorf("------ node=%v, child=%v", cname, nav.current.HTMLNode().Data)
 	}
 	return ok
 }
 
 func (nav *NodeNavigator) MoveToFirst() bool {
+	//T().Errorf("move to first (current = %v)", nav.current)
 	if nav.attr != -1 || nav.chinx == 0 {
 		return false
 	}
@@ -199,22 +223,47 @@ func (nav *NodeNavigator) String() string {
 }
 
 func (nav *NodeNavigator) MoveToNext() bool {
+	//T().Errorf("move to next (current = %v)", nav.current)
+	//cname := nav.current.HTMLNode().Data
+	//old := nav.current
 	if nav.attr != -1 {
 		return false
 	}
 	parent := styledtree.Node(nav.current.Parent())
-	if nav.chinx < parent.ChildCount()-1 {
-		nav.chinx++
-		ch, ok := parent.Child(nav.chinx)
+	//T().Errorf("parent.ch#=%d", parent.ChildCount())
+	//T().Errorf("nav.chinx=%d", nav.chinx)
+	i := 0
+	for ; i < parent.ChildCount()-1; i++ {
+		child, ok := parent.Child(i)
 		if ok {
-			nav.current = styledtree.Node(ch)
+			y := styledtree.Node(child)
+			if y == nav.current {
+				break
+			}
 		}
-		return ok
 	}
-	return false
+	i++
+	if i == parent.ChildCount() { // was last child of parent
+		return false
+	}
+	child, ok := parent.Child(i)
+	if ok {
+		nav.current = styledtree.Node(child)
+		// if old == nav.current {
+		// 	for i := 0; i < parent.ChildCount(); i++ {
+		// 		x, _ := parent.Child(i)
+		// 		xx := styledtree.Node(x)
+		// 		T().Errorf("x = %v", xx.HTMLNode().Data)
+		// 	}
+		// 	T().Errorf("old = %v, inx=%d", old.HTMLNode().Data, nav.chinx)
+		// 	panic("old == nav.current")
+		// }
+	}
+	return ok
 }
 
 func (nav *NodeNavigator) MoveToPrevious() bool {
+	//T().Errorf("move to previous (current = %v)", nav.current)
 	if nav.attr != -1 {
 		return false
 	}
@@ -231,6 +280,7 @@ func (nav *NodeNavigator) MoveToPrevious() bool {
 }
 
 func (nav *NodeNavigator) MoveTo(other xpath.NodeNavigator) bool {
+	//T().Errorf("move to other (current = %v)", nav.current)
 	n, ok := other.(*NodeNavigator)
 	if !ok || n.root != nav.root {
 		return false

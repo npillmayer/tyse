@@ -8,7 +8,9 @@ import (
 	"github.com/npillmayer/tyse/engine/dom/style/cssom"
 	"github.com/npillmayer/tyse/engine/dom/style/cssom/douceuradapter"
 	"github.com/npillmayer/tyse/engine/dom/styledtree"
+	"github.com/npillmayer/tyse/engine/dom/styledtree/xpathadapter"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
+	"github.com/npillmayer/tyse/engine/dom/xpath"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
@@ -548,6 +550,20 @@ func FromHTMLParseTree(h *html.Node, css cssom.StyleSheet) *W3CNode {
 		return nil
 	}
 	return domify(stytree)
+}
+
+// XPath creates an xpath navigator with start position w.
+func (w *W3CNode) XPath() *xpath.XPath {
+	if w == nil {
+		return nil
+	}
+	nav := xpathadapter.NewNavigator(w.stylednode)
+	xp, err := xpath.NewXPath(nav, xpathadapter.CurrentNode)
+	if err != nil {
+		T().Errorf("dom xpath: %v", err.Error())
+		return nil
+	}
+	return xp
 }
 
 // Walk creates a tree walker set up to traverse the DOM.
