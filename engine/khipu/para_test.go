@@ -4,7 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/khipu/styled"
@@ -24,12 +25,26 @@ var myhtml = `
 `
 
 func TestBasic(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
-	defer teardown()
+	//teardown := testconfig.QuickConfig(t)
+	//defer teardown()
+	gtrace.CoreTracer = gologadapter.New()
 	//
 	grapheme.SetupGraphemeClasses()
-	dom := buildDOM(myhtml, t)
-	para, err := styled.InnerParagraphText(dom)
+	root := buildDOM(myhtml, t)
+	xp := root.XPath()
+	n, err := xp.FindOne("//p")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Logf("n=%v", n)
+	if n == nil {
+		t.Fatal("p not found")
+	}
+	p, _ := dom.NodeFromTreeNode(n)
+	// if err != nil {
+	// 	t.Fatalf(err.Error())
+	// }
+	para, err := styled.InnerParagraphText(p)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -41,7 +56,7 @@ func TestBasic(t *testing.T) {
 	if k == nil {
 		t.Fatalf("resulting khipu is nil, should not be")
 	}
-	t.Logf("k = %v", k)
+	t.Logf("khipu = %v", k)
 	t.Fail()
 }
 
