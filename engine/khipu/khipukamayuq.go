@@ -64,16 +64,40 @@ type TypesettingPipeline struct {
 	words       *segment.Segmenter
 }
 
+type typEnv struct { // typesetting environment
+	shaper   text.Shaper
+	pipeline *TypesettingPipeline
+	regs     *params.TypesettingRegisters
+	levels   *bidi.ResolvedLevels
+}
+
+type styledItem struct {
+	from, to uint64
+	styles   styled.Set
+}
+
 func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper,
 	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
 	//
 	if regs == nil {
 		regs = params.NewTypesettingRegisters()
 	}
+	env := typEnv{
+		shaper:   shaper,
+		pipeline: pipeline,
+		regs:     regs,
+		levels:   para.Levels(),
+	}
+	text := para.Raw().Reader()
+	env.pipeline = PrepareTypesettingPipeline(text, env.pipeline)
 	var result *Khipu = NewKhipu()
 	para.ForEachStyleRun(func(run styled.Run) error {
-		text := strings.NewReader(run.Text)
-		k, err := encodeRun(text, startpos, run.StyleSet, para.Levels(), shaper, pipeline, regs)
+		item := styledItem{
+			from: startpos + run.Position,
+			to:   startpos + run.Position + run.Len(),
+		}
+		item.styles = run.StyleSet
+		k, err := encodeRun(text, item, env)
 		if err != nil {
 			return err
 		}
@@ -83,19 +107,20 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper
 	return result, nil
 }
 
-func encodeRun(text io.Reader, startpos uint64, styles styled.Set, levels *bidi.ResolvedLevels, shaper text.Shaper,
-	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
+func encodeRun(text io.Reader, item styledItem, env typEnv) (*Khipu, error) {
 	//
-	pipeline = PrepareTypesettingPipeline(text, pipeline)
 	k := NewKhipu()
-	textpos := startpos
-	seg := pipeline.segmenter
-	for seg.Next() {
+	seg := env.pipeline.segmenter
+	//end := item.to
+	for seg.Next() { // TODO we have to set a stopper at item.to  for the segmenter
+		T().Errorf("TODO set stopper for segmenter at item.to")
 		fragment := seg.Text()
 		p := penlty(seg.Penalties())
 		T().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
 		//k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
-		kfrag, err := encodeSegment(fragment, p, textpos, levels, styles, shaper, pipeline, regs)
+		item.from = item.to
+		item.to += uint64(len(fragment))
+		kfrag, err := encodeSegment(fragment, p, item, env)
 		// if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
 		// 	HyphenateTextBoxes(k, pipeline, regs)
 		// }
@@ -107,27 +132,31 @@ func encodeRun(text io.Reader, startpos uint64, styles styled.Set, levels *bidi.
 	return k, nil
 }
 
-func encodeSegment(fragm string, p penalties, pos uint64, levels *bidi.ResolvedLevels, styles styled.Set, shaper text.Shaper,
-	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
+func encodeSegment(fragm string, p penalties, item styledItem, env typEnv) (*Khipu, error) {
 	//
 	if p.breakSpace() && isspace(fragm) {
-		return encodeSpace(fragm, p, styles, regs), nil
+		return encodeSpace(fragm, p, item.styles, env.regs), nil
 	}
 	if p.lineWrap() && p.breakSpace() {
 		// line wrap at space
 		// b := NewTextBox(seg.Text(), textpos)
 		// khipu.AppendKnot(b).AppendKnot(Penalty(dimen.Infty))
+		b := encodeText(fragm, item, env)
+		b.AppendKnot(Penalty(p.p1))
+		return b, nil
 	}
 	if p.lineWrap() { // line wrap without space
 		// identified as a possible line break, but no space
 		// insert explicit discretionary '\-' penalty
+		k := NewKhipu().AppendKnot(Penalty(env.regs.N(params.P_HYPHENPENALTY)))
+		return k, nil
 	}
 	// no line wrap and no break at space: inhibit break with infinite penalty
 	// close a text box which is not a possible line wrap position
 	// b := NewTextBox(seg.Text(), textpos)
 	// pen := Penalty(dimen.Infty)
 	// khipu.AppendKnot(b).AppendKnot(pen)
-	b := encodeText(fragm, pos, levels, styles, shaper, pipeline, regs)
+	b := encodeText(fragm, item, env)
 	b.AppendKnot(Penalty(dimen.Infty))
 	return b, nil
 }
@@ -135,44 +164,43 @@ func encodeSegment(fragm string, p penalties, pos uint64, levels *bidi.ResolvedL
 func encodeSpace(fragm string, p penalties, styles styled.Set,
 	regs *params.TypesettingRegisters) *Khipu {
 	//
+	T().Debugf("khipukamayuq: encode space with penalites %v", p)
 	k := NewKhipu()
 	g := spaceglue(regs)
 	k.AppendKnot(g).AppendKnot(Penalty(p.p2))
 	return k
 }
 
-func encodeText(fragm string, pos uint64, levels *bidi.ResolvedLevels, styles styled.Set, shaper text.Shaper,
-	pipeline *TypesettingPipeline,
-	regs *params.TypesettingRegisters) *Khipu {
+func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 	//
 	wordsKhipu := NewKhipu()
 	// 1. break fragment into words by UAX#29
-	pipeline.words.Init(strings.NewReader(fragm))
-	for pipeline.words.Next() {
-		word := pipeline.words.Text()
+	env.pipeline.words.Init(strings.NewReader(fragm))
+	pos := item.from
+	for env.pipeline.words.Next() {
+		word := env.pipeline.words.Text()
 		if len(word) == 0 { // should never happen, but be careful not to panic
 			continue
 		}
 		end := pos + uint64(len(word))
 		T().Debugf("encode text: word = '%s'", word)
-		bidiDir := levels.DirectionAt(pos)
-		bidiEnd := levels.DirectionAt(end - 1)
+		bidiDir := env.levels.DirectionAt(pos)
+		bidiEnd := env.levels.DirectionAt(end - 1)
 		if bidiDir != bidiEnd {
 			panic("bidi-level changes mid-word")
 			// TODO: iterate over word and bidi-level until point of change
 			// or: have an API for this in bidi.ResolvedLevels
 		}
 		// 2. configure shaper
-		shaper.SetDirection(directionForText(styles, bidiDir, regs))
-		shaper.SetScript(scriptForText(styles, regs))
-		shaper.SetLanguage(regs.S(params.P_LANGUAGE))
+		env.shaper.SetDirection(directionForText(item.styles, bidiDir, env.regs))
+		env.shaper.SetScript(scriptForText(item.styles, env.regs))
+		env.shaper.SetLanguage(env.regs.S(params.P_LANGUAGE))
 		// 3. do NOT hyphenate => leave this to line breaker
 		// 4. attach glyph sequences to text boxes
 		box := NewTextBox(word, pos)
-		box.glyphs = shaper.Shape(word, styles.Font())
-		T().Errorf("khipukamayuq: TODO h and d not yet calculated")
+		box.glyphs = env.shaper.Shape(word, item.styles.Font())
 		// 5. measure text of glyph sequence
-		box.Width, _, _ = box.glyphs.BBoxDimens()
+		box.Width, box.Height, box.Depth = box.glyphs.BBoxDimens()
 		pos = end
 		wordsKhipu.AppendKnot(box)
 	}

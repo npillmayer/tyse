@@ -128,6 +128,7 @@ func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) text.GlyphSequen
 	}
 	harfbuzzShape(hb.buffer, text, hbfont)
 	seq := getHBGlyphInfo(hb.buffer)
+	seq.font = typecase
 	return seq
 }
 

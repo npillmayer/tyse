@@ -99,7 +99,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// T traces to the core-tracer.
+// T traces to the engine-tracer.
 func T() tracing.Trace {
-	return gtrace.CoreTracer
+	return gtrace.EngineTracer
 }

@@ -200,6 +200,7 @@ type GlyphSequence interface {
 	GlyphCount() int
 	GetGlyphInfoAt(pos int) GlyphInfo
 	BBoxDimens() (dimen.Dimen, dimen.Dimen, dimen.Dimen) // w, h, d
+	Font() *font.TypeCase
 }
 
 // A Shaper creates a sequence of glyphs from a sequence of

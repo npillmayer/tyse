@@ -95,6 +95,11 @@ type Run struct {
 	StyleSet Set
 }
 
+// Len is a shortcut for len(r.Text)
+func (r Run) Len() uint64 {
+	return uint64(len(r.Text))
+}
+
 // innerText creates a text cord for the textual content of an HTML element and all
 // its descendents. It resembles the text produced by
 //

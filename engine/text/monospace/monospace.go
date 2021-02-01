@@ -60,6 +60,8 @@ func (ms msshape) Shape(text string, typecase *font.TypeCase) text.GlyphSequence
 		seq.glyphs = append(seq.glyphs, g)
 		seq.w += g.w
 	}
+	seq.h = 3 / 5 * ms.em
+	seq.d = 2 / 5 * ms.em
 	return seq
 }
 
@@ -93,6 +95,10 @@ func (gseq msglyphseq) GetGlyphInfoAt(pos int) text.GlyphInfo {
 
 func (gseq msglyphseq) BBoxDimens() (dimen.Dimen, dimen.Dimen, dimen.Dimen) {
 	return gseq.w, gseq.h, gseq.d
+}
+
+func (gseq msglyphseq) Font() *font.TypeCase {
+	return nil
 }
 
 func (gseq msglyphseq) String() string {

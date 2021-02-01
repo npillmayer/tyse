@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
@@ -19,7 +20,7 @@ var myhtml = `
 	<html>
 	<body>
 	<h1>My First Heading</h1>
-	<p>My <b>first</b> paragraph.</p>
+	<p>My short <b>first</b> paragraph.</p>
 	</body>
 	</html> 
 `
@@ -27,7 +28,8 @@ var myhtml = `
 func TestBasic(t *testing.T) {
 	//teardown := testconfig.QuickConfig(t)
 	//defer teardown()
-	gtrace.CoreTracer = gologadapter.New()
+	gtrace.EngineTracer = gologadapter.New()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	grapheme.SetupGraphemeClasses()
 	root := buildDOM(myhtml, t)

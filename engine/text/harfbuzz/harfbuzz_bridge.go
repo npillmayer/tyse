@@ -151,6 +151,7 @@ type hbGlyphSequence struct {
 	length int
 	info   *C.hb_glyph_info_t
 	pos    *C.hb_glyph_position_t
+	font   *font.TypeCase
 }
 
 // Implement the GlyphSequence interface
@@ -167,6 +168,10 @@ func (seq *hbGlyphSequence) BBoxDimens() (dimen.Dimen, dimen.Dimen, dimen.Dimen)
 	}
 	// TODO find h and d from font
 	return w, 0, 0
+}
+
+func (seq *hbGlyphSequence) Font() *font.TypeCase {
+	return seq.font
 }
 
 type hbGlyphInfo struct {
