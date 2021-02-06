@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import (
 	"bufio"
 	"io"
+	"math"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -72,8 +73,10 @@ type typEnv struct { // typesetting environment
 }
 
 type styledItem struct {
-	from, to uint64
-	styles   styled.Set
+	offset             uint64
+	end                uint64
+	from, to           uint64
+	prevStyles, styles styled.Set
 }
 
 func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper,
@@ -89,14 +92,21 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper
 		levels:   para.Levels(),
 	}
 	text := para.Raw().Reader()
+	paraLen := para.Raw().Len()
 	env.pipeline = PrepareTypesettingPipeline(text, env.pipeline)
 	var result *Khipu = NewKhipu()
+	T().Debugf("------------ start of para -----------")
+	//var stylesForItem styled.Set
 	para.ForEachStyleRun(func(run styled.Run) error {
 		item := styledItem{
-			from: startpos + run.Position,
-			to:   startpos + run.Position + run.Len(),
+			offset: startpos,
+			end:    paraLen,
+			from:   startpos + run.Position,
+			to:     startpos + run.Position + run.Len(),
+			//prevStyles: stylesForItem,
+			styles: run.StyleSet,
 		}
-		item.styles = run.StyleSet
+		T().Debugf("--- encoding run '%s'", run.Text)
 		k, err := encodeRun(text, item, env)
 		if err != nil {
 			return err
@@ -107,17 +117,17 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper
 	return result, nil
 }
 
-func encodeRun(text io.Reader, item styledItem, env typEnv) (*Khipu, error) {
-	//
-	k := NewKhipu()
+func encodeRun(text io.Reader, item styledItem, env typEnv) (k *Khipu, err error) {
+	k = NewKhipu()                   // will be return value
+	stopper := int64(item.to)        // we won't read beyond end of item run
+	if uint64(stopper) >= item.end { // except when at end of paragraph
+		stopper = math.MaxInt64 // set stopper to unreachable value
+	}
 	seg := env.pipeline.segmenter
-	//end := item.to
-	for seg.Next() { // TODO we have to set a stopper at item.to  for the segmenter
-		T().Errorf("TODO set stopper for segmenter at item.to")
+	for seg.BoundedNext(stopper) {
 		fragment := seg.Text()
 		p := penlty(seg.Penalties())
 		T().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
-		//k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
 		item.from = item.to
 		item.to += uint64(len(fragment))
 		kfrag, err := encodeSegment(fragment, p, item, env)
@@ -125,11 +135,12 @@ func encodeRun(text io.Reader, item styledItem, env typEnv) (*Khipu, error) {
 		// 	HyphenateTextBoxes(k, pipeline, regs)
 		// }
 		if err != nil {
-			return nil, err
+			break
 		}
 		k = k.AppendKhipu(kfrag)
 	}
-	return k, nil
+	T().Debugf("------------- end of run -------------")
+	return k, err
 }
 
 func encodeSegment(fragm string, p penalties, item styledItem, env typEnv) (*Khipu, error) {
