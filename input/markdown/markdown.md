@@ -1,6 +1,12 @@
 Parsing Markdown
 ================
 
+https://www.howtogeek.com/448323/what-is-markdown-and-how-do-you-use-it/
+
+https://allmark.io/
+
+https://github.com/mattn/efm-langserver
+
 Ziele bei "normalen" MD parsern:
 
 * Speed (online-Darstellung im Web)

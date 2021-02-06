@@ -1,0 +1,49 @@
+
+
+document ::= blocks*
+
+block ::=
+    title
+  | paragraph
+  | block_image
+  | indentenvironment
+  | block_quote
+  | block_pre
+  | list
+  | htmlblock
+
+title ::=
+    fence space? text
+  | text underline
+
+paragraph ::= text parasep
+
+block_image ::= 
+
+indentenvironment ::=
+    indented indentcont*
+
+indented ::=
+    block_quote
+  | list
+
+
+indentcont ::=
+    spaceindent+ line
+  | spaceindent? numberindent line
+  | spaceindent? bulletindent line
+  | spaceindent? arrowindent line
+
+
+span ::=
+    asterisk span asterisk
+  | backtick span backtick
+  | underscore span underscore
+  | htmlspan span htmlspan
+  | text
+
+linebreak ::=
+    space space newline
+  | <br>
+
+text ::= any+
