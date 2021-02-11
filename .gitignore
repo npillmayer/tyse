@@ -7,5 +7,6 @@
 *.pdf
 *.code-workspace
 *.swp
+,*.txt
 generator
 engine/frame/lines/experiments/experiments
