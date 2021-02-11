@@ -96,14 +96,12 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper
 	env.pipeline = PrepareTypesettingPipeline(text, env.pipeline)
 	var result *Khipu = NewKhipu()
 	T().Debugf("------------ start of para -----------")
-	//var stylesForItem styled.Set
 	para.ForEachStyleRun(func(run styled.Run) error {
 		item := styledItem{
 			offset: startpos,
 			end:    paraLen,
 			from:   startpos + run.Position,
 			to:     startpos + run.Position + run.Len(),
-			//prevStyles: stylesForItem,
 			styles: run.StyleSet,
 		}
 		T().Debugf("--- encoding run '%s'", run.Text)
@@ -125,12 +123,12 @@ func encodeRun(text io.Reader, item styledItem, env typEnv) (k *Khipu, err error
 	}
 	seg := env.pipeline.segmenter
 	for seg.BoundedNext(stopper) {
-		fragment := seg.Text()
+		segment := seg.Text()
 		p := penlty(seg.Penalties())
-		T().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
+		T().Debugf("next segment = '%s'\twith penalties %d|%d", segment, p.p1, p.p2)
 		item.from = item.to
-		item.to += uint64(len(fragment))
-		kfrag, err := encodeSegment(fragment, p, item, env)
+		item.to += uint64(len(segment))
+		kfrag, err := encodeSegment(segment, p, item, env)
 		// if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
 		// 	HyphenateTextBoxes(k, pipeline, regs)
 		// }
@@ -143,20 +141,20 @@ func encodeRun(text io.Reader, item styledItem, env typEnv) (k *Khipu, err error
 	return k, err
 }
 
-func encodeSegment(fragm string, p penalties, item styledItem, env typEnv) (*Khipu, error) {
+func encodeSegment(segm string, p penalties, item styledItem, env typEnv) (*Khipu, error) {
 	//
-	if p.breakSpace() && isspace(fragm) {
-		return encodeSpace(fragm, p, item.styles, env.regs), nil
+	if p.breaksAtSpace() && isspace(segm) {
+		return encodeSpace(segm, p, item.styles, env.regs), nil
 	}
-	if p.lineWrap() && p.breakSpace() {
+	if p.canWrapLine() && p.breaksAtSpace() {
 		// line wrap at space
 		// b := NewTextBox(seg.Text(), textpos)
 		// khipu.AppendKnot(b).AppendKnot(Penalty(dimen.Infty))
-		b := encodeText(fragm, item, env)
+		b := encodeText(segm, item, env)
 		b.AppendKnot(Penalty(p.p1))
 		return b, nil
 	}
-	if p.lineWrap() { // line wrap without space
+	if p.canWrapLine() { // line wrap without space
 		// identified as a possible line break, but no space
 		// insert explicit discretionary '\-' penalty
 		k := NewKhipu().AppendKnot(Penalty(env.regs.N(params.P_HYPHENPENALTY)))
@@ -167,7 +165,8 @@ func encodeSegment(fragm string, p penalties, item styledItem, env typEnv) (*Khi
 	// b := NewTextBox(seg.Text(), textpos)
 	// pen := Penalty(dimen.Infty)
 	// khipu.AppendKnot(b).AppendKnot(pen)
-	b := encodeText(fragm, item, env)
+	T().Debugf("no line wrap possible, encode unbreakable text")
+	b := encodeText(segm, item, env)
 	b.AppendKnot(Penalty(dimen.Infty))
 	return b, nil
 }
@@ -182,14 +181,35 @@ func encodeSpace(fragm string, p penalties, styles styled.Set,
 	return k
 }
 
+// Currently we do a re-scan of every segment to extract word break opportunities.
+// That is obviously not the most efficient way to go about it, as we already scanned
+// every input code-point to get here in the first place.
+// But it is very complicated and hard to reason about segmenting without thinking
+// in some kind of hierarchy. Thus, we will approach the problem this way, and in
+// a later step interweave UAX segmenting of sentences, words and graphemes into
+// one scan. The uax package is able to do that, so it's more about my brain not
+// being able to work it out in one go. For now I rather incrementally reduce complexity
+// by hierarchy.
+// The final task will be to re-structure and split this up into co-routines and have
+// a monoid on text to produce the khipu. This is limited by at least two constraints:
+// First, some UAX segmentations require a O(N) scan of code-points (I did not event start to
+// reason about parallelizing the Bidi algorithm, but I'm afraid it will be a nightmare).
+// Second, shaping requires front-to-end traversal of code-points as well, and for some
+// languages may not even be chunked at whitespace (although some systems make this
+// assumption, even a pre-requisite).
+// For now, our proposition is that paragraphs are the finest level downto which we can
+// parallelize things. From paragraphs on we switch to sequential mode.
+//
 func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 	//
 	wordsKhipu := NewKhipu()
 	// 1. break fragment into words by UAX#29
 	env.pipeline.words.Init(strings.NewReader(fragm))
 	pos := item.from
+	T().Debugf("################### start word breaker on '%s'", fragm)
 	for env.pipeline.words.Next() {
 		word := env.pipeline.words.Text()
+		T().Debugf("      word = '%s'", word)
 		if len(word) == 0 { // should never happen, but be careful not to panic
 			continue
 		}
@@ -215,6 +235,7 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 		pos = end
 		wordsKhipu.AppendKnot(box)
 	}
+	T().Debugf("###############################################")
 	return wordsKhipu
 }
 
@@ -278,9 +299,9 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 	khipu := NewKhipu()
 	p := penlty(seg.Penalties())
 	T().Errorf("CREATE PARITAL KHIPU, PENALTIES=%d|%d", p.p1, p.p2)
-	if p.lineWrap() { // broken by primary breaker
+	if p.canWrapLine() { // broken by primary breaker
 		// fragment is terminated by possible line wrap opportunity
-		if p.breakSpace() { // broken by secondary breaker, too
+		if p.breaksAtSpace() { // broken by secondary breaker, too
 			if isspace(seg.Text()) {
 				g := spaceglue(regs)
 				khipu.AppendKnot(g).AppendKnot(Penalty(p.p2))
@@ -380,11 +401,13 @@ func PrepareTypesettingPipeline(text io.Reader, pipeline *TypesettingPipeline) *
 	}
 	pipeline.input = bufio.NewReader(norm.NFC.Reader(text))
 	if pipeline.segmenter == nil {
-		pipeline.linewrap = uax14.NewLineWrap()
-		pipeline.segmenter = segment.NewSegmenter(pipeline.linewrap, segment.NewSimpleWordBreaker())
+		// pipeline.linewrap = uax14.NewLineWrap()
+		// pipeline.segmenter = segment.NewSegmenter(pipeline.linewrap, segment.NewSimpleWordBreaker())
+		pipeline.segmenter = segment.NewSegmenter()
 		pipeline.segmenter.Init(pipeline.input)
-		pipeline.wordbreaker = uax29.NewWordBreaker()
+		pipeline.wordbreaker = uax29.NewWordBreaker(1)
 		pipeline.words = segment.NewSegmenter(pipeline.wordbreaker)
+		pipeline.words.BreakOnZero(true, false)
 	}
 	return pipeline
 }
@@ -419,11 +442,11 @@ func (p penalties) primaryBreak() bool {
 	return p.p1 < uax.InfinitePenalty
 }
 
-func (p penalties) lineWrap() bool {
+func (p penalties) canWrapLine() bool {
 	return p.p1 < uax.InfinitePenalty
 }
 
-func (p penalties) breakSpace() bool {
+func (p penalties) breaksAtSpace() bool {
 	return p.p2 < uax.InfinitePenalty
 }
 

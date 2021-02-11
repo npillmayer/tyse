@@ -4,9 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/khipu/styled"
@@ -25,14 +23,20 @@ var myhtml = `
 	</html> 
 `
 
-func TestBasic(t *testing.T) {
-	//teardown := testconfig.QuickConfig(t)
-	//defer teardown()
-	gtrace.EngineTracer = gologadapter.New()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+// TestParaBreak: Build a DOM from a small input HTML string, use XPath to navigate
+// to the only paragraph, extract the styled text of the paragraph, and encode
+// it into a khipu using a monospace shaper.
+func TestParaBreak(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	// gtrace.EngineTracer = gologadapter.New()
+	// gtrace.CoreTracer = gologadapter.New()
+	// gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	grapheme.SetupGraphemeClasses()
 	root := buildDOM(myhtml, t)
+	t.Logf("DOM ok")
 	xp := root.XPath()
 	n, err := xp.FindOne("//p")
 	if err != nil {
@@ -43,9 +47,6 @@ func TestBasic(t *testing.T) {
 		t.Fatal("p not found")
 	}
 	p, _ := dom.NodeFromTreeNode(n)
-	// if err != nil {
-	// 	t.Fatalf(err.Error())
-	// }
 	para, err := styled.InnerParagraphText(p)
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -59,7 +60,9 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("resulting khipu is nil, should not be")
 	}
 	t.Logf("khipu = %v", k)
-	t.Fail()
+	if len(k.knots) != 15 {
+		t.Errorf("expected 15 knots in khipu, got %d", len(k.knots))
+	}
 }
 
 // --- Helpers ---------------------------------------------------------------

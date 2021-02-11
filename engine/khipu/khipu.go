@@ -478,7 +478,7 @@ func (kh *Khipu) Text(from, to int64) string {
 
 // Debug representation of a knot list.
 func (kh *Khipu) String() string {
-	buf := make([]byte, 30)
+	buf := make([]byte, 0, 30)
 	w := bytes.NewBuffer(buf)
 	switch kh.typ {
 	case HList:
