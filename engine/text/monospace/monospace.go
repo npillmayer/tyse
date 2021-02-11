@@ -30,6 +30,7 @@ func Shaper(em dimen.Dimen, context *uax11.Context) text.Shaper {
 	}
 	// onGraphemes := grapheme.NewBreaker()
 	// sh.graphemeSplitter = segment.NewSegmenter(onGraphemes)
+	grapheme.SetupGraphemeClasses()
 	return sh
 }
 
