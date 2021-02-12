@@ -45,10 +45,11 @@ import (
 // Box type, following the CSS box model.
 type Box struct {
 	dimen.Rect
-	Min     dimen.Point
-	Max     dimen.Point
-	Padding [4]dimen.Dimen // inside of border
-	Margins [4]dimen.Dimen // outside of border
+	Min         dimen.Point
+	Max         dimen.Point
+	Padding     [4]dimen.Dimen // inside of border
+	BorderWidth [4]dimen.Dimen // thickness of border
+	Margins     [4]dimen.Dimen // outside of border
 }
 
 // For padding, margins
@@ -79,10 +80,9 @@ type TextStyle struct {
 
 // BorderStyle is a type for simple borders.
 type BorderStyle struct {
-	LineColor     color.Color
-	LineThickness dimen.Dimen
-	LineStyle     int8
-	CornerRadius  dimen.Dimen
+	LineColor    color.Color
+	LineStyle    int8
+	CornerRadius dimen.Dimen
 }
 
 // LineStyle is a type for border line styles.
@@ -128,6 +128,15 @@ func (box *Box) Normalize() *Box {
 		box.TopL.Y, box.BotR.Y = box.BotR.Y, box.TopL.Y
 	}
 	return box
+}
+
+func (box *Box) InnerWidth() dimen.Dimen {
+	return box.BotR.X - box.TopL.X
+}
+
+func (box *Box) FullWidth() dimen.Dimen {
+	return box.BotR.X + box.Padding[Right] + box.BorderWidth[Right] + box.Margins[Right] -
+		box.TopL.X - box.Padding[Left] - box.BorderWidth[Left] - box.Margins[Left]
 }
 
 // Shift a box along a vector. The size of the box is unchanged.

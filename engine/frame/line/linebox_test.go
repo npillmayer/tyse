@@ -41,7 +41,6 @@ func TestBox1(t *testing.T) {
 	}
 	t.Logf("inner text of DOM = '%s'", para.Raw().String())
 	regs := parameters.NewTypesettingRegisters()
-	regs.Push(parameters.P_MINHYPHENLENGTH, 100) // inhibit hyphenation
 	k, err := khipu.EncodeParagraph(para, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	if err != nil {
 		t.Fatalf(err.Error())

@@ -107,6 +107,22 @@ var _ Container = &PrincipalBox{}
 var _ Container = &AnonymousBox{}
 var _ Container = &TextBox{}
 
+// BoxFromNode returns the box which wraps a given tree node.
+func BoxFromNode(n *tree.Node) *Box {
+	if n == nil || n.Payload == nil {
+		return nil
+	}
+	switch b := n.Payload.(type) {
+	case *PrincipalBox:
+		return &b.Box.Box
+	case *TextBox:
+		return b.Box
+	case *AnonymousBox:
+		return b.Box
+	}
+	panic(fmt.Sprintf("Tree node is not a box; type is %T", n.Payload))
+}
+
 // --- PrincipalBox --------------------------------------------------------------------
 
 // PrincipalBox is a (CSS-)styled box which may contain other boxes.

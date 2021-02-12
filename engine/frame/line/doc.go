@@ -42,7 +42,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// T traces to a global core-tracer.
+// T traces to a global engine-tracer.
 func T() tracing.Trace {
-	return gtrace.CoreTracer
+	return gtrace.EngineTracer
 }
