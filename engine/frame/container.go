@@ -1,4 +1,4 @@
-package layout
+package frame
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
-	"github.com/npillmayer/tyse/engine/frame/box"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -113,17 +112,17 @@ var _ Container = &TextBox{}
 // PrincipalBox is a (CSS-)styled box which may contain other boxes.
 // It references a node in the styled tree, i.e., a stylable DOM element node.
 type PrincipalBox struct {
-	tree.Node                // a container is a node within the layout tree
-	Box       *box.StyledBox // styled box for a DOM node
-	domNode   *dom.W3CNode   // the DOM node this PrincipalBox refers to
-	outerMode DisplayMode    // container lives in this mode (block or inline)
-	innerMode DisplayMode    // context of children (block or inline)
-	ChildInx  uint32         // this box represents child #ChildInx of the parent principal box
-	anonMask  runlength      // mask for anonymous box children
+	tree.Node              // a container is a node within the layout tree
+	Box       *StyledBox   // styled box for a DOM node
+	domNode   *dom.W3CNode // the DOM node this PrincipalBox refers to
+	outerMode DisplayMode  // container lives in this mode (block or inline)
+	innerMode DisplayMode  // context of children (block or inline)
+	ChildInx  uint32       // this box represents child #ChildInx of the parent principal box
+	anonMask  runlength    // mask for anonymous box children
 }
 
-// newPrincipalBox creates either a block-level container or an inline-level container
-func newPrincipalBox(domnode *dom.W3CNode, outerMode DisplayMode, innerMode DisplayMode) *PrincipalBox {
+// NewPrincipalBox creates either a block-level container or an inline-level container
+func NewPrincipalBox(domnode *dom.W3CNode, outerMode DisplayMode, innerMode DisplayMode) *PrincipalBox {
 	pbox := &PrincipalBox{
 		domNode:   domnode,
 		outerMode: outerMode,
@@ -202,7 +201,7 @@ func (pbox *PrincipalBox) ChildIndices() (uint32, uint32) {
 	return pbox.ChildInx, pbox.ChildInx
 }
 
-func (pbox *PrincipalBox) prepareAnonymousBoxes() {
+func (pbox *PrincipalBox) PrepareAnonymousBoxes() {
 	if pbox.domNode.HasChildNodes() {
 		if pbox.innerMode.Contains(InlineMode) {
 			// In inline mode all block-children have to be wrapped in an anon box.
@@ -345,7 +344,7 @@ func (pbox *PrincipalBox) AppendChild(child *PrincipalBox) {
 // their principal boxes.
 type AnonymousBox struct {
 	tree.Node                // an anonymous box is a node within the layout tree
-	Box          *box.Box    // an anoymous box cannot be styled
+	Box          *Box        // an anoymous box cannot be styled
 	outerMode    DisplayMode // container lives in this mode (block or inline)
 	innerMode    DisplayMode // context of children (block or inline)
 	ChildInxFrom uint32      // this box represents children starting at #ChildInxFrom of the principal box
@@ -409,13 +408,13 @@ func newAnonymousBox(outer DisplayMode, inner DisplayMode) *AnonymousBox {
 // their principal boxes. Text boxes have an inner display type of inline.
 type TextBox struct {
 	tree.Node              // a text box is a node within the layout tree
-	Box       *box.Box     // text box cannot be explicitely styled
+	Box       *Box         // text box cannot be explicitely styled
 	domNode   *dom.W3CNode // the DOM text-node this box refers to
 	//outerMode DisplayMode  // container lives in this mode (block or inline)
 	ChildInx uint32 // this box represents a text node at #ChildInx of the principal box
 }
 
-func newTextBox(domnode *dom.W3CNode) *TextBox {
+func NewTextBox(domnode *dom.W3CNode) *TextBox {
 	tbox := &TextBox{
 		domNode: domnode,
 		//outerMode: FlowMode,

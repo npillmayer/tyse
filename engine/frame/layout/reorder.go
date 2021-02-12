@@ -2,6 +2,7 @@ package layout
 
 import (
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -12,7 +13,7 @@ import (
 // the normal DOM hierarchy and re-attaches them to the document root or an ancestor
 // with non-static positioning, respectively.
 // In a future version, CSS regions will be supported as well.
-func ReorderBoxTree(boxRoot *PrincipalBox) error {
+func ReorderBoxTree(boxRoot *frame.PrincipalBox) error {
 	if boxRoot == nil {
 		return nil
 	}
@@ -23,7 +24,7 @@ func ReorderBoxTree(boxRoot *PrincipalBox) error {
 
 // Tree filter predicate: box has position "fixed" or "absolute".
 func absolutePositioning(node *tree.Node, unused *tree.Node) (match *tree.Node, err error) {
-	pbox := TreeNodeAsPrincipalBox(node)
+	pbox := frame.TreeNodeAsPrincipalBox(node)
 	if pbox != nil {
 		position := pbox.DOMNode().ComputedStyles().GetPropertyValue("position")
 		if position == "fixed" || position == "absolute" {
@@ -35,10 +36,10 @@ func absolutePositioning(node *tree.Node, unused *tree.Node) (match *tree.Node, 
 
 // Tree filter predicate with side effect: attaches node to anchor, if suited.
 func anchor(test *tree.Node, node *tree.Node) (match *tree.Node, err error) {
-	absoultePosChild := TreeNodeAsPrincipalBox(node)
-	possibleAnchor := TreeNodeAsPrincipalBox(test)
+	absoultePosChild := frame.TreeNodeAsPrincipalBox(node)
+	possibleAnchor := frame.TreeNodeAsPrincipalBox(test)
 	if absoultePosChild != nil && possibleAnchor != nil {
-		var anchor *PrincipalBox
+		var anchor *frame.PrincipalBox
 		position := absoultePosChild.DOMNode().ComputedStyles().GetPropertyValue("position")
 		switch position {
 		case "fixed": // searching for viewport
@@ -52,7 +53,7 @@ func anchor(test *tree.Node, node *tree.Node) (match *tree.Node, err error) {
 			}
 		}
 		if anchor != nil {
-			anchor.AppendChild(TreeNodeAsPrincipalBox(absoultePosChild.Isolate()))
+			anchor.AppendChild(frame.TreeNodeAsPrincipalBox(absoultePosChild.Isolate()))
 		}
 	}
 	return

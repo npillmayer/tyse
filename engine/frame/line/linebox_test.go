@@ -1,4 +1,4 @@
-package lines
+package line
 
 import (
 	"strings"

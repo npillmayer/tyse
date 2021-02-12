@@ -1,23 +1,8 @@
 /*
-Package box deals with typesetting boxes.
-
-Typesetting may be understood as the process of placing boxes within
-larger boxes. The smallest type of box is a glyph, i.e. a printable
-letter. The largest type of box is a page—or even a book, where
-page-boxes are placed into.
-
-The box model is very versatile. Nevertheless we will generalize the
-notion of a box to mean the bounding box of a polygon. Typesetting in
-irregular shapes is a feature available in most modern systems, e.g.
-when letting text flow around a non-rectangular illustration.
-
-This module deals with rectangular boxes, starting at the glyph level.
-Boxes follow the CSS box model. Nevertheless, the notation oftentimes follows
-the one introduced by the TeX typesetting system.
 
 BSD License
 
-Copyright (c) 2017–2020, Norbert Pillmayer
+Copyright (c) 2017–2021, Norbert Pillmayer
 
 All rights reserved.
 
@@ -46,8 +31,9 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
-package box
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+package frame
 
 import (
 	"image/color"

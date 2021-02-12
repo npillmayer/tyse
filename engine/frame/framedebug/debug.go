@@ -1,4 +1,4 @@
-package renderdbg
+package framedebug
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
-	"github.com/npillmayer/tyse/engine/frame/layout"
+	"github.com/npillmayer/tyse/engine/frame"
 )
 
 // Parameters for GraphViz drawing.
@@ -22,7 +22,7 @@ type graphParamsType struct {
 
 // ToGraphViz creates a graphical representation of a render tree.
 // It produces a DOT file format suitable as input for Graphviz, given a Writer.
-func ToGraphViz(boxroot *layout.PrincipalBox, w io.Writer) {
+func ToGraphViz(boxroot *frame.PrincipalBox, w io.Writer) {
 	header, err := template.New("renderTree").Parse(graphHeadTmpl)
 	if err != nil {
 		panic(err)
@@ -37,14 +37,14 @@ func ToGraphViz(boxroot *layout.PrincipalBox, w io.Writer) {
 	if err != nil {
 		panic(err)
 	}
-	dict := make(map[layout.Container]string, 4096)
+	dict := make(map[frame.Container]string, 4096)
 	boxes(boxroot, w, dict, &gparams)
 	w.Write([]byte("}\n"))
 }
 
 var cnt int
 
-func boxes(c layout.Container, w io.Writer, dict map[layout.Container]string, gparams *graphParamsType) {
+func boxes(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
 	cnt++
 	if cnt == 300 {
 		return
@@ -67,7 +67,7 @@ func boxes(c layout.Container, w io.Writer, dict map[layout.Container]string, gp
 					gtrace.EngineTracer.Errorf("Child at #%d is nil", i)
 				} else {
 					gtrace.EngineTracer.Errorf("Child is %v", ch)
-					child := ch.Payload.(layout.Container)
+					child := ch.Payload.(frame.Container)
 					gtrace.EngineTracer.Infof("  child[%d] = %v", i, child)
 					boxes(child, w, dict, gparams)
 					edge(c, child, w, dict, gparams)
@@ -77,7 +77,7 @@ func boxes(c layout.Container, w io.Writer, dict map[layout.Container]string, gp
 	}
 }
 
-func box(c layout.Container, w io.Writer, dict map[layout.Container]string, gparams *graphParamsType) {
+func box(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
 	name := dict[c]
 	if name == "" {
 		sz := len(dict) + 1
@@ -91,7 +91,7 @@ func box(c layout.Container, w io.Writer, dict map[layout.Container]string, gpar
 
 // Helper struct
 type cbox struct {
-	C    layout.Container
+	C    frame.Container
 	N    w3cdom.Node
 	Name string
 }
@@ -116,7 +116,7 @@ type cedge struct {
 	N1, N2 cbox
 }
 
-func edge(c1 layout.Container, c2 layout.Container, w io.Writer, dict map[layout.Container]string,
+func edge(c1 frame.Container, c2 frame.Container, w io.Writer, dict map[frame.Container]string,
 	gparams *graphParamsType) {
 	//
 	//fmt.Printf("dict has %d entries\n", len(dict))

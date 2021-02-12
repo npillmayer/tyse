@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
@@ -16,7 +17,7 @@ var errDOMRootIsNull = errors.New("DOM root is null")
 var errDOMNodeNotSuitable = errors.New("DOM node is not suited for layout")
 
 // BuildBoxTree creates a render box tree from a styled tree.
-func BuildBoxTree(domRoot *dom.W3CNode) (Container, error) {
+func BuildBoxTree(domRoot *dom.W3CNode) (frame.Container, error) {
 	if domRoot == nil {
 		return nil, errDOMRootIsNull
 	}
@@ -84,13 +85,13 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 			parentbox, found := dom2box.Get(parent)
 			if found {
 				T().Debugf("adding new box %s node to parent %s\n", box, parentbox)
-				p := parentbox.(*PrincipalBox)
+				p := parentbox.(*frame.PrincipalBox)
 				var err error
 				switch b := box.(type) {
-				case *PrincipalBox:
+				case *frame.PrincipalBox:
 					b.ChildInx = uint32(chpos)
 					err = p.AddChild(b)
-				case *TextBox:
+				case *frame.TextBox:
 					b.ChildInx = uint32(chpos)
 					err = p.AddTextChild(b)
 				default:
@@ -113,32 +114,32 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 // ----------------------------------------------------------------------
 
 // NewBoxForDOMNode creates an adequately initialized box for a given DOM node.
-func NewBoxForDOMNode(domnode *dom.W3CNode) Container {
+func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
 	if domnode.NodeType() == html.TextNode {
-		tbox := newTextBox(domnode)
+		tbox := frame.NewTextBox(domnode)
 		// TODO find index within parent
 		// and set #ChildInx
 		return tbox
 	}
 	// document or element node
-	outerMode, innerMode := DisplayModesForDOMNode(domnode)
-	if outerMode == NoMode || outerMode == DisplayNone {
+	outerMode, innerMode := frame.DisplayModesForDOMNode(domnode)
+	if outerMode == frame.NoMode || outerMode == frame.DisplayNone {
 		return nil // do not produce box for illegal mode or for display = "none"
 	}
-	pbox := newPrincipalBox(domnode, outerMode, innerMode)
-	pbox.prepareAnonymousBoxes()
+	pbox := frame.NewPrincipalBox(domnode, outerMode, innerMode)
+	pbox.PrepareAnonymousBoxes()
 	// TODO find index within parent
 	// and set #ChildInx
 	return pbox
 }
 
-func possiblyCreateMiniHierarchy(pbox *PrincipalBox) {
-	htmlnode := pbox.domNode.HTMLNode()
+func possiblyCreateMiniHierarchy(pbox *frame.PrincipalBox) {
+	//htmlnode := pbox.DOMNode().HTMLNode()
 	//propertyMap := styler.ComputedStyles()
-	switch htmlnode.Data {
+	switch pbox.DOMNode().NodeName() {
 	case "li":
 		//markertype, _ := style.GetCascadedProperty(c.DOMNode, "list-style-type", toStyler)
-		markertype := pbox.domNode.ComputedStyles().GetPropertyValue("list-style-type")
+		markertype := pbox.DOMNode().ComputedStyles().GetPropertyValue("list-style-type")
 		if markertype != "none" {
 			//markerbox := newContainer(BlockMode, FlowMode)
 			// TODO: fill box with correct marker symbol
