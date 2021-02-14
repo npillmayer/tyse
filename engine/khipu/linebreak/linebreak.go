@@ -35,6 +35,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 package linebreak
 
+// https://quod.lib.umich.edu/j/jep/3336451.0013.105?view=text;rgn=main
+
 import (
 	"fmt"
 

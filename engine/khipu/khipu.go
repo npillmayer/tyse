@@ -10,7 +10,7 @@ import (
 
 /*
 BSD License
-Copyright (c) 2017-20, Norbert Pillmayer
+Copyright (c) 2017-21, Norbert Pillmayer
 
 All rights reserved.
 Redistribution and use in source and binary forms, with or without
@@ -106,9 +106,8 @@ func KnotString(k Knot) string {
 		return k.(TextBox).String()
 	case KTDiscretionary:
 		return "\u2af6"
-	default:
-		return "yes, it is a knot"
 	}
+	return fmt.Sprintf("%v", k)
 }
 
 // --- Kern ------------------------------------------------------------------

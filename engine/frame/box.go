@@ -40,6 +40,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/engine/khipu"
 )
 
 // Box type, following the CSS box model.
@@ -175,3 +176,28 @@ func HBoxKhipu(nl *Khipu, target p.Dimen, identifier string, class string) *Type
 	return box
 }
 */
+
+// --- Boxes as khipu knots --------------------------------------------------
+
+// KTBox is a khipu knot type
+const KTBox = khipu.KTUserDefined + 1
+
+func (box *Box) Type() khipu.KnotType {
+	return KTBox
+}
+
+func (box *Box) W() dimen.Dimen {
+	return box.Width()
+}
+
+func (box *Box) MinW() dimen.Dimen {
+	return box.Width()
+}
+
+func (box *Box) MaxW() dimen.Dimen {
+	return box.Width()
+}
+
+func (box *Box) IsDiscardable() bool {
+	return false
+}

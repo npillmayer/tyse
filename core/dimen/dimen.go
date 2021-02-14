@@ -94,3 +94,7 @@ func (p *Point) Shift(vector Point) *Point {
 type Rect struct {
 	TopL, BotR Point
 }
+
+func (r Rect) Width() Dimen {
+	return r.BotR.X - r.TopL.X
+}

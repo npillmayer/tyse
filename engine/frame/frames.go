@@ -159,7 +159,7 @@ func shortText(n *dom.W3CNode) string {
 	h := n.HTMLNode()
 	s := "\""
 	if len(h.Data) > 10 {
-		s += h.Data[:10] + "...\""
+		s += h.Data[:10] + "…\""
 	} else {
 		s += h.Data + "\""
 	}
