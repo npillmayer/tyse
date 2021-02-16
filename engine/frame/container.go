@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
+	"github.com/npillmayer/tyse/engine/khipu"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -178,7 +180,7 @@ func (pbox *PrincipalBox) DOMNode() w3cdom.Node {
 //
 // Some HTML elements create a mini-hierachy of boxes for rendering. The outermost box
 // is called the principal box. It will always refer to the styled node.
-// An example would be an "li"-element: it will create two sub-boxes, one for the
+// An example would be a `<li>`-element: it will create two sub-boxes, one for the
 // list item marker and one for the item's text/content. Another example are anonymous
 // boxes, which will be generated for reconciling context/level-discrepancies.
 func (pbox *PrincipalBox) IsPrincipal() bool {
@@ -211,7 +213,7 @@ func (pbox *PrincipalBox) String() string {
 }
 
 // ChildIndices returns the positional index of this box reference to
-// the parent principal box. To comply with the PrincipalBox interface, it returns
+// the parent principal box. To comply with the Container interface, it returns
 // the index twice (from, to).
 func (pbox *PrincipalBox) ChildIndices() (uint32, uint32) {
 	return pbox.ChildInx, pbox.ChildInx
@@ -337,6 +339,10 @@ func (pbox *PrincipalBox) addChildContainer(child Container) error {
 // AppendChild appends a child box to a principal box.
 // The child is a principal box itself, i.e. references a styleable DOM node.
 // It is appended as the last child of pbox.
+//
+// If the child's display mode does not correspond to the context of pbox,
+// an anonymous box may be inserterd.
+//
 func (pbox *PrincipalBox) AppendChild(child *PrincipalBox) {
 	if !pbox.innerMode.Overlaps(child.outerMode) {
 		// create an anon box
@@ -368,8 +374,14 @@ type AnonymousBox struct {
 }
 
 // DOMNode returns the underlying DOM node for a render tree element.
+// For anonymous boxes, it returns the DOM node corresponding to the parent container,
+// which should be of type PrincipalBox.
 func (anon *AnonymousBox) DOMNode() w3cdom.Node {
-	return nil
+	parent := TreeNodeAsPrincipalBox(anon.Parent())
+	if parent == nil {
+		return nil
+	}
+	return parent.DOMNode()
 }
 
 // TreeNode returns the underlying tree node for a box.
@@ -416,7 +428,62 @@ func newAnonymousBox(outer DisplayMode, inner DisplayMode) *AnonymousBox {
 	return anon
 }
 
-// --- Anonymous Boxes -----------------------------------------------------------------
+// --- Line Boxes ------------------------------------------------------------
+
+// LineBox is a type for CSS inline text boxes.
+type LineBox struct {
+	tree.Node
+	Box      *Box
+	khipu    *khipu.Khipu
+	indent   dimen.Dimen // horizontal offset of the text within the line box
+	pos      int64       // start position within the khipu
+	length   int64       // length of the segment for this line
+	ChildInx uint32      // this box represents a text node at #ChildInx of the principal box
+}
+
+func NewLineBox(k *khipu.Khipu, start, length int64, indent dimen.Dimen) *LineBox {
+	lbox := &LineBox{
+		khipu:  k,
+		pos:    start,
+		length: length,
+		indent: indent,
+	}
+	lbox.Payload = lbox
+	return lbox
+}
+
+// DOMNode returns the underlying DOM node for a render tree element.
+// For line boxes, it returns the DOM node corresponding to the parent container,
+// which should be of type PrincipalBox.
+func (lbox *LineBox) DOMNode() w3cdom.Node {
+	parent := TreeNodeAsPrincipalBox(lbox.Parent())
+	if parent == nil {
+		return nil
+	}
+	return parent.DOMNode()
+}
+
+// TreeNode returns the underlying tree node for a box.
+func (lbox *LineBox) TreeNode() *tree.Node {
+	return &lbox.Node
+}
+
+// IsAnonymous will always return true for a text box.
+func (lbox *LineBox) IsAnonymous() bool {
+	return false
+}
+
+// IsText will always return true for a text box.
+func (lbox *LineBox) IsText() bool {
+	return true
+}
+
+// DisplayModes always returns inline.
+func (lbox *LineBox) DisplayModes() (DisplayMode, DisplayMode) {
+	return InlineMode, InlineMode
+}
+
+// --- Text Boxes ----------------------------------------------------------------------
 
 // TextBox is a type for CSS inline text boxes.
 // It references a text node in the DOM.

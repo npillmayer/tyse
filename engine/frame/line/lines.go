@@ -35,6 +35,16 @@ func BreakParagraph(k *khipu.Khipu, pbox *frame.PrincipalBox,
 	//
 	// TODO
 	// assemble the broken line segments into anonymous line boxes
+	j := int64(0)
+	for i := 1; i < len(breakpoints); i++ {
+		pos := breakpoints[i].Position()
+		T().Debugf("%3d: %s", i, k.Text(j, pos))
+		l := pos - j
+		indent := dimen.Dimen(0) // TODO derive from parshape
+		linebox := frame.NewLineBox(k, breakpoints[i].Position(), l, indent)
+		pbox.AddTextChild(linebox)
+		j = breakpoints[i].Position()
+	}
 	//
 	return nil, nil
 }
