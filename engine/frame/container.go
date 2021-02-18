@@ -313,6 +313,16 @@ func (pbox *PrincipalBox) AddTextChild(child *TextBox) error {
 	return err
 }
 
+func (pbox *PrincipalBox) AppendLineBox(line *LineBox) {
+	if pbox.innerMode == InlineMode {
+		pbox.TreeNode().AddChild(line.TreeNode())
+		return
+	}
+	anon := newAnonymousBox(pbox.innerMode, InlineMode)
+	anon.TreeNode().AddChild(line.TreeNode())
+	pbox.TreeNode().AddChild(anon.TreeNode())
+}
+
 func (pbox *PrincipalBox) addChildContainer(child Container) error {
 	if child == nil {
 		return ErrNullChild

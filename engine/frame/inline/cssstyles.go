@@ -1,4 +1,4 @@
-package styled
+package inline
 
 import (
 	"github.com/npillmayer/tyse/core/dimen"

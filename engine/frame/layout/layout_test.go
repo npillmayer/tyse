@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-var graphviz = false
+var graphviz = true
 
 var Xmyhtml = `<div><b>bold</b><table></table><span>spanned</span></div>`
 

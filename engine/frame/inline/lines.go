@@ -1,4 +1,4 @@
-package line
+package inline
 
 import (
 	"github.com/npillmayer/tyse/core/dimen"
@@ -42,7 +42,7 @@ func BreakParagraph(k *khipu.Khipu, pbox *frame.PrincipalBox,
 		l := pos - j
 		indent := dimen.Dimen(0) // TODO derive from parshape
 		linebox := frame.NewLineBox(k, breakpoints[i].Position(), l, indent)
-		pbox.AddTextChild(linebox)
+		pbox.AppendLineBox(linebox)
 		j = breakpoints[i].Position()
 	}
 	//

@@ -1,5 +1,5 @@
 /*
-Package lines produces line boxes from khipus.
+Package inline produces line boxes from khipus.
 
 _________________________________________________________________________
 
@@ -35,7 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
-package line
+package inline
 
 import (
 	"github.com/npillmayer/schuko/gtrace"

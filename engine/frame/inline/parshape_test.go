@@ -1,4 +1,4 @@
-package line
+package inline
 
 import (
 	"testing"

@@ -116,10 +116,13 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 // NewBoxForDOMNode creates an adequately initialized box for a given DOM node.
 func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
 	if domnode.NodeType() == html.TextNode {
-		tbox := frame.NewTextBox(domnode)
+		//tbox := frame.NewTextBox(domnode)
 		// TODO find index within parent
 		// and set #ChildInx
-		return tbox
+		//return tbox
+		// New: we do not create a box yet, but rather will create line boxes
+		// after all non-replacable elements or sub-boxes have been created.
+		return nil
 	}
 	// document or element node
 	outerMode, innerMode := frame.DisplayModesForDOMNode(domnode)
