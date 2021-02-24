@@ -48,7 +48,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
 // fbGraph is a directed weighted graph of feasible breakpoints.

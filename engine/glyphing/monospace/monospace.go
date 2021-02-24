@@ -5,14 +5,14 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
-	"github.com/npillmayer/tyse/engine/text"
+	"github.com/npillmayer/tyse/engine/glyphing"
 	"github.com/npillmayer/uax/grapheme"
 	"github.com/npillmayer/uax/uax11"
 )
 
 type msshape struct {
 	em  dimen.Dimen
-	dir text.Direction
+	dir glyphing.Direction
 	// graphemeSplitter *segment.Segmenter
 	context *uax11.Context
 }
@@ -20,10 +20,10 @@ type msshape struct {
 // Shaper creates a shaper for monospace typesetting.
 // An em-dimension may be given which will then be used for shaping text.
 // If is is zero, a monospace must be provided with Shape(…).
-func Shaper(em dimen.Dimen, context *uax11.Context) text.Shaper {
+func Shaper(em dimen.Dimen, context *uax11.Context) glyphing.Shaper {
 	sh := &msshape{
 		em:  em,
-		dir: text.LeftToRight,
+		dir: glyphing.LeftToRight,
 	}
 	if context == nil {
 		sh.context = uax11.LatinContext
@@ -35,7 +35,7 @@ func Shaper(em dimen.Dimen, context *uax11.Context) text.Shaper {
 }
 
 // Shape creates a glyph sequence from a text.
-func (ms msshape) Shape(text string, typecase *font.TypeCase) text.GlyphSequence {
+func (ms msshape) Shape(text string, typecase *font.TypeCase) glyphing.GlyphSequence {
 	if ms.em == 0 && typecase == nil {
 		T().Errorf("monospace shaper has em=0 and not font provided => no output")
 		return msglyphseq{}
@@ -67,12 +67,12 @@ func (ms msshape) Shape(text string, typecase *font.TypeCase) text.GlyphSequence
 }
 
 // SetScript does not do anything for monospace shapers.
-func (ms msshape) SetScript(scr text.ScriptID) {
+func (ms msshape) SetScript(scr glyphing.ScriptID) {
 	//
 }
 
 // SetDirection sets the text direction.
-func (ms *msshape) SetDirection(dir text.Direction) {
+func (ms *msshape) SetDirection(dir glyphing.Direction) {
 	ms.dir = dir
 }
 
@@ -90,7 +90,7 @@ func (gseq msglyphseq) GlyphCount() int {
 	return len(gseq.glyphs)
 }
 
-func (gseq msglyphseq) GetGlyphInfoAt(pos int) text.GlyphInfo {
+func (gseq msglyphseq) GetGlyphInfoAt(pos int) glyphing.GlyphInfo {
 	return gseq.glyphs[pos]
 }
 
@@ -110,7 +110,7 @@ func (gseq msglyphseq) String() string {
 	return s
 }
 
-var _ text.GlyphSequence = msglyphseq{}
+var _ glyphing.GlyphSequence = msglyphseq{}
 
 type msglyph struct {
 	glyph    rune
@@ -147,7 +147,7 @@ func (g msglyph) String() string {
 	return fmt.Sprintf("['%#U' %d]", g.glyph, g.w)
 }
 
-var _ text.GlyphInfo = msglyph{}
+var _ glyphing.GlyphInfo = msglyph{}
 
 // ---------------------------------------------------------------------------
 

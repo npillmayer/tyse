@@ -79,8 +79,8 @@ import (
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/tyse/engine/khipu"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
 // T traces to the core tracer.

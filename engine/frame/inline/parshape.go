@@ -5,7 +5,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/frame"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
 func OutlineParshape(pbox *frame.PrincipalBox, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {

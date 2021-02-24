@@ -40,7 +40,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
-	"github.com/npillmayer/tyse/engine/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
 )
 
 // Box type, following the CSS box model.

@@ -43,7 +43,7 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/engine/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
 )
 
 // T traces to a global core tracer.

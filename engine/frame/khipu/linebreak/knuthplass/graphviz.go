@@ -5,8 +5,8 @@ import (
 	"io"
 	"text/template"
 
-	"github.com/npillmayer/tyse/engine/khipu"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
 // Parameters for GraphViz drawing.

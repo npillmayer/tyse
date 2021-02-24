@@ -21,7 +21,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
-	"github.com/npillmayer/tyse/engine/text"
+	"github.com/npillmayer/tyse/engine/glyphing"
 )
 
 /*
@@ -76,28 +76,28 @@ func freeHBBuffer(buf uintptr) {
 }
 
 // Helper: convert a Textdirection enum into a flag suited for Harfbuzz
-func dir2hbdir(textdir text.Direction) int32 {
+func dir2hbdir(textdir glyphing.Direction) int32 {
 	switch textdir {
-	case text.LeftToRight:
+	case glyphing.LeftToRight:
 		return 4
-	case text.RightToLeft:
+	case glyphing.RightToLeft:
 		return 5
-	case text.TopToBottom:
+	case glyphing.TopToBottom:
 		return 6
-	case text.BottomToTop:
+	case glyphing.BottomToTop:
 		return 7
 	}
 	return 4
 }
 
 // Set the text direction flag for a Harfbuzz buffer.
-func setHBBufferDirection(hbbuf uintptr, dir text.Direction) {
+func setHBBufferDirection(hbbuf uintptr, dir glyphing.Direction) {
 	ptr := (*C.struct_hb_buffer_t)(unsafe.Pointer(hbbuf))
 	C.hb_buffer_set_direction(ptr, C.hb_direction_t(dir2hbdir(dir)))
 }
 
 // Set the script info for a Harfbuzz buffer.
-func setHBBufferScript(hbbuf uintptr, script text.ScriptID) {
+func setHBBufferScript(hbbuf uintptr, script glyphing.ScriptID) {
 	ptr := (*C.struct_hb_buffer_t)(unsafe.Pointer(hbbuf))
 	C.hb_buffer_set_script(ptr, C.hb_script_t(script))
 }
@@ -184,7 +184,7 @@ type hbGlyphInfo struct {
 }
 
 // Implement the GlyphSequence interface
-func (seq *hbGlyphSequence) GetGlyphInfoAt(i int) text.GlyphInfo {
+func (seq *hbGlyphSequence) GetGlyphInfoAt(i int) glyphing.GlyphInfo {
 	gi := &hbGlyphInfo{}
 	info := C.get_glyph_info_at(seq.info, C.int(i))
 	pos := C.get_glyph_position_at(seq.pos, C.int(i))
@@ -209,22 +209,22 @@ func (gi *hbGlyphInfo) Cluster() int {
 
 // Implement the GlyphInfo interface
 func (gi *hbGlyphInfo) XAdvance() dimen.Dimen {
-	return text.Float2Dimen(gi.xadvance)
+	return glyphing.Float2Dimen(gi.xadvance)
 }
 
 // Implement the GlyphInfo interface
 func (gi *hbGlyphInfo) YAdvance() dimen.Dimen {
-	return text.Float2Dimen(gi.yadvance)
+	return glyphing.Float2Dimen(gi.yadvance)
 }
 
 // Implement the GlyphInfo interface
 func (gi *hbGlyphInfo) XPosition() dimen.Dimen {
-	return text.Float2Dimen(gi.x)
+	return glyphing.Float2Dimen(gi.x)
 }
 
 // Implement the GlyphInfo interface
 func (gi *hbGlyphInfo) YPosition() dimen.Dimen {
-	return text.Float2Dimen(gi.y)
+	return glyphing.Float2Dimen(gi.y)
 }
 
 // For debugging purposes: string representation of a glyph sequence,

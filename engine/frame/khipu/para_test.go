@@ -4,12 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
-	"github.com/npillmayer/tyse/engine/khipu/styled"
-	"github.com/npillmayer/tyse/engine/text/monospace"
-	"github.com/npillmayer/uax/grapheme"
 	"golang.org/x/net/html"
 )
 
@@ -26,6 +21,7 @@ var myhtml = `
 // TestParaBreak: Build a DOM from a small input HTML string, use XPath to navigate
 // to the only paragraph, extract the styled text of the paragraph, and encode
 // it into a khipu using a monospace shaper.
+/*
 func TestParaBreak(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
@@ -64,6 +60,7 @@ func TestParaBreak(t *testing.T) {
 		t.Errorf("expected 15 knots in khipu, got %d", len(k.knots))
 	}
 }
+*/
 
 // --- Helpers ---------------------------------------------------------------
 

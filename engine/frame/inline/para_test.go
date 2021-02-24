@@ -1,25 +1,8 @@
 package inline
 
-import (
-	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-	"os/exec"
-	"strings"
-	"testing"
-
-	"github.com/npillmayer/cords"
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/tyse/engine/dom"
-	"github.com/npillmayer/tyse/engine/dom/domdbg"
-	"golang.org/x/net/html"
-)
-
 var dot bool = true
 
+/*
 var myhtml = `
 	<!DOCTYPE html>
 	<html>
@@ -27,7 +10,7 @@ var myhtml = `
 	<h1>My First Heading</h1>
 	<p>My <b>first</b> paragraph.</p>
 	</body>
-	</html> 
+	</html>
 `
 
 func TestDOMSimple(t *testing.T) {
@@ -83,7 +66,6 @@ func TestParaCreate(t *testing.T) {
 	// defer f.Close()
 	t.Fail()
 }
-
 // ---------------------------------------------------------------------------
 
 func buildDOM(hh string, t *testing.T) *dom.W3CNode {
@@ -133,3 +115,5 @@ func cordsdotty(text cords.Cord, t *testing.T) *os.File {
 	}
 	return tmpfile
 }
+
+*/

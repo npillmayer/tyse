@@ -44,7 +44,7 @@ import (
 	"fmt"
 
 	"github.com/npillmayer/tyse/core/font"
-	"github.com/npillmayer/tyse/engine/text"
+	"github.com/npillmayer/tyse/engine/glyphing"
 )
 
 // https://harfbuzz.github.io/shaping-and-shape-plans.html
@@ -63,9 +63,9 @@ import (
 // The downside of this is the need to free() memory whenever we
 // hand a Harfbuzz-shaper to GC.
 type Harfbuzz struct {
-	buffer    uintptr        // central data structure for Harfbuzz
-	direction text.Direction // L-to-R, R-to-L, T-to-B
-	script    text.ScriptID  // i.e., Latin, Arabic, Korean, ...
+	buffer    uintptr            // central data structure for Harfbuzz
+	direction glyphing.Direction // L-to-R, R-to-L, T-to-B
+	script    glyphing.ScriptID  // i.e., Latin, Arabic, Korean, ...
 }
 
 // NewHarfbuzz creates a new Harfbuzz text shaper, fully initialized.
@@ -73,9 +73,9 @@ type Harfbuzz struct {
 func NewHarfbuzz() *Harfbuzz {
 	hb := &Harfbuzz{}
 	hb.buffer = allocHBBuffer()
-	hb.direction = text.LeftToRight
+	hb.direction = glyphing.LeftToRight
 	setHBBufferDirection(hb.buffer, hb.direction)
-	hb.script = text.Latin
+	hb.script = glyphing.Latin
 	setHBBufferScript(hb.buffer, hb.script)
 	return hb
 }
@@ -101,12 +101,12 @@ func (hb *Harfbuzz) findFont(typecase *font.TypeCase) uintptr {
 }
 
 // SetScript is part of TextShaper interface.
-func (hb *Harfbuzz) SetScript(scr text.ScriptID) {
+func (hb *Harfbuzz) SetScript(scr glyphing.ScriptID) {
 	setHBBufferScript(hb.buffer, scr)
 }
 
 // SetDirection is part of TextShaper interface.
-func (hb *Harfbuzz) SetDirection(dir text.Direction) {
+func (hb *Harfbuzz) SetDirection(dir glyphing.Direction) {
 	setHBBufferDirection(hb.buffer, dir)
 }
 
@@ -119,7 +119,7 @@ func (hb *Harfbuzz) SetLanguage(string) {
 //
 // This is where all the heavy lifting is done. We input a font and a
 // string of Unicode code-points, and receive a list of glyphs.
-func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) text.GlyphSequence {
+func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) glyphing.GlyphSequence {
 	var hbfont uintptr
 	hbfont = hb.findFont(typecase)
 	if hbfont == 0 {
@@ -132,7 +132,7 @@ func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) text.GlyphSequen
 	return seq
 }
 
-func (hb *Harfbuzz) GlyphSequenceString(typecase *font.TypeCase, seq text.GlyphSequence) string {
+func (hb *Harfbuzz) GlyphSequenceString(typecase *font.TypeCase, seq glyphing.GlyphSequence) string {
 	var hbfont uintptr
 	hbfont = hb.findFont(typecase)
 	if hbfont == 0 {
@@ -143,4 +143,4 @@ func (hb *Harfbuzz) GlyphSequenceString(typecase *font.TypeCase, seq text.GlyphS
 	return s
 }
 
-var _ text.Shaper = &Harfbuzz{}
+var _ glyphing.Shaper = &Harfbuzz{}

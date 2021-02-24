@@ -2,7 +2,7 @@ package linebreak
 
 import (
 	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/engine/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
 )
 
 // FixedWidthCursor is a linebreak-cursor for assigning a fixed width to

@@ -42,8 +42,8 @@ import (
 
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/engine/khipu"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
 // linebreaker is an internal entity for K&P-linebreaking.

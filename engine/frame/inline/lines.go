@@ -4,9 +4,9 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/frame"
-	"github.com/npillmayer/tyse/engine/khipu"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak/firstfit"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak/firstfit"
 )
 
 // BreakParagraph breaks a khipu (of a paragraph) into lines, given the outline

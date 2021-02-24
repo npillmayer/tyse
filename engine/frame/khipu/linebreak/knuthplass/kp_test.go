@@ -13,8 +13,8 @@ import (
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
-	"github.com/npillmayer/tyse/engine/khipu"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
 var graphviz = false // globally switches GraphViz output on/off

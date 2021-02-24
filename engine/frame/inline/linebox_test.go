@@ -7,11 +7,10 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
-	"github.com/npillmayer/tyse/engine/khipu"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak"
-	"github.com/npillmayer/tyse/engine/khipu/linebreak/firstfit"
-	"github.com/npillmayer/tyse/engine/khipu/styled"
-	"github.com/npillmayer/tyse/engine/text/monospace"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
+	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak/firstfit"
+	"github.com/npillmayer/tyse/engine/glyphing/monospace"
 	"golang.org/x/net/html"
 )
 
@@ -35,13 +34,13 @@ vor den Augen.
 func TestBox1(t *testing.T) {
 	root := buildDOM(myhtml, t)
 	p := findPara(root, t)
-	para, err := styled.InnerParagraphText(p)
+	para, err := InnerParagraphText(p)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	t.Logf("inner text of DOM = '%s'", para.Raw().String())
 	regs := parameters.NewTypesettingRegisters()
-	k, err := khipu.EncodeParagraph(para, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
+	k, err := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

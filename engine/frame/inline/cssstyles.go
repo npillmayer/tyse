@@ -4,7 +4,7 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/engine/dom/style"
-	"github.com/npillmayer/tyse/engine/text"
+	"github.com/npillmayer/uax/bidi"
 )
 
 /*
@@ -85,8 +85,8 @@ func (set Set) Whitespace(ws string) string {
 	return " "
 }
 
-func (set Set) BidiDir() text.Direction {
-	return text.LeftToRight
+func (set Set) BidiDir() bidi.Direction {
+	return bidi.LeftToRight
 }
 
 func (set Set) Font() *font.TypeCase {

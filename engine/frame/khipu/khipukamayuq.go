@@ -47,8 +47,7 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/locate"
 	params "github.com/npillmayer/tyse/core/parameters"
-	"github.com/npillmayer/tyse/engine/frame/inline"
-	"github.com/npillmayer/tyse/engine/text"
+	"github.com/npillmayer/tyse/engine/glyphing"
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/bidi"
 	"github.com/npillmayer/uax/segment"
@@ -67,7 +66,7 @@ type TypesettingPipeline struct {
 }
 
 type typEnv struct { // typesetting environment
-	shaper   text.Shaper
+	shaper   glyphing.Shaper
 	pipeline *TypesettingPipeline
 	regs     *params.TypesettingRegisters
 	levels   *bidi.ResolvedLevels
@@ -80,7 +79,7 @@ type styledItem struct {
 	prevStyles, styles styled.Style
 }
 
-func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper,
+func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper glyphing.Shaper,
 	pipeline *TypesettingPipeline, regs *params.TypesettingRegisters) (*Khipu, error) {
 	//
 	if regs == nil {
@@ -172,7 +171,7 @@ func encodeSegment(segm string, p penalties, item styledItem, env typEnv) (*Khip
 	return b, nil
 }
 
-func encodeSpace(fragm string, p penalties, styles inline.Set,
+func encodeSpace(fragm string, p penalties, styles styled.Style,
 	regs *params.TypesettingRegisters) *Khipu {
 	//
 	T().Debugf("khipukamayuq: encode space with penalites %v", p)
@@ -230,8 +229,11 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 		// 3. do NOT hyphenate => leave this to line breaker
 		// 4. attach glyph sequences to text boxes
 		box := NewTextBox(word, pos)
-		styleset := item.styles.(Set)
-		box.glyphs = env.shaper.Shape(word, item.styles.Font())
+		//
+		// TODO
+		//styleset := item.styles.(Set)
+		//box.glyphs = env.shaper.Shape(word, item.styles.Font())
+		//
 		// 5. measure text of glyph sequence
 		box.Width, box.Height, box.Depth = box.glyphs.BBoxDimens()
 		pos = end
@@ -241,25 +243,25 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 	return wordsKhipu
 }
 
-func directionForText(styles inline.Set, dir bidi.Direction,
-	regs *params.TypesettingRegisters) text.Direction {
+func directionForText(styles styled.Style, dir bidi.Direction,
+	regs *params.TypesettingRegisters) glyphing.Direction {
 	//
 	switch dir {
 	case bidi.LeftToRight:
-		return text.LeftToRight
+		return glyphing.LeftToRight
 	case bidi.RightToLeft:
-		return text.RightToLeft
+		return glyphing.RightToLeft
 	}
 	T().Infof("khipukamayuq: vertical text directions not yet implemented")
-	return text.LeftToRight
+	return glyphing.LeftToRight
 }
 
-func scriptForText(styles inline.Set, regs *params.TypesettingRegisters) text.ScriptID {
+func scriptForText(styles styled.Style, regs *params.TypesettingRegisters) glyphing.ScriptID {
 	scr := regs.S(params.P_SCRIPT)
 	if scr == "" {
-		return text.Latin
+		return glyphing.Latin
 	}
-	return text.ScriptByName(scr)
+	return glyphing.ScriptByName(scr)
 }
 
 // KnotEncode transforms an input text into a khipu.

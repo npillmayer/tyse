@@ -7,7 +7,7 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
-	"github.com/npillmayer/tyse/engine/khipu"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 

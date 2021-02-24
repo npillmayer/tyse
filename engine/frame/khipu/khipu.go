@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/engine/text"
+	"github.com/npillmayer/tyse/engine/glyphing"
 )
 
 /*
@@ -237,12 +237,12 @@ func (d Discretionary) IsDiscardable() bool {
 
 // A TextBox is a fixed unit of text
 type TextBox struct {
-	Width    dimen.Dimen        // width
-	Height   dimen.Dimen        // height
-	Depth    dimen.Dimen        // depth
-	Position uint64             // start position in text
-	text     string             // text, if available
-	glyphs   text.GlyphSequence // result of shaping
+	Width    dimen.Dimen            // width
+	Height   dimen.Dimen            // height
+	Depth    dimen.Dimen            // depth
+	Position uint64                 // start position in text
+	text     string                 // text, if available
+	glyphs   glyphing.GlyphSequence // result of shaping
 }
 
 // NewTextBox creates a text box.
