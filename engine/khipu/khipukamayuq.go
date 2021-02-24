@@ -43,10 +43,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/locate"
 	params "github.com/npillmayer/tyse/core/parameters"
-	"github.com/npillmayer/tyse/engine/khipu/styled"
+	"github.com/npillmayer/tyse/engine/frame/inline"
 	"github.com/npillmayer/tyse/engine/text"
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/bidi"
@@ -76,7 +77,7 @@ type styledItem struct {
 	offset             uint64
 	end                uint64
 	from, to           uint64
-	prevStyles, styles styled.Set
+	prevStyles, styles styled.Style
 }
 
 func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper,
@@ -89,29 +90,29 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper text.Shaper
 		shaper:   shaper,
 		pipeline: pipeline,
 		regs:     regs,
-		levels:   para.Levels(),
+		levels:   para.BidiLevels(),
 	}
 	text := para.Raw().Reader()
-	paraLen := para.Raw().Len()
+	//paraLen := para.Raw().Len()
 	env.pipeline = PrepareTypesettingPipeline(text, env.pipeline)
 	var result *Khipu = NewKhipu()
 	T().Debugf("------------ start of para -----------")
-	para.ForEachStyleRun(func(run styled.Run) error {
-		item := styledItem{
-			offset: startpos,
-			end:    paraLen,
-			from:   startpos + run.Position,
-			to:     startpos + run.Position + run.Len(),
-			styles: run.StyleSet,
-		}
-		T().Debugf("--- encoding run '%s'", run.Text)
-		k, err := encodeRun(text, item, env)
-		if err != nil {
-			return err
-		}
-		result = result.AppendKhipu(k)
-		return nil
-	})
+	// para.ForEachStyleRun(func(run inline.Run) error {
+	// 	item := styledItem{
+	// 		offset: startpos,
+	// 		end:    paraLen,
+	// 		from:   startpos + run.Position,
+	// 		to:     startpos + run.Position + run.Len(),
+	// 		styles: run.StyleSet,
+	// 	}
+	// 	T().Debugf("--- encoding run '%s'", run.Text)
+	// 	k, err := encodeRun(text, item, env)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	result = result.AppendKhipu(k)
+	// 	return nil
+	// })
 	return result, nil
 }
 
@@ -171,7 +172,7 @@ func encodeSegment(segm string, p penalties, item styledItem, env typEnv) (*Khip
 	return b, nil
 }
 
-func encodeSpace(fragm string, p penalties, styles styled.Set,
+func encodeSpace(fragm string, p penalties, styles inline.Set,
 	regs *params.TypesettingRegisters) *Khipu {
 	//
 	T().Debugf("khipukamayuq: encode space with penalites %v", p)
@@ -229,6 +230,7 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 		// 3. do NOT hyphenate => leave this to line breaker
 		// 4. attach glyph sequences to text boxes
 		box := NewTextBox(word, pos)
+		styleset := item.styles.(Set)
 		box.glyphs = env.shaper.Shape(word, item.styles.Font())
 		// 5. measure text of glyph sequence
 		box.Width, box.Height, box.Depth = box.glyphs.BBoxDimens()
@@ -239,7 +241,7 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 	return wordsKhipu
 }
 
-func directionForText(styles styled.Set, dir bidi.Direction,
+func directionForText(styles inline.Set, dir bidi.Direction,
 	regs *params.TypesettingRegisters) text.Direction {
 	//
 	switch dir {
@@ -252,7 +254,7 @@ func directionForText(styles styled.Set, dir bidi.Direction,
 	return text.LeftToRight
 }
 
-func scriptForText(styles styled.Set, regs *params.TypesettingRegisters) text.ScriptID {
+func scriptForText(styles inline.Set, regs *params.TypesettingRegisters) text.ScriptID {
 	scr := regs.S(params.P_SCRIPT)
 	if scr == "" {
 		return text.Latin

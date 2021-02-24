@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/npillmayer/cords"
-	sty "github.com/npillmayer/cords/styled"
+	"github.com/npillmayer/cords/styled"
+	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
 	"github.com/npillmayer/uax/bidi"
@@ -14,81 +15,83 @@ import (
 
 // Paragraph represents a styled paragraph of text, from a W3C DOM.
 type Paragraph struct {
-	*sty.Text                           // a Paragraph is a styled text
-	eBidiDir  bidi.Direction            // embedding bidi text direction
-	levels    *bidi.ResolvedLevels      // levels from UAX#9 algorithm
-	irsElems  map[uint64]bidi.Direction // text position ⇒ explicit bidi dir
-	pdis      map[uint64]bool           // text position ⇒ PDI
+	*styled.Paragraph         // a Paragraph is a styled text
+	irs               infoIRS // info about Bidi Isolating Run Sequences
+}
+
+type infoIRS struct {
+	irsElems map[uint64]bidi.Direction // text position ⇒ explicit bidi dir
+	pdis     map[uint64]bool           // text position ⇒ PDI
 }
 
 // InnerParagraphText creates a Paragraph instance holding the text content
 // of a W3C DOM node as a styled text.
 // node should be a paragraph-level HTML node, but this is not enforced.
-func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
+func InnerParagraphText(node *dom.W3CNode) (*Paragraph, error) {
 	para := &Paragraph{
-		irsElems: make(map[uint64]bidi.Direction),
+		irs: infoIRS{
+			irsElems: make(map[uint64]bidi.Direction),
+			pdis:     make(map[uint64]bool),
+		},
 	}
-	innerText, err := innerText(node)
+	innerText, err := innerText(node, &para.irs)
 	if err != nil {
 		return nil, err
 	}
-	var explicit bool
-	para.Text = sty.TextFromCord(innerText)
-	para.Text.Raw().EachLeaf(func(l cords.Leaf, pos uint64) error {
-		T().Debugf("styled paragraph: creating a style leaf for '%s'", l.String())
-		leaf := l.(*pLeaf)
-		styles := leaf.element.ComputedStyles().Styles()
-		styleset := Set{styles: styles}
-		styleset.eBidiDir, explicit = findEmbeddingBidiDirection(leaf.element)
-		para.Text.Style(styleset, pos, pos+l.Weight())
-		if explicit {
-			para.irsElems[pos] = styleset.eBidiDir
-			para.pdis[pos+l.Weight()] = true
-		}
-		return nil
-	})
-	para.eBidiDir, _ = findEmbeddingBidiDirection(node)
-	para.levels = bidi.ResolveParagraph(innerText.Reader(), para.bidiMarkup(),
-		bidi.DefaultDirection(para.eBidiDir), bidi.IgnoreParagraphSeparators(true))
-	return para, nil
-}
-
-func (p *Paragraph) Levels() *bidi.ResolvedLevels {
-	return p.levels
+	// var explicit bool
+	// text := styled.TextFromCord(innerText)
+	// text.Raw().EachLeaf(func(l cords.Leaf, pos uint64) error {
+	// 	T().Debugf("styled paragraph: creating a style leaf for '%s'", l.String())
+	// 	leaf := l.(*pLeaf)
+	// 	styles := leaf.element.ComputedStyles().Styles()
+	// 	styleset := Set{styles: styles}
+	// 	styleset.eBidiDir, explicit = findEmbeddingBidiDirection(leaf.element)
+	// 	text.Style(styleset, pos, pos+l.Weight())
+	// 	if explicit {
+	// 		para.irsElems[pos] = styleset.eBidiDir
+	// 		para.pdis[pos+l.Weight()] = true
+	// 	}
+	// 	return nil
+	// })
+	eBidiDir, _ := findEmbeddingBidiDirection(node)
+	para.Paragraph, err = styled.ParagraphFromText(innerText, 0, innerText.Raw().Len(), eBidiDir,
+		para.bidiMarkup())
+	return para, err
 }
 
 // ForEachStyleRun applies a function to each run of the same style set
 // for a paragraph's text.
-func (p *Paragraph) ForEachStyleRun(f func(run Run) error) error {
-	err := p.Text.EachStyleRun(func(content string, style sty.Style, pos uint64) error {
-		r := Run{
-			Text:     content,
-			Position: pos,
-		}
-		set, ok := style.(Set)
-		if !ok {
-			T().Errorf("paragraph each style: style is not a CSS style set")
-			return cords.ErrIllegalArguments
-		}
-		r.StyleSet = set
-		return f(r)
-	})
-	return err
-}
+// func (p *Paragraph) ForEachStyleRun(f func(run Run) error) error {
+// 	err := p.Text.EachStyleRun(func(content string, style sty.Style, pos uint64) error {
+// 		r := Run{
+// 			Text:     content,
+// 			Position: pos,
+// 		}
+// 		set, ok := style.(Set)
+// 		if !ok {
+// 			T().Errorf("paragraph each style: style is not a CSS style set")
+// 			return cords.ErrIllegalArguments
+// 		}
+// 		r.StyleSet = set
+// 		return f(r)
+// 	})
+// 	return err
+// }
 
 // StyleAt returns the active style at text position pos, together with an
 // index relative to the start of the style run.
 //
 // Overwrites StyleAt from cords.styled.Text
-func (p *Paragraph) StyleAt(pos uint64) (Set, uint64, error) {
-	sty, i, err := p.Text.StyleAt(pos)
-	if err != nil {
-		return Set{}, pos, err
-	}
-	return sty.(Set), i, nil
-}
+// func (p *Paragraph) StyleAt(pos uint64) (Set, uint64, error) {
+// 	sty, i, err := p.Text.StyleAt(pos)
+// 	if err != nil {
+// 		return Set{}, pos, err
+// 	}
+// 	return sty.(Set), i, nil
+// }
 
 // Run is a simple container type to hold a run of text with equal style.
+/*
 type Run struct {
 	Text     string
 	Position uint64
@@ -99,30 +102,35 @@ type Run struct {
 func (r Run) Len() uint64 {
 	return uint64(len(r.Text))
 }
+*/
 
 // innerText creates a text cord for the textual content of an HTML element and all
 // its descendents. It resembles the text produced by
 //
 //      document.getElementById("myNode").innerText
 //
-// in JavaScript (except that html.InnerText cannot respect CSS styling suppressing
-// the visibility of the node's descendents).
+// in JavaScript. However, it creates a styled text, which means that attributes
+// of sub-elements are respected and preserved.
 //
-// The fragment organization of the resulting cord will reflect the hierarchy of
+// The fragment organization of the resulting cord(s) will reflect the hierarchy of
 // the element node's descendents.
 //
-func innerText(n w3cdom.Node) (cords.Cord, error) {
+func innerText(n w3cdom.Node, irs *infoIRS) (*styled.Text, error) {
 	if n == nil {
-		return cords.Cord{}, cords.ErrIllegalArguments
+		return styled.TextFromString(""), cords.ErrIllegalArguments
 	}
-	b := cords.NewBuilder()
-	collectText(n, b)
-	return b.Cord(), nil
+	b := styled.NewTextBuilder()
+	collectText(n, b, irs)
+	return b.Text(), nil
 }
 
-func collectText(n w3cdom.Node, b *cords.CordBuilder) {
+func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
 	if n.NodeType() == html.ElementNode {
-		T().Debugf("styled paragraph: collect text of <%s>", n.NodeValue)
+		if n.ComputedStyles().GetPropertyValue("display") == "block" {
+			b.Append(&nonReplacableElementLeaf{n}, Set{})
+		} else {
+			T().Debugf("styled paragraph: collect text of <%s>", n.NodeName())
+		}
 	} else if n.NodeType() == html.TextNode {
 		//T().Debugf("text = %s", n.NodeValue())
 		parent := n.ParentNode()
@@ -136,11 +144,20 @@ func collectText(n w3cdom.Node, b *cords.CordBuilder) {
 			length:  uint64(len(value)),
 			content: value,
 		}
-		b.Append(leaf)
+		styles := parent.ComputedStyles().Styles()
+		styleset := Set{styles: styles}
+		var isExplicitDir bool
+		styleset.eBidiDir, isExplicitDir = findEmbeddingBidiDirection(leaf.element)
+		if isExplicitDir {
+			irs.irsElems[b.Len()] = styleset.eBidiDir
+			irs.pdis[b.Len()+leaf.Weight()] = true
+		}
+		//text.Style(styleset, pos, pos+l.Weight())
+		b.Append(leaf, styleset)
 	}
 	if n.HasChildNodes() {
 		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-			collectText(c, b)
+			collectText(c, b, irs)
 		}
 	}
 }
@@ -182,8 +199,8 @@ func findEmbeddingBidiDirection(pnode w3cdom.Node) (bidi.Direction, bool) {
 	return eBidiDir, explicit
 }
 
-func (p *Paragraph) bidiMarkup() bidi.OutOfLineBidiMarkup {
-	irs, pdis := p.irsElems, p.pdis
+func (para *Paragraph) bidiMarkup() bidi.OutOfLineBidiMarkup {
+	irs, pdis := para.irs.irsElems, para.irs.pdis
 	return func(pos uint64) int {
 		if i, ok := irs[pos]; ok {
 			if i == bidi.LeftToRight {
@@ -254,6 +271,36 @@ func (l pLeaf) dbgString() string {
 	return fmt.Sprintf("{<%s> \"%s\"}", estr, cont)
 }
 
+type nonReplacableElementLeaf struct {
+	Node w3cdom.Node
+}
+
+// Weight is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l nonReplacableElementLeaf) Weight() uint64 {
+	return 1
+}
+
+// String is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l nonReplacableElementLeaf) String() string {
+	return "<" + l.Node.NodeName() + "/>"
+}
+
+// Split is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l *nonReplacableElementLeaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
+	return l, nil
+}
+
+// Substring is part of interface cords.pLeaf.
+// Not intended for client usage.
+func (l nonReplacableElementLeaf) Substring(i, j uint64) []byte {
+	return []byte{}
+}
+
+var _ cords.Leaf = &nonReplacableElementLeaf{}
+
 // --- Styles -----------------------------------------------------------------
 
 // Set is a type to hold CSS styles/properties for runs of text of a Paragraph.
@@ -268,7 +315,7 @@ func (set Set) String() string {
 }
 
 // Equals is part of interface cords.styled.Style, not intended for client usage.
-func (set Set) Equals(other sty.Style) bool {
+func (set Set) Equals(other styled.Style) bool {
 	if o, ok := other.(Set); ok {
 		if o.styles == set.styles {
 			return true
@@ -277,4 +324,4 @@ func (set Set) Equals(other sty.Style) bool {
 	return false
 }
 
-var _ sty.Style = Set{}
+var _ styled.Style = Set{}
