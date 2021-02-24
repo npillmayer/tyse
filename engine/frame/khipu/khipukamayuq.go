@@ -18,7 +18,7 @@ notice, this list of conditions and the following disclaimer.
 notice, this list of conditions and the following disclaimer in the
 documentation and/or other materials provided with the distribution.
 
-3. Neither the name of this software nor the names of its contributors
+3. Neither the name of the software nor the names of its contributors
 may be used to endorse or promote products derived from this software
 without specific prior written permission.
 
@@ -96,22 +96,23 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper glyphing.Sh
 	env.pipeline = PrepareTypesettingPipeline(text, env.pipeline)
 	var result *Khipu = NewKhipu()
 	T().Debugf("------------ start of para -----------")
-	// para.ForEachStyleRun(func(run inline.Run) error {
-	// 	item := styledItem{
-	// 		offset: startpos,
-	// 		end:    paraLen,
-	// 		from:   startpos + run.Position,
-	// 		to:     startpos + run.Position + run.Len(),
-	// 		styles: run.StyleSet,
-	// 	}
-	// 	T().Debugf("--- encoding run '%s'", run.Text)
-	// 	k, err := encodeRun(text, item, env)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	result = result.AppendKhipu(k)
-	// 	return nil
-	// })
+	para.EachStyleRun(func(content string, sty styled.Style, pos, length uint64) error {
+		item := styledItem{
+			offset: para.Offset,
+			end:    para.Offset + para.Raw().Len(),
+			from:   startpos + pos,
+			to:     startpos + pos + length,
+			styles: sty,
+		}
+		T().Debugf("--- encoding run '%s'", content)
+		k, err := encodeRun(text, item, env)
+		if err != nil {
+			return err
+		}
+		result = result.AppendKhipu(k)
+		return nil
+	})
+	T().Debugf("------------- end of para ------------")
 	return result, nil
 }
 

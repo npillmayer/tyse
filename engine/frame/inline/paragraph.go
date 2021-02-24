@@ -9,6 +9,7 @@ import (
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/uax/bidi"
 	"golang.org/x/net/html"
 )
@@ -127,7 +128,7 @@ func innerText(n w3cdom.Node, irs *infoIRS) (*styled.Text, error) {
 func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
 	if n.NodeType() == html.ElementNode {
 		if n.ComputedStyles().GetPropertyValue("display") == "block" {
-			b.Append(&nonReplacableElementLeaf{n}, Set{})
+			b.Append(&nonReplacableElementLeaf{n}, frame.StyleSet{})
 		} else {
 			T().Debugf("styled paragraph: collect text of <%s>", n.NodeName())
 		}
@@ -145,11 +146,11 @@ func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
 			content: value,
 		}
 		styles := parent.ComputedStyles().Styles()
-		styleset := Set{styles: styles}
+		styleset := frame.StyleSet{Props: styles}
 		var isExplicitDir bool
-		styleset.eBidiDir, isExplicitDir = findEmbeddingBidiDirection(leaf.element)
+		styleset.EmbBidiDir, isExplicitDir = findEmbeddingBidiDirection(leaf.element)
 		if isExplicitDir {
-			irs.irsElems[b.Len()] = styleset.eBidiDir
+			irs.irsElems[b.Len()] = styleset.EmbBidiDir
 			irs.pdis[b.Len()+leaf.Weight()] = true
 		}
 		//text.Style(styleset, pos, pos+l.Weight())
@@ -300,28 +301,3 @@ func (l nonReplacableElementLeaf) Substring(i, j uint64) []byte {
 }
 
 var _ cords.Leaf = &nonReplacableElementLeaf{}
-
-// --- Styles -----------------------------------------------------------------
-
-// Set is a type to hold CSS styles/properties for runs of text of a Paragraph.
-type Set struct {
-	styles   *style.PropertyMap
-	eBidiDir bidi.Direction // embedding bidi text direction
-}
-
-// String is part of interface cords.styled.Style.
-func (set Set) String() string {
-	return "<style>"
-}
-
-// Equals is part of interface cords.styled.Style, not intended for client usage.
-func (set Set) Equals(other styled.Style) bool {
-	if o, ok := other.(Set); ok {
-		if o.styles == set.styles {
-			return true
-		}
-	}
-	return false
-}
-
-var _ styled.Style = Set{}

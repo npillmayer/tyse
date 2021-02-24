@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/aymerick/douceur/parser"
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
@@ -35,12 +34,14 @@ func Test0(t *testing.T) {
 	T = gtrace.EngineTracer
 }
 
+type UNUSED interface{}
+
 func Test1(t *testing.T) {
-	q, tree := setupTest(html1, css1)
+	_, tree := setupTest(html1, css1)
 	if tree == nil {
 		t.Error("failed to setup test")
 	}
-	paras := findNodesFor("p", q, &tree.Node)
+	paras := findNodesFor("p", nil, &tree.Node)
 	if !assertProperty(paras, "padding-top").equals("10px") {
 		t.Error("padding-top of paragraphs should be 10px")
 	}
@@ -69,7 +70,7 @@ func getTestCSS(s string) cssom.StyleSheet {
 	return douceuradapter.Wrap(css)
 }
 
-func setupTest(htmlStr string, cssStr string) (*goquery.Document, *styledtree.StyNode) {
+func setupTest(htmlStr string, cssStr string) (*UNUSED, *styledtree.StyNode) {
 	dom := getTestDOM(htmlStr)
 	css := getTestCSS(cssStr)
 	styler := cssom.NewCSSOM(nil)
@@ -79,11 +80,11 @@ func setupTest(htmlStr string, cssStr string) (*goquery.Document, *styledtree.St
 		T.Errorf("error: %s", err)
 		return nil, nil
 	}
-	doc := goquery.NewDocumentFromNode(dom)
-	return doc, styledtree.Node(styledTree)
+	//doc := goquery.NewDocumentFromNode(dom)
+	return nil, styledtree.Node(styledTree)
 }
 
-func findNodesFor(xpstr string, doc *goquery.Document, tree *tree.Node) []*tree.Node {
+func findNodesFor(xpstr string, doc UNUSED, tree *tree.Node) []*tree.Node {
 	nav := xpathadapter.NewNavigator(styledtree.Node(tree))
 	xp, _ := xpath.NewXPath(nav, xpathadapter.CurrentNode)
 	nodes, _ := xp.Find(xpstr)

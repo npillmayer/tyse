@@ -43,7 +43,7 @@ import (
 
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/backend/gfx"
-	"github.com/tdewolff/canvas"
+	//"github.com/tdewolff/canvas"
 )
 
 // G traces to the graphics tracer.
@@ -54,24 +54,25 @@ func G() tracing.Trace {
 // Surface creates a bridge to a canvas.Canvas.
 func Surface(width, height float64) gfx.Surface {
 	cb := &canvasBridge{
-		c: canvas.New(width, height),
+		//c: canvas.New(width, height),
 	}
-	cb.ctx = canvas.NewContext(cb.c)
+	//cb.ctx = canvas.NewContext(cb.c)
 	return cb
 }
 
 type canvasBridge struct {
-	c   *canvas.Canvas
-	ctx *canvas.Context
+	//c   *canvas.Canvas
+	//ctx *canvas.Context
 }
 
 func (cb *canvasBridge) W() float64 {
-	w, _ := cb.c.Size()
-	return w
+	//w, _ := cb.c.Size()
+	//return w
+	return 0
 }
 func (cb *canvasBridge) H() float64 {
-	_, h := cb.c.Size()
-	return h
+	//_, h := cb.c.Size()
+	return 0
 }
 
 // AddContour is MetaFont's "filldraw with pen with colors".

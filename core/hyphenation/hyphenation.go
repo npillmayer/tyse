@@ -10,7 +10,6 @@ import (
 	"unicode"
 
 	"github.com/derekparker/trie" // TODO: replace this
-	"github.com/huandu/xstrings"
 )
 
 /* ----------------------------------------------------------------------
@@ -283,9 +282,14 @@ func insertHyphens(word string, positions []int) string {
 	hyphencount := 0
 	for i, pos := range positions {
 		if pos > 0 && pos%2 != 0 { // only odd positions are valid breakpoints
-			word = xstrings.Insert(word, "-", hyphencount+i)
+			//word = xstrings.Insert(word, "-", hyphencount+i)
+			word = insertStr(word, "-", hyphencount+i)
 			hyphencount++ // remember hyphens => hyphens prolong word
 		}
 	}
 	return word
+}
+
+func insertStr(word string, s string, at int) string {
+	return word[:at] + s + word[at:]
 }

@@ -4,12 +4,8 @@ package html
 // github.com/PuerkitoBio/goquery
 
 import (
-	"io"
-
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
 // CT traces to the core-tracer.
@@ -17,6 +13,7 @@ func CT() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
+/*
 func ReadHTMLBook(r io.Reader) (*goquery.Document, error) {
 	doc, err := goquery.NewDocumentFromReader(r)
 	//doc, err = html.Parse(r)
@@ -25,3 +22,4 @@ func ReadHTMLBook(r io.Reader) (*goquery.Document, error) {
 	}
 	return doc, err
 }
+*/
