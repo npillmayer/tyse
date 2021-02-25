@@ -111,7 +111,7 @@ func (b isoBox) String() string {
 	return fmt.Sprintf("B[(%d,%d) (%d,%d)]", b.TopL.X, b.TopL.Y, b.BotR.X, b.BotR.Y)
 }
 
-// func polygonFromBox(f *frame.Box) *isoPolygon {
+// func polygonFromBox(f *box.Box) *isoPolygon {
 // 	iso := &isoPolygon{stack: make([]isoBox, 0, 1)}
 // 	if f.FullWidth() > 0 {
 // 		iso.stack = append(iso.stack, nullbox)

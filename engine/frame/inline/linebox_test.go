@@ -14,7 +14,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-var myhtml = `
+var kafkaHTML = `
 	<!DOCTYPE html>
 	<html>
 	<body>
@@ -32,7 +32,7 @@ vor den Augen.
 `
 
 func TestBox1(t *testing.T) {
-	root := buildDOM(myhtml, t)
+	root := buildDOM(kafkaHTML, t)
 	p := findPara(root, t)
 	para, err := InnerParagraphText(p)
 	if err != nil {

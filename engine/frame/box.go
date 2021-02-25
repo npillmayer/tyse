@@ -40,7 +40,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
-	"github.com/npillmayer/tyse/engine/frame/khipu"
+	//"github.com/npillmayer/tyse/engine/frame/khipu"
 )
 
 // Box type, following the CSS box model.
@@ -109,6 +109,8 @@ type StyledBox struct {
 	Styling *Styling
 }
 
+/*
+
 // Glyph is a box for glyphs. Glyphs currently are content-stylable only (no borders).
 //
 // Wikipedia: In typography, a glyph [...] is an elemental symbol within
@@ -159,7 +161,6 @@ func (box *Box) Enlarge(scales dimen.Point) *Box {
 // node list. The nodes will be enclosed into a new box.
 // The box may be set to a target size.
 // Parameters for styling class and/or identifier may be provided.
-/*
 func HBoxKhipu(nl *Khipu, target p.Dimen, identifier string, class string) *TypesetBox {
 	box := &TypesetBox{}
 	box.Cord = nl
@@ -175,7 +176,6 @@ func HBoxKhipu(nl *Khipu, target p.Dimen, identifier string, class string) *Type
 	box.Height, box.Depth = nl.MaxHeightAndDepth(0, -1)
 	return box
 }
-*/
 
 // --- Boxes as khipu knots --------------------------------------------------
 
@@ -201,3 +201,4 @@ func (box *Box) MaxW() dimen.Dimen {
 func (box *Box) IsDiscardable() bool {
 	return false
 }
+*/

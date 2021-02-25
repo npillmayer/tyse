@@ -185,12 +185,14 @@ func encodeSpace(fragm string, p penalties, styles styled.Style,
 // Currently we do a re-scan of every segment to extract word break opportunities.
 // That is obviously not the most efficient way to go about it, as we already scanned
 // every input code-point to get here in the first place.
+//
 // But it is very complicated and hard to reason about segmenting without thinking
 // in some kind of hierarchy. Thus, we will approach the problem this way, and in
 // a later step interweave UAX segmenting of sentences, words and graphemes into
 // one scan. The uax package is able to do that, so it's more about my brain not
 // being able to work it out in one go. For now I rather incrementally reduce complexity
 // by hierarchy.
+//
 // The final task will be to re-structure and split this up into co-routines and have
 // a monoid on text to produce the khipu. This is limited by at least two constraints:
 // First, some UAX segmentations require a O(N) scan of code-points (I did not event start to
@@ -198,7 +200,8 @@ func encodeSpace(fragm string, p penalties, styles styled.Style,
 // Second, shaping requires front-to-end traversal of code-points as well, and for some
 // languages may not even be chunked at whitespace (although some systems make this
 // assumption, even a pre-requisite).
-// For now, our proposition is that paragraphs are the finest level downto which we can
+//
+// For now, our proposition is that paragraphs are the finest level down to which we can
 // parallelize things. From paragraphs on we switch to sequential mode.
 //
 func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
@@ -232,8 +235,8 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 		box := NewTextBox(word, pos)
 		//
 		// TODO
-		//styleset := item.styles.(Set)
-		//box.glyphs = env.shaper.Shape(word, item.styles.Font())
+		//styleset := item.styles.(
+		//box.glyphs = env.shaper.Shape(word, styleset.Font())
 		//
 		// 5. measure text of glyph sequence
 		box.Width, box.Height, box.Depth = box.glyphs.BBoxDimens()

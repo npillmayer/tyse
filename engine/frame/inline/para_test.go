@@ -1,9 +1,26 @@
 package inline
 
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+
+	"github.com/npillmayer/cords"
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/domdbg"
+	"golang.org/x/net/html"
+)
+
 var dot bool = true
 
-/*
-var myhtml = `
+var testhtml = `
 	<!DOCTYPE html>
 	<html>
 	<body>
@@ -13,62 +30,32 @@ var myhtml = `
 	</html>
 `
 
-func TestDOMSimple(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
-	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	domroot := buildDOM(myhtml, t)
-	if domroot == nil {
-		t.Fatalf("DOM root is nil")
-	}
-	//
-	if dot {
-		tmpfile := dotty(domroot, t)
-		defer tmpfile.Close()
-	}
-	//
-	text, err := innerText(domroot)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	if text.IsVoid() {
-		t.Fatalf("expected text to be non-nil")
-	}
-	if dot {
-		cordsdotty(text, t)
-	}
-	text.EachLeaf(func(leaf cords.Leaf, pos uint64) error {
-		l := leaf.(*pLeaf)
-		t.Logf("leaf = %v", l.dbgString())
-		return nil
-	})
-}
-
 func TestParaCreate(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	domroot := buildDOM(myhtml, t)
-	para, err := InnerParagraphText(domroot)
+	domroot := buildTestDOM(testhtml, t)
+	text, err := InnerParagraphText(domroot)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if para.Text.Raw().IsVoid() {
+	if text.Raw().IsVoid() {
 		t.Errorf("inner text of para is void, should not be")
 	}
-	t.Logf("inner text = (%s)", para.Text.Raw().String())
-	t.Logf("levels = %v", para.levels)
+	t.Logf("inner text = (%s)", text.Raw().String())
+	//t.Logf("levels = %v", para.levels)
+	//
 	//f := cordsdotty(cords.Cord(para.Text.Styles()), t)
 	// f := cordsdotty(para.Text.Raw(), t)
 	// defer f.Close()
 	t.Fail()
 }
+
 // ---------------------------------------------------------------------------
 
-func buildDOM(hh string, t *testing.T) *dom.W3CNode {
+func buildTestDOM(hh string, t *testing.T) *dom.W3CNode {
 	h, err := html.Parse(strings.NewReader(hh))
 	if err != nil {
 		t.Errorf("Cannot create test document")
@@ -115,5 +102,3 @@ func cordsdotty(text cords.Cord, t *testing.T) *os.File {
 	}
 	return tmpfile
 }
-
-*/

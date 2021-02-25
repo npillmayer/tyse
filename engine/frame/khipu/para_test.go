@@ -1,13 +1,5 @@
 package khipu
 
-import (
-	"strings"
-	"testing"
-
-	"github.com/npillmayer/tyse/engine/dom"
-	"golang.org/x/net/html"
-)
-
 var myhtml = `
 	<!DOCTYPE html>
 	<html>
@@ -18,10 +10,11 @@ var myhtml = `
 	</html> 
 `
 
+/*
+
 // TestParaBreak: Build a DOM from a small input HTML string, use XPath to navigate
 // to the only paragraph, extract the styled text of the paragraph, and encode
 // it into a khipu using a monospace shaper.
-/*
 func TestParaBreak(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
@@ -43,7 +36,7 @@ func TestParaBreak(t *testing.T) {
 		t.Fatal("p not found")
 	}
 	p, _ := dom.NodeFromTreeNode(n)
-	para, err := styled.InnerParagraphText(p)
+	para, err := styled.ParagraphFromText(p)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -60,7 +53,6 @@ func TestParaBreak(t *testing.T) {
 		t.Errorf("expected 15 knots in khipu, got %d", len(k.knots))
 	}
 }
-*/
 
 // --- Helpers ---------------------------------------------------------------
 
@@ -79,3 +71,4 @@ func buildDOM(hh string, t *testing.T) *dom.W3CNode {
 func findPara(dom *dom.W3CNode) {
 	//
 }
+*/
