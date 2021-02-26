@@ -131,7 +131,21 @@ func (pbox *PrincipalBox) DisplayMode() DisplayMode {
 
 func (pbox *PrincipalBox) Context() Context {
 	if pbox.context == nil {
-		pbox.context = CreateContextForContainer(pbox)
+		pbox.context = CreateContextForContainer(pbox, false)
+		// if pbox.context == nil {
+		// 	parent := pbox.Node.Parent()
+		// 	for parent != nil {
+		// 		c, ok := parent.Payload.(Container)
+		// 		if !ok {
+		// 			break
+		// 		}
+		// 		ctx := c.Context()
+		// 		if ctx != nil {
+		// 			pbox.context = ctx
+		// 		}
+		// 		parent = parent.Parent()
+		// 	}
+		// }
 	}
 	return pbox.context
 }
@@ -145,7 +159,7 @@ func (pbox *PrincipalBox) String() string {
 	//outerSym := pbox.outerMode.Symbol()
 	outerSym := NoMode.Symbol()
 	if pbox.context != nil {
-		if pbox.context.IsBlock() {
+		if pbox.context.Type() == BlockFormattingContext {
 			outerSym = BlockMode.Symbol()
 		} else {
 			outerSym = InlineMode.Symbol()

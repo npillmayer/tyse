@@ -37,19 +37,19 @@ func TestIntervalTranslation(t *testing.T) {
 	}
 }
 
-func TestDisplayMode(t *testing.T) {
-	// teardown := gotestingadapter.RedirectTracing(t)
-	// defer teardown()
-	disp := InlineMode | FlowMode
-	expected := "FlowMode InlineMode"
-	if disp.FullString() != expected {
-		t.Errorf("display = '%s', should be '%s'", disp.FullString(), expected)
-	}
-	if !disp.Contains(FlowMode) {
-		t.Errorf("display expected to contain 'flow', is missing")
-	}
-	other := BlockMode | ContentsMode | FlowMode
-	if !disp.Overlaps(other) {
-		t.Errorf("displays should both contain 'flow', don't")
-	}
-}
+// func TestDisplayMode(t *testing.T) {
+// 	// teardown := gotestingadapter.RedirectTracing(t)
+// 	// defer teardown()
+// 	disp := InlineMode | FlowMode
+// 	expected := "FlowMode InlineMode"
+// 	if disp.FullString() != expected {
+// 		t.Errorf("display = '%s', should be '%s'", disp.FullString(), expected)
+// 	}
+// 	if !disp.Contains(FlowMode) {
+// 		t.Errorf("display expected to contain 'flow', is missing")
+// 	}
+// 	other := BlockMode | ContentsMode | FlowMode
+// 	if !disp.Overlaps(other) {
+// 		t.Errorf("displays should both contain 'flow', don't")
+// 	}
+// }

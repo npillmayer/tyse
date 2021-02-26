@@ -81,3 +81,6 @@ img {
 .clearright {
   clear: right;
 }
+.ofhidden {
+    overflow: hidden;
+}

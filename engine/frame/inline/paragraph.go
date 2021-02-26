@@ -26,6 +26,10 @@ type infoIRS struct {
 
 // --- Paragraph from Container Box ------------------------------------------
 
+func InlineBoxes(c frame.Container) ([]frame.Container, error) {
+	//
+}
+
 // ParagraphFromBox creates a Paragraph instance holding the text content
 // of a container box node as a styled text.
 // c should be a paragraph-level container, but this is not enforced.
@@ -36,7 +40,7 @@ func ParagraphFromBox(c frame.Container) (*Paragraph, error) {
 			pdis:     make(map[uint64]bool),
 		},
 	}
-	var innerText *styled.Text
+	var innerText *styled.Text // TODO set boxText()
 	eBidiDir, _ := findEmbeddingBidiDirection(c.DOMNode())
 	var err error
 	para.Paragraph, err = styled.ParagraphFromText(innerText, 0, innerText.Raw().Len(), eBidiDir,

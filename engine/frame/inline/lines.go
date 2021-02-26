@@ -168,18 +168,18 @@ func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, pbox *fram
 }
 
 func addLineHeights(pbox *frame.PrincipalBox) dimen.Dimen {
-	ctx := pbox.Context()
-	children := ctx.TreeNode().Children()
 	var height dimen.Dimen
-	var lastLine *frame.Box
-	for _, ch := range children {
-		if c, ok := ch.Payload.(frame.Container); ok {
-			height += c.CSSBox().Height()
-			_, smallerMargin := frame.CollapseMargins(lastLine, c.CSSBox())
-			height -= smallerMargin
-			lastLine = c.CSSBox()
-		}
-	}
+	// ctx := pbox.Context()
+	// children := ctx.TreeNode().Children()
+	// var lastLine *frame.Box
+	// for _, ch := range children {
+	// 	if c, ok := ch.Payload.(frame.Container); ok {
+	// 		height += c.CSSBox().Height()
+	// 		_, smallerMargin := frame.CollapseMargins(lastLine, c.CSSBox())
+	// 		height -= smallerMargin
+	// 		lastLine = c.CSSBox()
+	// 	}
+	// }
 	return height
 }
 

@@ -101,7 +101,7 @@ func DefaultDisplayModeForHTMLNode(h *html.Node) (DisplayMode, DisplayMode) {
 		case "ul", "ol":
 			return BlockMode, ListItemMode
 		case "li":
-			return ListItemMode, FlowMode | BlockMode
+			return ListItemMode, BlockMode
 		case "html", "body", "div", "section", "article", "nav":
 			return BlockMode, BlockMode
 		case "p":
@@ -134,9 +134,9 @@ func ParseDisplay(display string) (DisplayMode, error) {
 	case "inline":
 		return InlineMode, nil
 	case "list-item":
-		return ListItemMode | BlockMode | FlowMode, nil
+		return ListItemMode | BlockMode, nil
 	case "inline-block":
-		return InlineMode, nil
+		return InlineMode | InnerBlockMode, nil
 	case "table":
 		return BlockMode | TableMode, nil
 	case "inline-table":

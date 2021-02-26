@@ -8,22 +8,37 @@ type DisplayMode uint16
 // Flags for box context and display mode (outer and inner).
 //go:generate stringer -type=DisplayMode
 const (
-	NoMode       DisplayMode = iota   // unset or error condition
-	DisplayNone  DisplayMode = 0x0001 // CSS outer display = none
-	FlowMode     DisplayMode = 0x0002 // CSS inner display = flow
-	BlockMode    DisplayMode = 0x0004 // CSS block context (inner or outer)
-	InlineMode   DisplayMode = 0x0008 // CSS inline context
-	ListItemMode DisplayMode = 0x0010 // CSS list-item display
-	FlowRoot     DisplayMode = 0x0020 // CSS flow-root display property
-	FlexMode     DisplayMode = 0x0040 // CSS inner display = flex
-	GridMode     DisplayMode = 0x0080 // CSS inner display = grid
-	TableMode    DisplayMode = 0x0100 // CSS table display property (inner or outer)
-	ContentsMode DisplayMode = 0x0200 // CSS contents display mode, experimental !
+	NoMode          DisplayMode = iota   // unset or error condition
+	DisplayNone     DisplayMode = 0x0001 // CSS outer display = none
+	BlockMode       DisplayMode = 0x0002 // CSS block context (inner or outer)
+	InlineMode      DisplayMode = 0x0004 // CSS inline context
+	FlowRoot        DisplayMode = 0x0010 // CSS flow-root display property
+	ListItemMode    DisplayMode = 0x0020 // CSS list-item display
+	FlexMode        DisplayMode = 0x0040 // CSS inner display = flex
+	GridMode        DisplayMode = 0x0080 // CSS inner display = grid
+	TableMode       DisplayMode = 0x0100 // CSS table display property (inner or outer)
+	InnerBlockMode  DisplayMode = 0x0200 // CSS inner block mode (inline-block)
+	InnerInlineMode DisplayMode = 0x0400 // CSS inner inline mode (paragraphs)
 )
 
 var allDisplayModes = []DisplayMode{
-	DisplayNone, FlowMode, BlockMode, InlineMode, ListItemMode, FlowRoot, FlexMode,
-	GridMode, TableMode, ContentsMode,
+	DisplayNone, BlockMode, InlineMode, ListItemMode, FlowRoot, FlexMode,
+	GridMode, TableMode, InnerBlockMode,
+}
+
+// Outer returns outer mode
+func (disp DisplayMode) Outer() DisplayMode {
+	return disp & 0x000f
+}
+
+// Inner returns inner mode
+func (disp DisplayMode) Inner() DisplayMode {
+	return disp & 0xfff0
+}
+
+// IsBlock return true if it has outer mode of BlockMode.
+func (disp DisplayMode) IsBlock() bool {
+	return disp&0x0001 == BlockMode
 }
 
 // Set sets a given atomic mode within this display mode.
@@ -52,9 +67,6 @@ func (disp DisplayMode) BlockOrInline() DisplayMode {
 	if disp.Overlaps(InlineMode) {
 		return InlineMode
 	}
-	if disp.Contains(FlowMode) || disp.Contains(ContentsMode) {
-		return InlineMode
-	}
 	return BlockMode
 }
 
@@ -76,9 +88,10 @@ func (disp DisplayMode) FullString() string {
 
 // Symbol returns a Unicode symbol for a mode.
 func (disp DisplayMode) Symbol() string {
-	if disp == FlowMode {
-		return "\u25a7"
-	} else if disp.Contains(BlockMode) {
+	//if disp == FlowMode {
+	//return "\u25a7"
+	//} else
+	if disp.Contains(BlockMode) {
 		return "\u25a9"
 	} else if disp.Contains(InlineMode) {
 		return "\u25ba"
