@@ -68,8 +68,6 @@ var _ styled.Style = StyleSet{}
 /*
 We take the following CSS properties as relevant for line boxes / span
 
-For khipu-enconding
-
 margin-left
 margin-right
 padding-left

@@ -35,7 +35,10 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
 package dimen
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Online dimension conversion for print:
 // http://www.unitconversion.org/unit_converter/typography-ex.html
@@ -54,17 +57,22 @@ const (
 	IN Dimen = 4718592 // inch
 )
 
-// Some infinite dimensions
-const Fil Dimen = BP * 10000
-const Fill Dimen = 2 * BP * 10000
-const Filll Dimen = 3 * BP * 10000
+// Origin is origin
+var Origin = Point{0, 0}
 
-// Infty is an infinite numeric
-const Infty int = 100000000 // TODO
+// Infinity is the largest possible dimension
+const Infinity = math.MaxInt32
 
+// Some very stretchable dimensions
+const Fil Dimen = Infinity - 3
+const Fill Dimen = Infinity - 2
+const Filll Dimen = Infinity - 1
+
+// Some common paper sizes
 var DINA4 = Point{210 * MM, 297 * MM}
 var DINA5 = Point{148 * MM, 210 * MM}
-var Origin = Point{0, 0}
+var USLetter = Point{216 * MM, 279 * MM}
+var USLegal = Point{216 * MM, 357 * MM}
 
 // Stringer implementation.
 func (d Dimen) String() string {
@@ -95,6 +103,32 @@ type Rect struct {
 	TopL, BotR Point
 }
 
+// Width returns the width of a rectangle, i.e. the difference between x-coordinates
+// of bottom-right and top-left corner.
 func (r Rect) Width() Dimen {
 	return r.BotR.X - r.TopL.X
+}
+
+// Height returns the height of a rectangle, i.e. the difference between y-coordinates
+// of bottom-right and top-left corner.
+func (r Rect) Height() Dimen {
+	return r.BotR.Y - r.TopL.Y
+}
+
+// ---------------------------------------------------------------------------
+
+// Min returns the smaller of two dimensions.
+func Min(a, b Dimen) Dimen {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Max returns the greater of two dimensions.
+func Max(a, b Dimen) Dimen {
+	if a > b {
+		return a
+	}
+	return b
 }

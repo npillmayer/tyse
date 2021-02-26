@@ -23,7 +23,7 @@ func GetDefaultProperty(styler Styler, key string) Property {
 	return p
 }
 
-// DisplayPropertyForHTMLNode returns the *display* CSS property for an HTML node.
+// DisplayPropertyForHTMLNode returns the default *display* CSS property for an HTML node.
 func DisplayPropertyForHTMLNode(node *html.Node) Property {
 	if node == nil {
 		return "none"

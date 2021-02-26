@@ -98,7 +98,7 @@ type cbox struct {
 
 func shortText(box *cbox) string {
 	txt := box.N.NodeValue()
-	disp, _ := box.C.DisplayModes()
+	disp := box.C.DisplayMode()
 	sym := disp.Symbol()
 	s := fmt.Sprintf("\"%s\u2000\\\"", sym)
 	if len(txt) > 10 {

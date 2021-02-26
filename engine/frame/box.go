@@ -121,6 +121,7 @@ type Glyph struct {
 	Colors    *ColorStyle
 	CharPos   rune
 }
+*/
 
 // Normalize sorts the corner coordinates into correct order.
 func (box *Box) Normalize() *Box {
@@ -142,6 +143,11 @@ func (box *Box) FullWidth() dimen.Dimen {
 		box.TopL.X - box.Padding[Left] - box.BorderWidth[Left] - box.Margins[Left]
 }
 
+func (box *Box) FullHeight() dimen.Dimen {
+	return box.BotR.Y + box.Padding[Bottom] + box.BorderWidth[Bottom] + box.Margins[Bottom] -
+		box.TopL.Y - box.Padding[Top] - box.BorderWidth[Top] - box.Margins[Top]
+}
+
 // Shift a box along a vector. The size of the box is unchanged.
 func (box *Box) Shift(vector dimen.Point) *Box {
 	box.TopL.Shift(vector)
@@ -157,6 +163,22 @@ func (box *Box) Enlarge(scales dimen.Point) *Box {
 	return box
 }
 
+// CollapseMargins returns the greater margin between bottom margin of box1 and
+// top margin of box2, and the smaller one as the second return value.
+func CollapseMargins(box1, box2 *Box) (dimen.Dimen, dimen.Dimen) {
+	if box1 == nil {
+		if box2 == nil {
+			return 0, 0
+		}
+		return box2.Margins[Top], 0
+	} else if box2 == nil {
+		return box1.Margins[Bottom], 0
+	}
+	return dimen.Max(box1.Margins[Bottom], box2.Margins[Top]),
+		dimen.Min(box1.Margins[Bottom], box2.Margins[Top])
+}
+
+/*
 // Method for boxing content into a horizontal box. Content is given as a
 // node list. The nodes will be enclosed into a new box.
 // The box may be set to a target size.

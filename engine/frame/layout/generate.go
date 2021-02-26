@@ -125,12 +125,12 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
 		return nil
 	}
 	// document or element node
-	outerMode, innerMode := frame.DisplayModesForDOMNode(domnode)
-	if outerMode == frame.NoMode || outerMode == frame.DisplayNone {
+	mode := frame.DisplayModeForDOMNode(domnode)
+	if mode == frame.NoMode || mode == frame.DisplayNone {
 		return nil // do not produce box for illegal mode or for display = "none"
 	}
-	pbox := frame.NewPrincipalBox(domnode, outerMode, innerMode)
-	pbox.PrepareAnonymousBoxes()
+	pbox := frame.NewPrincipalBox(domnode, mode)
+	//pbox.PrepareAnonymousBoxes()
 	// TODO find index within parent
 	// and set #ChildInx
 	return pbox

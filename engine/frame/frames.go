@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"golang.org/x/net/html"
 )
 
@@ -55,30 +56,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    https://code.tutsplus.com/tutorials/the-30-css-selectors-you-must-memorize--net-16048
 */
 
-// DisplayModesForDOMNode returns outer and inner display mode for a given DOM node.
-func DisplayModesForDOMNode(domnode *dom.W3CNode) (outerMode DisplayMode, innerMode DisplayMode) {
+// DisplayModeForDOMNode returns outer and inner display mode for a given DOM node.
+func DisplayModeForDOMNode(domnode *dom.W3CNode) DisplayMode {
 	if domnode == nil || domnode.HTMLNode() == nil {
-		return NoMode, NoMode
+		return NoMode
 	}
 	if domnode.NodeType() == html.TextNode {
-		return InlineMode, InlineMode
+		return InlineMode
 	}
 	display := domnode.ComputedStyles().GetPropertyValue("display")
-	T().Infof("property display=%v", display)
-	if display.String() == "initial" {
-		outerMode, innerMode = DefaultDisplayModeForHTMLNode(domnode.HTMLNode())
-	} else {
-		var err error
-		outerMode, innerMode, err = ParseDisplay(display.String())
-		if err != nil {
-			T().Errorf("unrecognized display property: %s", display)
-			outerMode, innerMode = BlockMode, BlockMode
-		} else if outerMode == NoMode {
-			outerMode, innerMode = DefaultDisplayModeForHTMLNode(domnode.HTMLNode())
-		}
+	//T().Infof("property display = %v", display)
+	if display.String() == "" || display.String() == "initial" {
+		//outerMode, innerMode = DefaultDisplayModeForHTMLNode(domnode.HTMLNode())
+		display = style.DisplayPropertyForHTMLNode(domnode.HTMLNode())
 	}
-	T().Infof("display modes = %s | %s", outerMode.String(), innerMode.String())
-	return
+	//outerMode, innerMode, err = ParseDisplay(display.String())
+	mode, err := ParseDisplay(display.String())
+	if err != nil {
+		T().Errorf("unrecognized display property: %s", display)
+		mode = BlockMode
+	}
+	//T().Infof("display modes = %s", mode)
+	return mode
 }
 
 // DefaultDisplayModeForHTMLNode returns the default display mode for a HTML node type,
@@ -124,26 +123,26 @@ func DefaultDisplayModeForHTMLNode(h *html.Node) (DisplayMode, DisplayMode) {
 }
 
 // ParseDisplay returns mode flags from a display property string (outer and inner).
-func ParseDisplay(display string) (DisplayMode, DisplayMode, error) {
+func ParseDisplay(display string) (DisplayMode, error) {
 	// TODO
 	if display == "" {
-		return NoMode, NoMode, nil
+		return NoMode, nil
 	}
 	switch display {
 	case "block":
-		return BlockMode, BlockMode, nil
+		return BlockMode, nil
 	case "inline":
-		return InlineMode, InlineMode, nil
+		return InlineMode, nil
 	case "list-item":
-		return ListItemMode, FlowMode, nil
+		return ListItemMode | BlockMode | FlowMode, nil
 	case "inline-block":
-		return InlineMode, BlockMode, nil
+		return InlineMode, nil
 	case "table":
-		return BlockMode, TableMode, nil
+		return BlockMode | TableMode, nil
 	case "inline-table":
-		return InlineMode, TableMode, nil
+		return InlineMode | TableMode, nil
 	}
-	return NoMode, NoMode, fmt.Errorf("Unknown display mode: %s", display)
+	return BlockMode, fmt.Errorf("Unknown display mode: %s", display)
 }
 
 // ---------------------------------------------------------------------------

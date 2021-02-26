@@ -54,7 +54,7 @@ func makeIsoBox(a, b, c, d dimen.Dimen) isoBox {
 }
 
 func makePara() (*frame.PrincipalBox, []*frame.Box, []*frame.Box) {
-	para := frame.NewPrincipalBox(nil, frame.BlockMode, frame.InlineMode)
+	para := frame.NewPrincipalBox(nil, frame.BlockMode)
 	para.Box = &frame.StyledBox{}
 	para.Box.BotR = dimen.Point{X: 500, Y: 800}
 	//

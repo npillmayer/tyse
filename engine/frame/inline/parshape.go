@@ -10,12 +10,17 @@ import (
 
 func OutlineParshape(pbox *frame.PrincipalBox, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
 	boundingBox := pbox.Box.Box // TODO check for nil
+	T().Infof("parshape: bounding box = %v", boundingBox.Rect)
 	polygon := paragraphPolygon(&boundingBox, leftAlign, rightAlign)
 	T().Debugf("polygon = %v", polygon)
 	if polygon == nil {
 		return nil
 	}
-	return nil
+	return polygonParshape{
+		lineskip: 12 * dimen.PT,
+		width:    pbox.Box.Box.Width(),
+		polygon:  polygon,
+	}
 }
 
 type polygonParshape struct {

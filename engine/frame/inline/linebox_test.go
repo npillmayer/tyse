@@ -4,9 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/khipu"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak/firstfit"
@@ -48,19 +52,70 @@ func TestBox1(t *testing.T) {
 		t.Fatalf("resulting khipu is nil, should not be")
 	}
 	t.Logf("khipu = %v", k)
-	parshape := linebreak.RectangularParShape(80 * 10 * dimen.BP)
+	parshape := linebreak.RectangularParShape(60 * 10 * dimen.BP)
 	cursor := linebreak.NewFixedWidthCursor(khipu.NewCursor(k), 10*dimen.BP, 0)
 	breakpoints, err := firstfit.BreakParagraph(cursor, parshape, nil)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	t.Logf("text broken up into %d lines", len(breakpoints))
-	t.Logf("     |---------+---------+---------+---------+---------+---------+---------+---------|")
+	//t.Logf("     |---------+---------+---------+---------+---------+---------+---------+---------|")
+	t.Logf("     |---------+---------+---------+---------+---------50--------|")
 	j := int64(0)
 	for i := 1; i < len(breakpoints); i++ {
 		t.Logf("%3d: %s", i, k.Text(j, breakpoints[i].Position()))
 		j = breakpoints[i].Position()
 	}
+	t.Fail()
+}
+
+func TestBreakParagraph(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelInfo)
+	//
+	root := buildDOM(kafkaHTML, t)
+	p := findPara(root, t)
+	para, _ := InnerParagraphText(p)
+	t.Logf("inner text of DOM = '%s'", para.Raw().String())
+	regs := parameters.NewTypesettingRegisters()
+	k, _ := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
+	//t.Logf("khipu = %v", k)
+	pbox := frame.NewPrincipalBox(p, frame.BlockMode)
+	pbox.Box.BotR = dimen.Point{X: 60 * 10 * dimen.BP, Y: 10 * dimen.CM}
+	var err error
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	pbox, err = BreakParagraph(k, pbox, regs)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	//
+	t.Fail()
+}
+
+func TestInlineBoxes(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelInfo)
+	//
+	root := buildDOM(kafkaHTML, t)
+	p := findPara(root, t)
+	//
+	pbox := frame.NewPrincipalBox(p, frame.BlockMode)
+
+	para, _ := InnerParagraphText(p)
+	t.Logf("inner text of DOM = '%s'", para.Raw().String())
+	regs := parameters.NewTypesettingRegisters()
+	k, _ := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
+	//t.Logf("khipu = %v", k)
+	pbox.Box.BotR = dimen.Point{X: 60 * 10 * dimen.BP, Y: 10 * dimen.CM}
+	var err error
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	pbox, err = BreakParagraph(k, pbox, regs)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	//
 	t.Fail()
 }
 

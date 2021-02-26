@@ -85,7 +85,7 @@ func initParameters(p *[P_STOPPER]interface{}) {
 	p[P_LINESKIPLIMIT] = 0                // dimension
 	p[P_HYPHENCHAR] = int('-')            // a rune
 	p[P_HYPHENPENALTY] = 0                // a numeric penalty (int)
-	p[P_MINHYPHENLENGTH] = dimen.Infty    // a numeric quantitiv (int) = # of runes
+	p[P_MINHYPHENLENGTH] = dimen.Infinity // a numeric quantitiv (int) = # of runes
 }
 
 func (regs *TypesettingRegisters) Begingroup() {

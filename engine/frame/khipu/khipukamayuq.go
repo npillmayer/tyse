@@ -47,6 +47,7 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/locate"
 	params "github.com/npillmayer/tyse/core/parameters"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/glyphing"
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/bidi"
@@ -168,7 +169,7 @@ func encodeSegment(segm string, p penalties, item styledItem, env typEnv) (*Khip
 	// khipu.AppendKnot(b).AppendKnot(pen)
 	T().Debugf("no line wrap possible, encode unbreakable text")
 	b := encodeText(segm, item, env)
-	b.AppendKnot(Penalty(dimen.Infty))
+	b.AppendKnot(Penalty(dimen.Infinity))
 	return b, nil
 }
 
@@ -234,9 +235,8 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 		// 4. attach glyph sequences to text boxes
 		box := NewTextBox(word, pos)
 		//
-		// TODO
-		//styleset := item.styles.(
-		//box.glyphs = env.shaper.Shape(word, styleset.Font())
+		styleset := item.styles.(frame.StyleSet)
+		box.glyphs = env.shaper.Shape(word, styleset.Font())
 		//
 		// 5. measure text of glyph sequence
 		box.Width, box.Height, box.Depth = box.glyphs.BBoxDimens()
@@ -284,7 +284,7 @@ func KnotEncode(text io.Reader, startpos uint64, pipeline *TypesettingPipeline,
 		p := penlty(seg.Penalties())
 		T().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
 		k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
-		if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infty {
+		if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infinity {
 			HyphenateTextBoxes(k, pipeline, regs)
 		}
 		khipu.AppendKhipu(k)
@@ -315,7 +315,7 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 				khipu.AppendKnot(g).AppendKnot(Penalty(p.p2))
 			} else {
 				b := NewTextBox(seg.Text(), textpos)
-				khipu.AppendKnot(b).AppendKnot(Penalty(dimen.Infty))
+				khipu.AppendKnot(b).AppendKnot(Penalty(dimen.Infinity))
 			}
 		} else { // identified as a possible line break, but no space
 			// insert explicit discretionary '\-' penalty
@@ -335,7 +335,7 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 			T().Errorf("BROKEN BY SECONDARY BREAKER: TEXT_BOX")
 			// close a text box which is not a possible line wrap position
 			b := NewTextBox(seg.Text(), textpos)
-			pen := Penalty(dimen.Infty)
+			pen := Penalty(dimen.Infinity)
 			khipu.AppendKnot(b).AppendKnot(pen)
 		}
 	}

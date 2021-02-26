@@ -6,7 +6,6 @@ import (
 
 	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/styled"
-	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
 	"github.com/npillmayer/tyse/engine/frame"
@@ -25,10 +24,84 @@ type infoIRS struct {
 	pdis     map[uint64]bool           // text position ⇒ PDI
 }
 
+// --- Paragraph from Container Box ------------------------------------------
+
+// ParagraphFromBox creates a Paragraph instance holding the text content
+// of a container box node as a styled text.
+// c should be a paragraph-level container, but this is not enforced.
+func ParagraphFromBox(c frame.Container) (*Paragraph, error) {
+	para := &Paragraph{
+		irs: infoIRS{
+			irsElems: make(map[uint64]bidi.Direction),
+			pdis:     make(map[uint64]bool),
+		},
+	}
+	var innerText *styled.Text
+	eBidiDir, _ := findEmbeddingBidiDirection(c.DOMNode())
+	var err error
+	para.Paragraph, err = styled.ParagraphFromText(innerText, 0, innerText.Raw().Len(), eBidiDir,
+		para.bidiMarkup())
+	return para, err
+}
+
+func boxText(c frame.Container, irs *infoIRS) (*styled.Text, error) {
+	if c == nil {
+		return styled.TextFromString(""), cords.ErrIllegalArguments
+	}
+	b := styled.NewTextBuilder()
+	collectBoxText(c, b, irs)
+	return b.Text(), nil
+}
+
+func collectBoxText(c frame.Container, b *styled.TextBuilder, irs *infoIRS) {
+	if c.IsText() {
+		leaf := createLeaf(c.DOMNode())
+		styles := leaf.element.ComputedStyles().Styles()
+		styleset := frame.StyleSet{Props: styles}
+		var isExplicitDir bool
+		styleset.EmbBidiDir, isExplicitDir = findEmbeddingBidiDirection(leaf.element)
+		if isExplicitDir {
+			irs.irsElems[b.Len()] = styleset.EmbBidiDir
+			irs.pdis[b.Len()+leaf.Weight()] = true
+		}
+		//text.Style(styleset, pos, pos+l.Weight())
+		b.Append(leaf, styleset)
+	} else if c.DisplayMode().BlockOrInline() == frame.BlockMode {
+		b.Append(&nonReplacableElementLeaf{c.DOMNode()}, frame.StyleSet{})
+	} else {
+		T().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())
+	}
+	if c.TreeNode().ChildCount() > 0 {
+		children := c.TreeNode().Children()
+		for _, ch := range children {
+			if childContainer, ok := ch.Payload.(frame.Container); ok {
+				collectBoxText(childContainer, b, irs)
+			}
+		}
+	}
+}
+
+func createLeaf(n w3cdom.Node) *pLeaf {
+	parent := n.ParentNode()
+	for parent != nil && parent.NodeType() != html.ElementNode {
+		parent = parent.ParentNode()
+	}
+	//T().Debugf("parent of text node = %v", parent)
+	value := n.NodeValue()
+	leaf := &pLeaf{
+		element: parent,
+		length:  uint64(len(value)),
+		content: value,
+	}
+	return leaf
+}
+
+// --- Paragraph from W3C Node -----------------------------------------------
+
 // InnerParagraphText creates a Paragraph instance holding the text content
 // of a W3C DOM node as a styled text.
 // node should be a paragraph-level HTML node, but this is not enforced.
-func InnerParagraphText(node *dom.W3CNode) (*Paragraph, error) {
+func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
 	para := &Paragraph{
 		irs: infoIRS{
 			irsElems: make(map[uint64]bidi.Direction),
@@ -133,18 +206,23 @@ func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
 			T().Debugf("styled paragraph: collect text of <%s>", n.NodeName())
 		}
 	} else if n.NodeType() == html.TextNode {
-		//T().Debugf("text = %s", n.NodeValue())
-		parent := n.ParentNode()
-		for parent != nil && parent.NodeType() != html.ElementNode {
-			parent = parent.ParentNode()
-		}
-		//T().Debugf("parent of text node = %v", parent)
-		value := n.NodeValue()
-		leaf := &pLeaf{
-			element: parent,
-			length:  uint64(len(value)),
-			content: value,
-		}
+		leaf := createLeaf(n)
+		/*
+			//T().Debugf("text = %s", n.NodeValue())
+			parent := n.ParentNode()
+			for parent != nil && parent.NodeType() != html.ElementNode {
+				parent = parent.ParentNode()
+			}
+			//T().Debugf("parent of text node = %v", parent)
+			value := n.NodeValue()
+			leaf := &pLeaf{
+				element: parent,
+				length:  uint64(len(value)),
+				content: value,
+			}
+		*/
+		//
+		parent := leaf.element
 		styles := parent.ComputedStyles().Styles()
 		styleset := frame.StyleSet{Props: styles}
 		var isExplicitDir bool

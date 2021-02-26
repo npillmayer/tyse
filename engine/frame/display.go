@@ -48,6 +48,16 @@ func (disp DisplayMode) Overlaps(d DisplayMode) bool {
 	return false
 }
 
+func (disp DisplayMode) BlockOrInline() DisplayMode {
+	if disp.Overlaps(InlineMode) {
+		return InlineMode
+	}
+	if disp.Contains(FlowMode) || disp.Contains(ContentsMode) {
+		return InlineMode
+	}
+	return BlockMode
+}
+
 // FullString returns all atomic modes set in a display mode.
 func (disp DisplayMode) FullString() string {
 	var b bytes.Buffer
