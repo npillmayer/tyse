@@ -8,11 +8,9 @@ import (
 )
 
 type Page struct {
-	dimen.Rect                     // page size
-	queue              *EventQ     // every page manages an event queue (e.g., reflow events)
-	template           interface{} // TODO
-	positionedFloats   FloatList
-	unpositionedFloats FloatList
+	dimen.Rect             // page size
+	queue      *EventQ     // every page manages an event queue (e.g., reflow events)
+	template   interface{} // TODO
 }
 
 func NewPage(papersize dimen.Point) *Page {

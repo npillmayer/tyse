@@ -25,14 +25,21 @@ const (
 //
 type Context interface {
 	Type() FormattingContextType
-	IsFlowRoot() bool     // this is a self-contained BFC
 	Container() Container // container which creates this formatting context
+	IsFlowRoot() bool     // this is a self-contained BFC
+	FlowRoot() *FlowRoot  // non-nil if this context is a flow root
+}
+
+type FlowRoot struct {
+	PositionedFloats   *FloatList
+	UnpositionedFloats *FloatList
 }
 
 type ContextBase struct {
 	tree.Node
 	container Container
 	isRoot    bool
+	flowRoot  *FlowRoot
 }
 
 func (ctx ContextBase) Container() Container {
@@ -52,6 +59,10 @@ func (ctx ContextBase) TreeNode() *tree.Node {
 
 func (ctx ContextBase) IsFlowRoot() bool {
 	return ctx.isRoot
+}
+
+func (ctx ContextBase) FlowRoot() *FlowRoot {
+	return ctx.flowRoot
 }
 
 // --- Block Formatting Context ----------------------------------------------
