@@ -120,7 +120,7 @@ func boxText(c boxtree.Container, irs *infoIRS) (*styled.Text, []boxtree.Contain
 func collectBoxText(c boxtree.Container, b *styled.TextBuilder, irs *infoIRS,
 	blocks []boxtree.Container) {
 	//
-	if c.IsText() {
+	if c.DOMNode() != nil && c.DOMNode().NodeType() == html.TextNode {
 		leaf := createLeaf(c.DOMNode())
 		styles := leaf.element.ComputedStyles().Styles()
 		styleset := frame.StyleSet{Props: styles}

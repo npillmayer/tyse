@@ -9,6 +9,7 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
 
@@ -126,6 +127,36 @@ func edge(c1 boxtree.Container, c2 boxtree.Container, w io.Writer, dict map[boxt
 	if err := gparams.EdgeTmpl.Execute(w, e); err != nil {
 		panic(err)
 	}
+}
+
+// ---------------------------------------------------------------------------
+
+func PrincipalLabel(pbox *boxtree.PrincipalBox) string {
+	if pbox == nil {
+		return "<empty box>"
+	}
+	name := pbox.DOMNode().NodeName()
+	innerSym := pbox.DisplayMode().Symbol()
+	//outerSym := pbox.outerMode.Symbol()
+	outerSym := frame.NoMode.Symbol()
+	if pbox.Context() != nil {
+		if pbox.Context().Type() == boxtree.BlockFormattingContext {
+			outerSym = frame.BlockMode.Symbol()
+		} else {
+			outerSym = frame.InlineMode.Symbol()
+		}
+	}
+	//return fmt.Sprintf("%s %s %s", outerSym, innerSym, name)
+	return fmt.Sprintf("%s %s %s", outerSym, innerSym, name)
+}
+
+func String(anon *boxtree.AnonymousBox) string {
+	if anon == nil {
+		return "<empty anon box>"
+	}
+	innerSym := anon.DisplayMode().Inner().Symbol()
+	outerSym := anon.DisplayMode().Outer().Symbol()
+	return fmt.Sprintf("%s %s", outerSym, innerSym)
 }
 
 // --- Templates --------------------------------------------------------

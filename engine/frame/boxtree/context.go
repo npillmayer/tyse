@@ -35,33 +35,33 @@ type FlowRoot struct {
 	UnpositionedFloats *FloatList
 }
 
-type ContextBase struct {
+type contextBase struct {
 	tree.Node
 	container Container
 	isRoot    bool
 	flowRoot  *FlowRoot
 }
 
-func (ctx ContextBase) Container() Container {
+func (ctx contextBase) Container() Container {
 	return ctx.container
 }
 
-func (ctx ContextBase) Self() Context {
-	if ctx.container == nil || ctx.container.Context() == nil {
-		panic("CSS context: internal inconsistency")
-	}
-	return ctx.container.Context()
-}
+// func (ctx contextBase) Self() Context {
+// 	if ctx.container == nil || ctx.container.Context() == nil {
+// 		panic("CSS context: internal inconsistency")
+// 	}
+// 	return ctx.container.Context()
+// }
 
-func (ctx ContextBase) TreeNode() *tree.Node {
+func (ctx contextBase) TreeNode() *tree.Node {
 	return &ctx.Node
 }
 
-func (ctx ContextBase) IsFlowRoot() bool {
+func (ctx contextBase) IsFlowRoot() bool {
 	return ctx.isRoot
 }
 
-func (ctx ContextBase) FlowRoot() *FlowRoot {
+func (ctx contextBase) FlowRoot() *FlowRoot {
 	return ctx.flowRoot
 }
 
@@ -84,7 +84,7 @@ func (ctx ContextBase) FlowRoot() *FlowRoot {
 // and margins only collapse between elements in the same formatting context.
 //
 type BlockContext struct {
-	ContextBase
+	contextBase
 }
 
 func NewBlockContext(c Container, isRoot bool) *BlockContext {
@@ -132,7 +132,7 @@ func (ctx *BlockContext) AddBox(c Container) {
 // --- Inline Context --------------------------------------------------------
 
 type InlineContext struct {
-	ContextBase
+	contextBase
 }
 
 func NewInlineContext(c Container, isRoot bool) *InlineContext {
