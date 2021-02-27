@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/framedebug"
 	"github.com/npillmayer/tyse/engine/frame/layout"
 
@@ -64,7 +64,7 @@ func TestBoxGeneration(t *testing.T) {
 		if graphviz {
 			gvz, _ := ioutil.TempFile(".", "layout-*.dot")
 			defer gvz.Close()
-			framedebug.ToGraphViz(boxes.(*frame.PrincipalBox), gvz)
+			framedebug.ToGraphViz(boxes.(*boxtree.PrincipalBox), gvz)
 		}
 	}
 }
@@ -81,13 +81,13 @@ func TestReorderingSimple(t *testing.T) {
 		t.Logf("root node is %s", boxes.DOMNode().NodeName())
 		gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 		gtrace.EngineTracer.Debugf("=== Reordering Boxes =========================")
-		renderRoot := frame.TreeNodeAsPrincipalBox(boxes.TreeNode())
+		renderRoot := boxtree.TreeNodeAsPrincipalBox(boxes.TreeNode())
 		if err = layout.ReorderBoxTree(renderRoot); err != nil {
 			t.Errorf(err.Error())
 		} else if graphviz {
 			gvz, _ := ioutil.TempFile(".", "reorder-*.dot")
 			defer gvz.Close()
-			framedebug.ToGraphViz(boxes.(*frame.PrincipalBox), gvz)
+			framedebug.ToGraphViz(boxes.(*boxtree.PrincipalBox), gvz)
 		}
 	}
 }

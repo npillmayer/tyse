@@ -8,6 +8,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
 
 func TestBoxIntersection(t *testing.T) {
@@ -53,8 +54,8 @@ func makeIsoBox(a, b, c, d dimen.Dimen) isoBox {
 	}
 }
 
-func makePara() (*frame.PrincipalBox, []*frame.Box, []*frame.Box) {
-	para := frame.NewPrincipalBox(nil, frame.BlockMode)
+func makePara() (*boxtree.PrincipalBox, []*frame.Box, []*frame.Box) {
+	para := boxtree.NewPrincipalBox(nil, frame.BlockMode)
 	para.Box = &frame.StyledBox{}
 	para.Box.BotR = dimen.Point{X: 500, Y: 800}
 	//

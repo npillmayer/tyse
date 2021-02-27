@@ -1,4 +1,4 @@
-package frame
+package boxtree
 
 import (
 	"testing"

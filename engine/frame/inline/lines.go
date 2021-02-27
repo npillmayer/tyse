@@ -5,6 +5,7 @@ import (
 	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/khipu"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak/firstfit"
@@ -40,7 +41,7 @@ func NewLineBox(k *khipu.Khipu, start, length int64, indent dimen.Dimen) *LineBo
 // For line boxes, it returns the DOM node corresponding to the parent container,
 // which should be of type PrincipalBox.
 func (lbox *LineBox) DOMNode() *dom.W3CNode {
-	parent := frame.TreeNodeAsPrincipalBox(lbox.Parent())
+	parent := boxtree.TreeNodeAsPrincipalBox(lbox.Parent())
 	if parent == nil {
 		return nil
 	}
@@ -77,15 +78,15 @@ func (lbox *LineBox) ChildIndices() (uint32, uint32) {
 	return 0, 0
 }
 
-func (lbox *LineBox) Context() frame.Context {
+func (lbox *LineBox) Context() boxtree.Context {
 	return nil
 }
 
-func (lbox *LineBox) AppendToPrincipalBox(pbox *frame.PrincipalBox) {
-	frame.Inline(pbox.Context()).AddLineBox(lbox)
+func (lbox *LineBox) AppendToPrincipalBox(pbox *boxtree.PrincipalBox) {
+	boxtree.Inline(pbox.Context()).AddLineBox(lbox)
 }
 
-var _ frame.Container = &LineBox{}
+var _ boxtree.Container = &LineBox{}
 
 // --- Breaking paragraphs into lines ----------------------------------------
 
@@ -97,8 +98,8 @@ var _ frame.Container = &LineBox{}
 // If an error occurs during line-breaking, a pbox of nil is returned, together with the
 // error value.
 //
-func BreakParagraph(k *khipu.Khipu, pbox *frame.PrincipalBox,
-	regs *parameters.TypesettingRegisters) (*frame.PrincipalBox, error) {
+func BreakParagraph(k *khipu.Khipu, pbox *boxtree.PrincipalBox,
+	regs *parameters.TypesettingRegisters) (*boxtree.PrincipalBox, error) {
 	//
 	// TODO
 	// find all children with align=left or align=right and collect their boxes
@@ -133,18 +134,29 @@ func BreakParagraph(k *khipu.Khipu, pbox *frame.PrincipalBox,
 	return nil, nil
 }
 
-func PositionLines(pbox *frame.PrincipalBox) (*frame.PrincipalBox, error) {
-	paraText, err := ParagraphFromBox(pbox)
+func FindParaWidthAndText(pbox *ParagraphBox, rootctx boxtree.Context) (
+	[]boxtree.Container, boxtree.Context, error) {
+	//
+	paraText, blocks, err := paragraphTextFromBox(pbox)
 	if err != nil {
 		T().Errorf(err.Error())
-		return nil, err
+		return []boxtree.Container{}, rootctx, err
 	}
 	regs := parameters.NewTypesettingRegisters()
 	regs = adaptTypesettingRegisters(regs, pbox)
 	k, err := khipu.EncodeParagraph(paraText.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	if err != nil || k == nil {
 		T().Errorf("lines: khipu resulting from paragraph is nil")
-		return nil, err
+		return []boxtree.Container{}, rootctx, err
+	}
+	pbox.para = paraText
+	pbox.khipu = k
+	//
+	if ctx := boxtree.CreateContextForContainer(pbox, false); ctx != nil {
+		// we have to respect floats from the root context
+		// ...
+		// then move on to the paragraphs context
+		rootctx = ctx
 	}
 	if pbox.Box.Width() == 0 {
 		pbox.Box.BotR = dimen.Point{
@@ -152,22 +164,25 @@ func PositionLines(pbox *frame.PrincipalBox) (*frame.PrincipalBox, error) {
 			Y: dimen.Infinity,
 		}
 	}
-	pbox, err = BreakParagraph(k, pbox, regs)
-	if err != nil {
-		T().Errorf(err.Error())
-		return nil, err
-	}
-	if pbox.Box.BotR.Y == dimen.Infinity {
-		pbox.Box.BotR.Y = addLineHeights(pbox)
-	}
-	return pbox, nil
+	return blocks, rootctx, nil
+	/*
+		pbox, err = BreakParagraph(k, pbox, regs)
+		if err != nil {
+			T().Errorf(err.Error())
+			return err
+		}
+		if pbox.Box.BotR.Y == dimen.Infinity {
+			pbox.Box.BotR.Y = addLineHeights(pbox)
+		}
+		return nil
+	*/
 }
 
-func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, pbox *frame.PrincipalBox) *parameters.TypesettingRegisters {
+func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, pbox *ParagraphBox) *parameters.TypesettingRegisters {
 	return regs
 }
 
-func addLineHeights(pbox *frame.PrincipalBox) dimen.Dimen {
+func addLineHeights(pbox *boxtree.PrincipalBox) dimen.Dimen {
 	var height dimen.Dimen
 	// ctx := pbox.Context()
 	// children := ctx.TreeNode().Children()
@@ -183,8 +198,18 @@ func addLineHeights(pbox *frame.PrincipalBox) dimen.Dimen {
 	return height
 }
 
-func collectAlignedBoxes(pbox *frame.PrincipalBox) ([]*frame.Box, []*frame.Box) {
+func collectAlignedBoxes(pbox *boxtree.PrincipalBox) ([]*frame.Box, []*frame.Box) {
 	// TODO
 	// Float handling has to be re-thought completely
 	return []*frame.Box{}, []*frame.Box{}
+}
+
+func Layout(c boxtree.Container) {
+	T().Debugf("Layout of sub-block")
+	if c.DisplayMode().Inner().Contains(frame.InlineMode) {
+		// call layout paragraph
+	} else {
+		// call layout block
+	}
+	// other cases
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
-	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
 
 // Parameters for GraphViz drawing.
@@ -22,7 +22,7 @@ type graphParamsType struct {
 
 // ToGraphViz creates a graphical representation of a render tree.
 // It produces a DOT file format suitable as input for Graphviz, given a Writer.
-func ToGraphViz(boxroot *frame.PrincipalBox, w io.Writer) {
+func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer) {
 	header, err := template.New("renderTree").Parse(graphHeadTmpl)
 	if err != nil {
 		panic(err)
@@ -37,14 +37,14 @@ func ToGraphViz(boxroot *frame.PrincipalBox, w io.Writer) {
 	if err != nil {
 		panic(err)
 	}
-	dict := make(map[frame.Container]string, 4096)
+	dict := make(map[boxtree.Container]string, 4096)
 	boxes(boxroot, w, dict, &gparams)
 	w.Write([]byte("}\n"))
 }
 
 var cnt int
 
-func boxes(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
+func boxes(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, gparams *graphParamsType) {
 	cnt++
 	if cnt == 300 {
 		return
@@ -67,7 +67,7 @@ func boxes(c frame.Container, w io.Writer, dict map[frame.Container]string, gpar
 					gtrace.EngineTracer.Errorf("Child at #%d is nil", i)
 				} else {
 					gtrace.EngineTracer.Errorf("Child is %v", ch)
-					child := ch.Payload.(frame.Container)
+					child := ch.Payload.(boxtree.Container)
 					gtrace.EngineTracer.Infof("  child[%d] = %v", i, child)
 					boxes(child, w, dict, gparams)
 					edge(c, child, w, dict, gparams)
@@ -77,7 +77,7 @@ func boxes(c frame.Container, w io.Writer, dict map[frame.Container]string, gpar
 	}
 }
 
-func box(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
+func box(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, gparams *graphParamsType) {
 	name := dict[c]
 	if name == "" {
 		sz := len(dict) + 1
@@ -91,7 +91,7 @@ func box(c frame.Container, w io.Writer, dict map[frame.Container]string, gparam
 
 // Helper struct
 type cbox struct {
-	C    frame.Container
+	C    boxtree.Container
 	N    w3cdom.Node
 	Name string
 }
@@ -116,7 +116,7 @@ type cedge struct {
 	N1, N2 cbox
 }
 
-func edge(c1 frame.Container, c2 frame.Container, w io.Writer, dict map[frame.Container]string,
+func edge(c1 boxtree.Container, c2 boxtree.Container, w io.Writer, dict map[boxtree.Container]string,
 	gparams *graphParamsType) {
 	//
 	//fmt.Printf("dict has %d entries\n", len(dict))

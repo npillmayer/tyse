@@ -11,6 +11,7 @@ import (
 	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/khipu"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak/firstfit"
@@ -81,7 +82,7 @@ func TestBreakParagraph(t *testing.T) {
 	regs := parameters.NewTypesettingRegisters()
 	k, _ := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	//t.Logf("khipu = %v", k)
-	pbox := frame.NewPrincipalBox(p, frame.BlockMode)
+	pbox := boxtree.NewPrincipalBox(p, frame.BlockMode)
 	pbox.Box.BotR = dimen.Point{X: 60 * 10 * dimen.BP, Y: 10 * dimen.CM}
 	var err error
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
@@ -101,7 +102,7 @@ func TestInlineBoxes(t *testing.T) {
 	root := buildDOM(kafkaHTML, t)
 	p := findPara(root, t)
 	//
-	pbox := frame.NewPrincipalBox(p, frame.BlockMode)
+	pbox := boxtree.NewPrincipalBox(p, frame.BlockMode)
 
 	para, _ := InnerParagraphText(p)
 	t.Logf("inner text of DOM = '%s'", para.Raw().String())

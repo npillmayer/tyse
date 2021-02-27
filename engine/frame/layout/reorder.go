@@ -2,7 +2,7 @@ package layout
 
 import (
 	"github.com/npillmayer/tyse/engine/dom/style"
-	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -13,7 +13,7 @@ import (
 // the normal DOM hierarchy and re-attaches them to the document root or an ancestor
 // with non-static positioning, respectively.
 // In a future version, CSS regions will be supported as well.
-func ReorderBoxTree(boxRoot *frame.PrincipalBox) error {
+func ReorderBoxTree(boxRoot *boxtree.PrincipalBox) error {
 	if boxRoot == nil {
 		return nil
 	}
@@ -24,7 +24,7 @@ func ReorderBoxTree(boxRoot *frame.PrincipalBox) error {
 
 // Tree filter predicate: box has position "fixed" or "absolute".
 func absolutePositioning(node *tree.Node, unused *tree.Node) (match *tree.Node, err error) {
-	pbox := frame.TreeNodeAsPrincipalBox(node)
+	pbox := boxtree.TreeNodeAsPrincipalBox(node)
 	if pbox != nil {
 		position := pbox.DOMNode().ComputedStyles().GetPropertyValue("position")
 		if position == "fixed" || position == "absolute" {
@@ -36,10 +36,10 @@ func absolutePositioning(node *tree.Node, unused *tree.Node) (match *tree.Node, 
 
 // Tree filter predicate with side effect: attaches node to anchor, if suited.
 func anchor(test *tree.Node, node *tree.Node) (match *tree.Node, err error) {
-	absoultePosChild := frame.TreeNodeAsPrincipalBox(node)
-	possibleAnchor := frame.TreeNodeAsPrincipalBox(test)
+	absoultePosChild := boxtree.TreeNodeAsPrincipalBox(node)
+	possibleAnchor := boxtree.TreeNodeAsPrincipalBox(test)
 	if absoultePosChild != nil && possibleAnchor != nil {
-		var anchor *frame.PrincipalBox
+		var anchor *boxtree.PrincipalBox
 		position := absoultePosChild.DOMNode().ComputedStyles().GetPropertyValue("position")
 		switch position {
 		case "fixed": // searching for viewport
@@ -53,7 +53,7 @@ func anchor(test *tree.Node, node *tree.Node) (match *tree.Node, err error) {
 			}
 		}
 		if anchor != nil {
-			anchor.AppendChild(frame.TreeNodeAsPrincipalBox(absoultePosChild.Isolate()))
+			anchor.AppendChild(boxtree.TreeNodeAsPrincipalBox(absoultePosChild.Isolate()))
 		}
 	}
 	return

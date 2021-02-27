@@ -5,10 +5,11 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
-func OutlineParshape(pbox *frame.PrincipalBox, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
+func OutlineParshape(pbox *boxtree.PrincipalBox, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
 	boundingBox := pbox.Box.Box // TODO check for nil
 	T().Infof("parshape: bounding box = %v", boundingBox.Rect)
 	polygon := paragraphPolygon(&boundingBox, leftAlign, rightAlign)

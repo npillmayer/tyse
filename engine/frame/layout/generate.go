@@ -9,6 +9,7 @@ import (
 
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
@@ -17,7 +18,7 @@ var errDOMRootIsNull = errors.New("DOM root is null")
 var errDOMNodeNotSuitable = errors.New("DOM node is not suited for layout")
 
 // BuildBoxTree creates a render box tree from a styled tree.
-func BuildBoxTree(domRoot *dom.W3CNode) (frame.Container, error) {
+func BuildBoxTree(domRoot *dom.W3CNode) (boxtree.Container, error) {
 	if domRoot == nil {
 		return nil, errDOMRootIsNull
 	}
@@ -85,13 +86,13 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 			parentbox, found := dom2box.Get(parent)
 			if found {
 				T().Debugf("adding new box %s node to parent %s\n", box, parentbox)
-				p := parentbox.(*frame.PrincipalBox)
+				p := parentbox.(*boxtree.PrincipalBox)
 				var err error
 				switch b := box.(type) {
-				case *frame.PrincipalBox:
+				case *boxtree.PrincipalBox:
 					b.ChildInx = uint32(chpos)
 					err = p.AddChild(b)
-				case *frame.TextBox:
+				case *boxtree.TextBox:
 					b.ChildInx = uint32(chpos)
 					err = p.AddTextChild(b)
 				default:
@@ -114,7 +115,7 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 // ----------------------------------------------------------------------
 
 // NewBoxForDOMNode creates an adequately initialized box for a given DOM node.
-func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
+func NewBoxForDOMNode(domnode *dom.W3CNode) boxtree.Container {
 	if domnode.NodeType() == html.TextNode {
 		//tbox := frame.NewTextBox(domnode)
 		// TODO find index within parent
@@ -129,14 +130,14 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
 	if mode == frame.NoMode || mode == frame.DisplayNone {
 		return nil // do not produce box for illegal mode or for display = "none"
 	}
-	pbox := frame.NewPrincipalBox(domnode, mode)
+	pbox := boxtree.NewPrincipalBox(domnode, mode)
 	//pbox.PrepareAnonymousBoxes()
 	// TODO find index within parent
 	// and set #ChildInx
 	return pbox
 }
 
-func possiblyCreateMiniHierarchy(pbox *frame.PrincipalBox) {
+func possiblyCreateMiniHierarchy(pbox *boxtree.PrincipalBox) {
 	//htmlnode := pbox.DOMNode().HTMLNode()
 	//propertyMap := styler.ComputedStyles()
 	switch pbox.DOMNode().NodeName() {

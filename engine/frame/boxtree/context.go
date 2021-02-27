@@ -1,7 +1,8 @@
-package frame
+package boxtree
 
 import (
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -95,8 +96,8 @@ func (ctx *BlockContext) Type() FormattingContextType {
 }
 
 func (ctx *BlockContext) AddBox(c Container) {
-	if c.DisplayMode() == InlineMode {
-		anon := NewAnonymousBox(InlineMode)
+	if c.DisplayMode() == frame.InlineMode {
+		anon := NewAnonymousBox(frame.InlineMode)
 		anon.AddChild(c.TreeNode())
 		return
 	}
@@ -146,7 +147,7 @@ func (ctx *InlineContext) AddLineBox(c Container) {
 	// May only add line boxes
 	// inline-block boxes will already be part of the khipu
 	//
-	if c.DisplayMode() == InlineMode {
+	if c.DisplayMode() == frame.InlineMode {
 		ctx.AddChild(c.TreeNode())
 		return
 	}
@@ -164,7 +165,7 @@ func (ctx *InlineContext) AddLineBox(c Container) {
 		T().P("context", "inline").Errorf("child container cannot have 2 parents")
 		panic("container is child container; cannot have 2 parents")
 	}
-	anon := NewAnonymousBox(InlineMode)
+	anon := NewAnonymousBox(frame.InlineMode)
 	anon.AddChild(c.TreeNode())
 }
 
@@ -193,11 +194,11 @@ A new block formatting context is created by:
 
 */
 func CreateContextForContainer(c Container, mustRoot bool) Context {
-	mode := DisplayModeForDOMNode(c.DOMNode()).BlockOrInline()
+	mode := frame.DisplayModeForDOMNode(c.DOMNode()).BlockOrInline()
 	// An inline box is one that is both inline-level and whose contents participate
 	// in its containing inline formatting context. A non-replaced element with a
 	// 'display' value of 'inline' generates an inline box.
-	if mode == InlineMode {
+	if mode == frame.InlineMode {
 		return NewInlineContext(c, mustRoot)
 	}
 	// c is a block level container
@@ -215,13 +216,13 @@ func CreateContextForContainer(c Container, mustRoot bool) Context {
 		block = true
 	} else if props.GetPropertyValue("position") == "absolute" || props.GetPropertyValue("fixed") == "absolute" {
 		block = true
-	} else if c.DisplayMode().Contains(InlineMode | BlockMode) { // "inline-block"
+	} else if c.DisplayMode().Contains(frame.InlineMode | frame.InnerBlockMode) { // "inline-block"
 		block = true
 	} else if overflow != "visible" && overflow != "clip" {
 		block = true
 	} // TODO and other rules
 	if c.TreeNode().ChildCount() > 0 {
-		var modes DisplayMode
+		var modes frame.DisplayMode
 		children := c.TreeNode().Children()
 		for _, ch := range children {
 			if childContainer, ok := ch.Payload.(Container); ok {
@@ -230,11 +231,11 @@ func CreateContextForContainer(c Container, mustRoot bool) Context {
 		}
 		// If a block level container contains only inline level children,
 		// its formatting context switches to inline
-		if !modes.Contains(BlockMode) {
-			mode = InlineMode
+		if !modes.Contains(frame.BlockMode) {
+			mode = frame.InlineMode
 		}
 	}
-	if mode == InlineMode {
+	if mode == frame.InlineMode {
 		return NewInlineContext(c, block || mustRoot)
 	}
 	return NewBlockContext(c, block || mustRoot)

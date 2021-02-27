@@ -3,21 +3,21 @@ package layout
 import (
 	"sync"
 
-	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
 
 type FloatList struct {
 	mutex  *sync.Mutex
-	floats []frame.Container
+	floats []boxtree.Container
 }
 
-func (l *FloatList) AppendFloat(float frame.Container) {
+func (l *FloatList) AppendFloat(float boxtree.Container) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	l.floats = append(l.floats, float)
 }
 
-func (l *FloatList) Contains(float frame.Container) bool {
+func (l *FloatList) Contains(float boxtree.Container) bool {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	for _, f := range l.floats {
@@ -28,7 +28,7 @@ func (l *FloatList) Contains(float frame.Container) bool {
 	return false
 }
 
-func (l *FloatList) Remove(float frame.Container) bool {
+func (l *FloatList) Remove(float boxtree.Container) bool {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	for i, f := range l.floats {
@@ -40,10 +40,10 @@ func (l *FloatList) Remove(float frame.Container) bool {
 	return false
 }
 
-func (l *FloatList) Floats() []frame.Container {
+func (l *FloatList) Floats() []boxtree.Container {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	floats := make([]frame.Container, len(l.floats))
+	floats := make([]boxtree.Container, len(l.floats))
 	copy(floats, l.floats)
 	return floats
 }

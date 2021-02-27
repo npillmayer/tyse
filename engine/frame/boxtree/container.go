@@ -1,10 +1,11 @@
-package frame
+package boxtree
 
 import (
 	"bytes"
 	"fmt"
 
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -14,12 +15,12 @@ import (
 type Container interface {
 	DOMNode() *dom.W3CNode
 	TreeNode() *tree.Node
-	CSSBox() *Box
+	CSSBox() *frame.Box
 	IsAnonymous() bool
-	IsText() bool
-	DisplayMode() DisplayMode
+	IsText() bool // TODO remove this
+	DisplayMode() frame.DisplayMode
 	Context() Context
-	ChildIndices() (uint32, uint32)
+	ChildIndices() (uint32, uint32) // TODO
 }
 
 var _ Container = &PrincipalBox{}
@@ -27,7 +28,7 @@ var _ Container = &AnonymousBox{}
 var _ Container = &TextBox{}
 
 // BoxFromNode returns the box which wraps a given tree node.
-func BoxFromNode(n *tree.Node) *Box {
+func BoxFromNode(n *tree.Node) *frame.Box {
 	if n == nil || n.Payload == nil {
 		return nil
 	}
@@ -47,26 +48,26 @@ func BoxFromNode(n *tree.Node) *Box {
 // PrincipalBox is a (CSS-)styled box which may contain other boxes.
 // It references a node in the styled tree, i.e., a stylable DOM element node.
 type PrincipalBox struct {
-	tree.Node                // a container is a node within the layout tree
-	Box         *StyledBox   // styled box for a DOM node
-	domNode     *dom.W3CNode // the DOM node this PrincipalBox refers to
-	displayMode DisplayMode  // outer display mode
-	context     Context      // principal boxes may establish a context
-	ChildInx    uint32       // this box represents child #ChildInx of the parent principal box
-	anonMask    runlength    // mask for anonymous box children
-	//innerMode DisplayMode  // context of children (block or inline)
-	//outerMode DisplayMode  // container lives in this mode (block or inline)
+	tree.Node                     // a container is a node within the layout tree
+	Box         *frame.StyledBox  // styled box for a DOM node
+	domNode     *dom.W3CNode      // the DOM node this PrincipalBox refers to
+	displayMode frame.DisplayMode // outer display mode
+	context     Context           // principal boxes may establish a context
+	ChildInx    uint32            // this box represents child #ChildInx of the parent principal box
+	anonMask    runlength         // mask for anonymous box children
+	//innerMode frame.DisplayMode  // context of children (block or inline)
+	//outerMode frame.DisplayMode  // container lives in this mode (block or inline)
 }
 
 // NewPrincipalBox creates either a block-level container or an inline-level container
-func NewPrincipalBox(domnode *dom.W3CNode, mode DisplayMode) *PrincipalBox {
+func NewPrincipalBox(domnode *dom.W3CNode, mode frame.DisplayMode) *PrincipalBox {
 	pbox := &PrincipalBox{
 		domNode: domnode,
 		//outerMode: outerMode,
 		//innerMode: innerMode,
 		displayMode: mode,
 	}
-	pbox.Box = &StyledBox{}
+	pbox.Box = &frame.StyledBox{}
 	pbox.Payload = pbox // always points to itself: tree node -> box
 	return pbox
 }
@@ -98,7 +99,7 @@ func (pbox *PrincipalBox) DOMNode() *dom.W3CNode {
 }
 
 // CSSBox returns the underlying box of a render tree element.
-func (pbox *PrincipalBox) CSSBox() *Box {
+func (pbox *PrincipalBox) CSSBox() *frame.Box {
 	return &pbox.Box.Box
 }
 
@@ -124,7 +125,7 @@ func (pbox *PrincipalBox) IsText() bool {
 }
 
 // DisplayMode returns the computed display mode of this box.
-func (pbox *PrincipalBox) DisplayMode() DisplayMode {
+func (pbox *PrincipalBox) DisplayMode() frame.DisplayMode {
 	//return pbox.outerMode, pbox.innerMode
 	return pbox.displayMode
 }
@@ -157,12 +158,12 @@ func (pbox *PrincipalBox) String() string {
 	name := pbox.DOMNode().NodeName()
 	innerSym := pbox.displayMode.Symbol()
 	//outerSym := pbox.outerMode.Symbol()
-	outerSym := NoMode.Symbol()
+	outerSym := frame.NoMode.Symbol()
 	if pbox.context != nil {
 		if pbox.context.Type() == BlockFormattingContext {
-			outerSym = BlockMode.Symbol()
+			outerSym = frame.BlockMode.Symbol()
 		} else {
-			outerSym = InlineMode.Symbol()
+			outerSym = frame.InlineMode.Symbol()
 		}
 	}
 	//return fmt.Sprintf("%s %s %s", outerSym, innerSym, name)
@@ -180,7 +181,7 @@ func (pbox *PrincipalBox) ChildIndices() (uint32, uint32) {
 // 	if pbox.domNode.HasChildNodes() {
 // 		if pbox.displayMode.Contains(InlineMode) {
 // 			// In inline mode all block-children have to be wrapped in an anon box.
-// 			blockChPos := pbox.checkForChildrenWithDisplayMode(BlockMode)
+// 			blockChPos := pbox.checkForChildrenWithframe.DisplayMode(BlockMode)
 // 			if !blockChPos.Empty() { // yes, found
 // 				// At least one block child present => need anon box for block children
 // 				pbox.anonMask = blockChPos
@@ -197,8 +198,8 @@ func (pbox *PrincipalBox) ChildIndices() (uint32, uint32) {
 // 			// In flow mode all children must have the same outer display mode,
 // 			// either block or inline.
 // 			// TODO This holds for flow and grid, too ?! others?
-// 			inlineChPos := pbox.checkForChildrenWithDisplayMode(InlineMode)
-// 			if !(pbox.checkForChildrenWithDisplayMode(BlockMode).Empty() ||
+// 			inlineChPos := pbox.checkForChildrenWithframe.DisplayMode(InlineMode)
+// 			if !(pbox.checkForChildrenWithframe.DisplayMode(BlockMode).Empty() ||
 // 				inlineChPos.Empty()) { // found both
 // 				// Both inline and block children => need anon boxes for inline children
 // 				T().Debugf("Creating inline anon boxes at %s", inlineChPos)
@@ -215,13 +216,13 @@ func (pbox *PrincipalBox) ChildIndices() (uint32, uint32) {
 // 	}
 // }
 
-// func (pbox *PrincipalBox) checkForChildrenWithDisplayMode(dispMode DisplayMode) runlength {
+// func (pbox *PrincipalBox) checkForChildrenWithframe.DisplayMode(dispMode frame.DisplayMode) runlength {
 // 	domchildren := pbox.domNode.ChildNodes()
 // 	var rl runlength
 // 	var openintv intv
 // 	for i := 0; i < domchildren.Length(); i++ {
 // 		domchild := domchildren.Item(i).(*dom.W3CNode)
-// 		outerMode, _ := DisplayModesForDOMNode(domchild)
+// 		outerMode, _ := frame.DisplayModesForDOMNode(domchild)
 // 		if outerMode.Overlaps(dispMode) {
 // 			if openintv != nullintv {
 // 				openintv.len++
@@ -322,13 +323,13 @@ func (pbox *PrincipalBox) AppendChild(child *PrincipalBox) {
 // too. Both are not directly stylable by the user, but rather inherit the styles of
 // their principal boxes.
 type AnonymousBox struct {
-	tree.Node                // an anonymous box is a node within the layout tree
-	Box          *Box        // an anoymous box cannot be styled
-	displayMode  DisplayMode // container lives in this mode (block or inline)
-	ChildInxFrom uint32      // this box represents children starting at #ChildInxFrom of the principal box
-	ChildInxTo   uint32      // this box represents children to #ChildInxTo
-	outerMode    DisplayMode // container lives in this mode (block or inline)
-	innerMode    DisplayMode // context of children (block or inline)
+	tree.Node                      // an anonymous box is a node within the layout tree
+	Box          *frame.Box        // an anoymous box cannot be styled
+	displayMode  frame.DisplayMode // container lives in this mode (block or inline)
+	ChildInxFrom uint32            // this box represents children starting at #ChildInxFrom of the principal box
+	ChildInxTo   uint32            // this box represents children to #ChildInxTo
+	outerMode    frame.DisplayMode // container lives in this mode (block or inline)
+	innerMode    frame.DisplayMode // context of children (block or inline)
 }
 
 // DOMNode returns the underlying DOM node for a render tree element.
@@ -348,7 +349,7 @@ func (anon *AnonymousBox) TreeNode() *tree.Node {
 }
 
 // CSSBox returns the underlying box of a render tree element.
-func (anon *AnonymousBox) CSSBox() *Box {
+func (anon *AnonymousBox) CSSBox() *frame.Box {
 	return anon.Box
 }
 
@@ -363,7 +364,7 @@ func (anon *AnonymousBox) IsText() bool {
 }
 
 // DisplayMode returns the computed display mode of this box.
-func (anon *AnonymousBox) DisplayMode() DisplayMode {
+func (anon *AnonymousBox) DisplayMode() frame.DisplayMode {
 	//return anon.outerMode, anon.innerMode
 	return anon.displayMode
 }
@@ -387,7 +388,7 @@ func (anon *AnonymousBox) Context() Context {
 	return nil // TODO
 }
 
-func NewAnonymousBox(mode DisplayMode) *AnonymousBox {
+func NewAnonymousBox(mode frame.DisplayMode) *AnonymousBox {
 	anon := &AnonymousBox{
 		displayMode: mode,
 		//innerMode: inner,
@@ -404,9 +405,9 @@ func NewAnonymousBox(mode DisplayMode) *AnonymousBox {
 // all text boxes under a common parent.
 type TextBox struct {
 	tree.Node              // a text box is a node within the layout tree
-	Box       *Box         // text box cannot be explicitely styled
+	Box       *frame.Box   // text box cannot be explicitely styled
 	domNode   *dom.W3CNode // the DOM text-node this box refers to
-	//outerMode DisplayMode  // container lives in this mode (block or inline)
+	//outerMode frame.DisplayMode  // container lives in this mode (block or inline)
 	ChildInx uint32 // this box represents a text node at #ChildInx of the principal box
 }
 
@@ -425,7 +426,7 @@ func (tbox *TextBox) DOMNode() *dom.W3CNode {
 }
 
 // CSSBox returns the underlying box of a render tree element.
-func (tbox *TextBox) CSSBox() *Box {
+func (tbox *TextBox) CSSBox() *frame.Box {
 	return tbox.Box
 }
 
@@ -445,9 +446,9 @@ func (tbox *TextBox) IsText() bool {
 }
 
 // DisplayMode always returns inline.
-func (tbox *TextBox) DisplayMode() DisplayMode {
+func (tbox *TextBox) DisplayMode() frame.DisplayMode {
 	//return InlineMode, InlineMode
-	return InlineMode
+	return frame.InlineMode
 }
 
 func (tbox *TextBox) Context() Context {

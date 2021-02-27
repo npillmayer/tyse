@@ -6,12 +6,71 @@ import (
 
 	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/styled"
+	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
 	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
+	"github.com/npillmayer/tyse/engine/frame/khipu"
+	"github.com/npillmayer/tyse/engine/tree"
 	"github.com/npillmayer/uax/bidi"
 	"golang.org/x/net/html"
 )
+
+type ParagraphBox struct {
+	tree.Node                     // a paragraph box is a node within the layout tree
+	Box         *frame.StyledBox  // styled box for a DOM node
+	domNode     *dom.W3CNode      // the DOM node this PrincipalBox refers to
+	displayMode frame.DisplayMode // outer display mode
+	context     boxtree.Context   // principal boxes may establish a context
+	para        *Paragraph        // text of the paragraph
+	khipu       *khipu.Khipu      // khipu knots make from paragraph text
+}
+
+var _ boxtree.Container = &ParagraphBox{}
+
+// TreeNode returns the underlying tree node for a box.
+func (pbox *ParagraphBox) TreeNode() *tree.Node {
+	return &pbox.Node
+}
+
+// DOMNode returns the underlying DOM node for a render tree element.
+func (pbox *ParagraphBox) DOMNode() *dom.W3CNode {
+	return pbox.domNode
+}
+
+// CSSBox returns the underlying box of a render tree element.
+func (pbox *ParagraphBox) CSSBox() *frame.Box {
+	return &pbox.Box.Box
+}
+
+// IsAnonymous will always return false for a paragraph container.
+func (pbox *ParagraphBox) IsAnonymous() bool {
+	return false
+}
+
+// DisplayMode returns the computed display mode of this box.
+func (pbox *ParagraphBox) DisplayMode() frame.DisplayMode {
+	return pbox.displayMode
+}
+
+// IsText will always return false for a paragraph box.
+func (pbox *ParagraphBox) IsText() bool {
+	return false
+}
+
+func (pbox *ParagraphBox) Context() boxtree.Context {
+	if pbox.context == nil {
+		pbox.context = boxtree.CreateContextForContainer(pbox, false)
+	}
+	return pbox.context
+}
+
+func (pbox *ParagraphBox) ChildIndices() (uint32, uint32) {
+	return 0, 0
+}
+
+// ---------------------------------------------------------------------------
 
 // Paragraph represents a styled paragraph of text, from a W3C DOM.
 type Paragraph struct {
@@ -26,14 +85,14 @@ type infoIRS struct {
 
 // --- Paragraph from Container Box ------------------------------------------
 
-func InlineBoxes(c frame.Container) ([]frame.Container, error) {
-	//
-}
-
 // ParagraphFromBox creates a Paragraph instance holding the text content
 // of a container box node as a styled text.
 // c should be a paragraph-level container, but this is not enforced.
-func ParagraphFromBox(c frame.Container) (*Paragraph, error) {
+//
+// Returns a paragraphs's text, a list of block level containers which are
+// children of c, or possibly an error.
+//
+func paragraphTextFromBox(c boxtree.Container) (*Paragraph, []boxtree.Container, error) {
 	para := &Paragraph{
 		irs: infoIRS{
 			irsElems: make(map[uint64]bidi.Direction),
@@ -41,23 +100,26 @@ func ParagraphFromBox(c frame.Container) (*Paragraph, error) {
 		},
 	}
 	var innerText *styled.Text // TODO set boxText()
+	innerText, blocks, err := boxText(c, &para.irs)
 	eBidiDir, _ := findEmbeddingBidiDirection(c.DOMNode())
-	var err error
 	para.Paragraph, err = styled.ParagraphFromText(innerText, 0, innerText.Raw().Len(), eBidiDir,
 		para.bidiMarkup())
-	return para, err
+	return para, blocks, err
 }
 
-func boxText(c frame.Container, irs *infoIRS) (*styled.Text, error) {
+func boxText(c boxtree.Container, irs *infoIRS) (*styled.Text, []boxtree.Container, error) {
 	if c == nil {
-		return styled.TextFromString(""), cords.ErrIllegalArguments
+		return styled.TextFromString(""), []boxtree.Container{}, cords.ErrIllegalArguments
 	}
 	b := styled.NewTextBuilder()
-	collectBoxText(c, b, irs)
-	return b.Text(), nil
+	var blocks []boxtree.Container
+	collectBoxText(c, b, irs, blocks)
+	return b.Text(), blocks, nil
 }
 
-func collectBoxText(c frame.Container, b *styled.TextBuilder, irs *infoIRS) {
+func collectBoxText(c boxtree.Container, b *styled.TextBuilder, irs *infoIRS,
+	blocks []boxtree.Container) {
+	//
 	if c.IsText() {
 		leaf := createLeaf(c.DOMNode())
 		styles := leaf.element.ComputedStyles().Styles()
@@ -78,8 +140,8 @@ func collectBoxText(c frame.Container, b *styled.TextBuilder, irs *infoIRS) {
 	if c.TreeNode().ChildCount() > 0 {
 		children := c.TreeNode().Children()
 		for _, ch := range children {
-			if childContainer, ok := ch.Payload.(frame.Container); ok {
-				collectBoxText(childContainer, b, irs)
+			if childContainer, ok := ch.Payload.(boxtree.Container); ok {
+				collectBoxText(childContainer, b, irs, blocks)
 			}
 		}
 	}
