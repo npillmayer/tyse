@@ -215,3 +215,8 @@ func (o RefT) Match(choices interface{}) (value interface{}, err error) {
 var _ Type = RefT{}
 
 // ---------------------------------------------------------------------------
+
+// Safe wraps a Match's return values and drops the error value.
+func Safe(x interface{}, err error) interface{} {
+	return x
+}

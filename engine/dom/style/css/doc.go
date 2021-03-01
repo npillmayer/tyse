@@ -1,6 +1,12 @@
 /*
 Package css provides functionality for CSS styling.
 
+CSS properties are plentyful and some of them are complicated.
+This package trys to shield clients from the cumbersome handling of
+CSS properties resulting of (1) the textual nature of CSS properties
+and (2) the complicated semantics of computing style attributes for a
+given node.
+
 Status
 
 This is a very first draft. It is unstable and the API will change without

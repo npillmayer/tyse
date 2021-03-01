@@ -25,11 +25,12 @@ type PropertyType int
 //          style.Auto: …   // will match a CSS property option-type with value "auto"
 //     }
 const (
-	Auto       PropertyType = 1 // for option matching
-	Inherit    PropertyType = 2 // for option matching
-	Initial    PropertyType = 3 // for option matching
-	FontScaled PropertyType = 4 // for option matching: dimension is font-dependent
-	ViewScaled PropertyType = 5 // for option matching: dimension is viewport-dependent
+	Auto          PropertyType = 1 // for option matching
+	Inherit       PropertyType = 2 // for option matching
+	Initial       PropertyType = 3 // for option matching
+	FontScaled    PropertyType = 4 // for option matching: dimension is font-dependent
+	ViewScaled    PropertyType = 5 // for option matching: dimension is viewport-dependent
+	ContentScaled PropertyType = 6 // for option matching: dimension is content-dependent
 )
 
 const (
@@ -37,18 +38,25 @@ const (
 
 	dimenAbsolute uint32 = 0x0001
 	dimenAuto     uint32 = 0x0002
-	dimenInherit  uint32 = 0x0004
-	dimenInitial  uint32 = 0x0008
+	dimenInherit  uint32 = 0x0003
+	dimenInitial  uint32 = 0x0004
 
-	dimenEM    uint32 = 0x0010
-	dimenEX    uint32 = 0x0020
-	dimenCH    uint32 = 0x0040
-	dimenREM   uint32 = 0x0080
-	dimenVW    uint32 = 0x0100
-	dimenVH    uint32 = 0x0200
-	dimenVMIN  uint32 = 0x0400
-	dimenVMAX  uint32 = 0x0800
-	dimenPRCNT uint32 = 0x1000
+	// Flags for content dependent dimensions
+	DimenContentMax uint32 = 0x0010
+	DimenContentMin uint32 = 0x0020
+	DimenContentFit uint32 = 0x0030
+	contentMask     uint32 = 0x00f0
+
+	dimenEM      uint32 = 0x0100
+	dimenEX      uint32 = 0x0200
+	dimenCH      uint32 = 0x0300
+	dimenREM     uint32 = 0x0400
+	dimenVW      uint32 = 0x0500
+	dimenVH      uint32 = 0x0600
+	dimenVMIN    uint32 = 0x0700
+	dimenVMAX    uint32 = 0x0800
+	dimenPRCNT   uint32 = 0x0900
+	relativeMask uint32 = 0x00f0
 )
 
 // --- DimenT-----------------------------------------------------------------
@@ -78,6 +86,8 @@ func (o DimenT) Match(choices interface{}) (value interface{}, err error) {
 func (o DimenT) Equals(other interface{}) bool {
 	T().Debugf("Dimen EQUALS %v ? %v", o, other)
 	switch i := other.(type) {
+	case DimenT:
+		return o.d == i.d && o.flags == i.flags
 	case dimen.Dimen:
 		return o.Unwrap() == i
 	case int32:
@@ -98,6 +108,8 @@ func (o DimenT) Equals(other interface{}) bool {
 		case ViewScaled:
 			return o.flags&dimenVW > 0 || o.flags&dimenVH > 0 ||
 				o.flags&dimenVMIN > 0 || o.flags&dimenVMAX > 0
+		case ContentScaled:
+			return o.flags&contentMask > 0
 		}
 	case string:
 		switch i {
@@ -120,7 +132,12 @@ func (o DimenT) IsNone() bool {
 
 // IsRelative returns true if o represents a valid relative dimension (`%`, `em`, etc.).
 func (o DimenT) IsRelative() bool {
-	return o.flags&0xfff0 > 0
+	return o.flags&relativeMask > 0
+}
+
+// IsAbsolute returns true if o represents a valid absolute dimension.
+func (o DimenT) IsAbsolute() bool {
+	return o.flags == dimenAbsolute
 }
 
 func (o DimenT) String() string {
@@ -136,7 +153,7 @@ func (o DimenT) String() string {
 		return "inherit"
 	}
 	if o.IsRelative() {
-		if unit, ok := relUnitMap[o.flags&0xfff0]; ok {
+		if unit, ok := relUnitMap[o.flags&relativeMask]; ok {
 			return fmt.Sprintf("%d%s", o.d, unit)
 		}
 	}
@@ -232,6 +249,30 @@ func ParseDimen(s string) (DimenT, error) {
 	}
 	dim.d = dimen.Dimen(n) * scale
 	return dim, nil
+}
+
+// MaxDimen returns the greater of two dimensions.
+func MaxDimen(d1, d2 DimenT) DimenT {
+	max, _ := d1.Match(option.Maybe{
+		option.None: d2,
+		option.Some: option.Safe(d2.Match(option.Maybe{
+			option.None: d1,
+			option.Some: dimen.Max(d1.Unwrap(), d2.Unwrap()),
+		})),
+	})
+	return max.(DimenT)
+}
+
+// MinDimen returns the lesser of two dimensions.
+func MinDimen(d1, d2 DimenT) DimenT {
+	max, _ := d1.Match(option.Maybe{
+		option.None: d2,
+		option.Some: option.Safe(d2.Match(option.Maybe{
+			option.None: d1,
+			option.Some: dimen.Min(d1.Unwrap(), d2.Unwrap()),
+		})),
+	})
+	return max.(DimenT)
 }
 
 // --- PositionT -------------------------------------------------------------

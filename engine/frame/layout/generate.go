@@ -114,16 +114,25 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 
 // ----------------------------------------------------------------------
 
+// TODO initialize box with style properties affection box layout:
+//    - padding
+//    - border
+//    - margin
+//    - width
+//    - height
+//    - box-sizing
+//
+// This is probably a separate run after the box tree is complete
+//
+// width := css.DimenOption(c.DOMNode().ComputedStyles().GetPropertyValue("width"))
+
 // NewBoxForDOMNode creates an adequately initialized box for a given DOM node.
 func NewBoxForDOMNode(domnode *dom.W3CNode) boxtree.Container {
 	if domnode.NodeType() == html.TextNode {
-		//tbox := frame.NewTextBox(domnode)
+		tbox := boxtree.NewTextBox(domnode)
 		// TODO find index within parent
 		// and set #ChildInx
-		//return tbox
-		// New: we do not create a box yet, but rather will create line boxes
-		// after all non-replacable elements or sub-boxes have been created.
-		return nil
+		return tbox
 	}
 	// document or element node
 	mode := frame.DisplayModeForDOMNode(domnode)

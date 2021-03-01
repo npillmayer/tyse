@@ -40,16 +40,24 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 )
+
+type Rect struct {
+	TopL dimen.Point
+	W    css.DimenT
+	H    css.DimenT
+}
 
 // Box type, following the CSS box model.
 type Box struct {
-	dimen.Rect
-	Min         dimen.Point
-	Max         dimen.Point
-	Padding     [4]dimen.Dimen // inside of border
-	BorderWidth [4]dimen.Dimen // thickness of border
-	Margins     [4]dimen.Dimen // outside of border
+	Rect
+	Min             dimen.Point
+	Max             dimen.Point
+	BoxSizingExtend bool           // box-sizing = border-box ?
+	Padding         [4]dimen.Dimen // inside of border
+	BorderWidth     [4]dimen.Dimen // thickness of border
+	Margins         [4]css.DimenT  // outside of border, maybe unknown
 }
 
 // For padding, margins, etc. 4-way values always start at the top and travel
@@ -109,118 +117,72 @@ type StyledBox struct {
 	Styling *Styling
 }
 
-/*
-
-// Glyph is a box for glyphs. Glyphs currently are content-stylable only (no borders).
-//
-// Wikipedia: In typography, a glyph [...] is an elemental symbol within
-// an agreed set of symbols, intended to represent a readable character
-// for the purposes of writing. [ Copyright (c) Wikipedia.com, 2017 ]
-type Glyph struct {
-	TextStyle *TextStyle
-	Colors    *ColorStyle
-	CharPos   rune
+func (box *Box) ContentWidth() css.DimenT {
+	return box.W
 }
-*/
 
-// Normalize sorts the corner coordinates into correct order.
-func (box *Box) Normalize() *Box {
-	if box.TopL.X > box.BotR.X {
-		box.TopL.X, box.BotR.X = box.BotR.X, box.TopL.X
+func (box *Box) SetContentWidth(w dimen.Dimen, shrink bool) {
+	if shrink {
+		w -= box.Padding[Left]
+		w -= box.Padding[Right]
+		w -= box.BorderWidth[Left]
+		w -= box.BorderWidth[Right]
 	}
-	if box.TopL.Y > box.BotR.Y {
-		box.TopL.Y, box.BotR.Y = box.BotR.Y, box.TopL.Y
+	box.W = css.SomeDimen(w)
+}
+
+func (box *Box) Width() css.DimenT {
+	if box.W.IsAbsolute() {
+		return css.SomeDimen(box.W.Unwrap() + box.Padding[Left] + box.Padding[Right] +
+			box.BorderWidth[Left] + box.BorderWidth[Right])
 	}
-	return box
+	return box.W
 }
 
-func (box *Box) InnerWidth() dimen.Dimen {
-	return box.BotR.X - box.TopL.X
+// SetWidth sets a known width for a box. If box.BoxSizingExtend is set,
+// padding and border have to be set beforehand to have a correct result
+// for the width-calculation.
+func (box *Box) SetWidth(w dimen.Dimen) {
+	if box.BoxSizingExtend {
+		box.W = css.SomeDimen(w - box.Padding[Left] - box.Padding[Right] -
+			box.BorderWidth[Left] - box.BorderWidth[Right])
+	} else {
+		box.W = css.SomeDimen(w)
+	}
 }
 
-func (box *Box) FullWidth() dimen.Dimen {
-	return box.BotR.X + box.Padding[Right] + box.BorderWidth[Right] + box.Margins[Right] -
-		box.TopL.X - box.Padding[Left] - box.BorderWidth[Left] - box.Margins[Left]
+func (box *Box) FullWidth() css.DimenT {
+	w := box.Width()
+	if w.IsAbsolute() && box.Margins[Left].IsAbsolute() && box.Margins[Right].IsAbsolute() {
+		full := w.Unwrap() + box.Margins[Left].Unwrap() + box.Margins[Right].Unwrap()
+		return css.SomeDimen(full)
+	}
+	if w.IsAbsolute() {
+		return css.Dimen()
+	}
+	return box.W
 }
 
 func (box *Box) FullHeight() dimen.Dimen {
-	return box.BotR.Y + box.Padding[Bottom] + box.BorderWidth[Bottom] + box.Margins[Bottom] -
-		box.TopL.Y - box.Padding[Top] - box.BorderWidth[Top] - box.Margins[Top]
-}
-
-// Shift a box along a vector. The size of the box is unchanged.
-func (box *Box) Shift(vector dimen.Point) *Box {
-	box.TopL.Shift(vector)
-	box.BotR.Shift(vector)
-	return box
-}
-
-// Enlarge a box in x- and y-direction. For shrinking, use negative
-// argument(s).
-func (box *Box) Enlarge(scales dimen.Point) *Box {
-	box.BotR.X = box.BotR.X + scales.X
-	box.BotR.Y = box.BotR.Y + scales.Y
-	return box
+	panic("TODO")
+	// return box.BotR.Y + box.Padding[Bottom] + box.BorderWidth[Bottom] + box.Margins[Bottom] -
+	// 	box.TopL.Y - box.Padding[Top] - box.BorderWidth[Top] - box.Margins[Top]
 }
 
 // CollapseMargins returns the greater margin between bottom margin of box1 and
 // top margin of box2, and the smaller one as the second return value.
-func CollapseMargins(box1, box2 *Box) (dimen.Dimen, dimen.Dimen) {
+//
+// If any of the boxes' margins are unset, return values may be unset, too.
+//
+func CollapseMargins(box1, box2 *Box) (css.DimenT, css.DimenT) {
 	if box1 == nil {
 		if box2 == nil {
-			return 0, 0
+			return css.SomeDimen(0), css.SomeDimen(0)
 		}
-		return box2.Margins[Top], 0
+		return box2.Margins[Top], css.SomeDimen(0)
 	} else if box2 == nil {
-		return box1.Margins[Bottom], 0
+		return box1.Margins[Bottom], css.SomeDimen(0)
 	}
-	return dimen.Max(box1.Margins[Bottom], box2.Margins[Top]),
-		dimen.Min(box1.Margins[Bottom], box2.Margins[Top])
+	return css.MaxDimen(box1.Margins[Bottom], box2.Margins[Top]),
+		css.MinDimen(box1.Margins[Bottom], box2.Margins[Top])
 }
-
-/*
-// Method for boxing content into a horizontal box. Content is given as a
-// node list. The nodes will be enclosed into a new box.
-// The box may be set to a target size.
-// Parameters for styling class and/or identifier may be provided.
-func HBoxKhipu(nl *Khipu, target p.Dimen, identifier string, class string) *TypesetBox {
-	box := &TypesetBox{}
-	box.Cord = nl
-	box.Style.StylingIdentifier = identifier
-	box.Style.StylingClass = class
-	box.Width = target
-	_, max, min := nl.Measure(0, -1)
-	if min > target {
-		fmt.Println("overfull hbox")
-	} else if max < target {
-		fmt.Println("underfull hbox")
-	}
-	box.Height, box.Depth = nl.MaxHeightAndDepth(0, -1)
-	return box
-}
-
-// --- Boxes as khipu knots --------------------------------------------------
-
-// KTBox is a khipu knot type
-const KTBox = khipu.KTUserDefined + 1
-
-func (box *Box) Type() khipu.KnotType {
-	return KTBox
-}
-
-func (box *Box) W() dimen.Dimen {
-	return box.Width()
-}
-
-func (box *Box) MinW() dimen.Dimen {
-	return box.Width()
-}
-
-func (box *Box) MaxW() dimen.Dimen {
-	return box.Width()
-}
-
-func (box *Box) IsDiscardable() bool {
-	return false
-}
-*/
