@@ -52,7 +52,8 @@ type Box struct {
 	Margins     [4]dimen.Dimen // outside of border
 }
 
-// For padding, margins
+// For padding, margins, etc. 4-way values always start at the top and travel
+// clockwise.
 const (
 	Top int = iota
 	Right

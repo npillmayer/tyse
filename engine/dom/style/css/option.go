@@ -1,4 +1,4 @@
-package style
+package css
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/option"
+	"github.com/npillmayer/tyse/engine/dom/style"
 )
 
 // PropertyType is a helper type for special values of properties, e.g.:
@@ -21,13 +22,14 @@ type PropertyType int
 // Auto, Inherit and Initial are constant values for options-matching.
 // Use with
 //     option.Of{
-//          style.Auto: …   // will match a DimenT with value "auto"
+//          style.Auto: …   // will match a CSS property option-type with value "auto"
 //     }
 const (
 	Auto       PropertyType = 1 // for option matching
 	Inherit    PropertyType = 2 // for option matching
 	Initial    PropertyType = 3 // for option matching
 	FontScaled PropertyType = 4 // for option matching: dimension is font-dependent
+	ViewScaled PropertyType = 5 // for option matching: dimension is viewport-dependent
 )
 
 const (
@@ -93,6 +95,9 @@ func (o DimenT) Equals(other interface{}) bool {
 		case FontScaled:
 			return o.flags&dimenEM > 0 || o.flags&dimenEX > 0 ||
 				o.flags&dimenREM > 0 || o.flags&dimenCH > 0
+		case ViewScaled:
+			return o.flags&dimenVW > 0 || o.flags&dimenVH > 0 ||
+				o.flags&dimenVMIN > 0 || o.flags&dimenVMAX > 0
 		}
 	case string:
 		switch i {
@@ -165,8 +170,10 @@ var relUnitStringMap map[string]uint32 = map[string]uint32{
 // DimenOption returns an optional dimension type from a property string.
 // It will never return an error, even with illegal input, but instead will then
 // return an unset dimension.
-func (p Property) DimenOption() DimenT {
+func DimenOption(p style.Property) DimenT {
 	switch p {
+	case style.NullStyle:
+		return Dimen()
 	case "auto":
 		return DimenT{flags: dimenAuto}
 	case "initial":
@@ -225,4 +232,117 @@ func ParseDimen(s string) (DimenT, error) {
 	}
 	dim.d = dimen.Dimen(n) * scale
 	return dim, nil
+}
+
+// --- PositionT -------------------------------------------------------------
+
+// Position is an enum type for the CSS position property.
+type Position uint16
+
+// Enum values for type Position
+const (
+	PositionUnknown  Position = iota
+	PositionStatic            // CSS static (default)
+	PositionRelative          // CSS relative
+	PositionAbsolute          // CSS absolute
+	PositionFixed             // CSS fixed
+	PositionSticky            // CSS sticky, currently mapped to relative
+)
+
+// PositionT is an option type for CSS positions.
+type PositionT struct {
+	p       Position
+	Offsets []DimenT
+}
+
+// SomePosition creates an optional position with an initial value of x.
+func SomePosition(x Position) PositionT {
+	return PositionT{p: x}
+}
+
+// Match is part of interface option.Type.
+func (o PositionT) Match(choices interface{}) (value interface{}, err error) {
+	return option.Match(o, choices)
+}
+
+// Equals is part of interface option.Type.
+func (o PositionT) Equals(other interface{}) bool {
+	T().Debugf("Position EQUALS %v ? %v", o, other)
+	switch p := other.(type) {
+	case Position:
+		return o.Unwrap() == p
+	case string:
+		if pp, ok := positionStringMap[p]; ok {
+			return o.p == pp
+		}
+	}
+	return false
+}
+
+// Unwrap returns the underlying position of o.
+func (o PositionT) Unwrap() Position {
+	return o.p
+}
+
+// IsNone returns true if o is unset.
+func (o PositionT) IsNone() bool {
+	return o.p == PositionUnknown
+}
+
+func (o PositionT) String() string {
+	if o.IsNone() {
+		return "PositionT.None"
+	}
+	if p, ok := positionMap[o.p]; ok {
+		return p
+	}
+	return "PositionT.None"
+}
+
+var positionMap map[Position]string = map[Position]string{
+	PositionStatic:   "static",
+	PositionRelative: "relative",
+	PositionAbsolute: "absolute",
+	PositionFixed:    "fixed",
+	PositionSticky:   "sticky",
+}
+
+var positionStringMap map[string]Position = map[string]Position{
+	"static":   PositionStatic,
+	"relative": PositionRelative,
+	"absolute": PositionAbsolute,
+	"fixed":    PositionFixed,
+	"sticky":   PositionSticky,
+}
+
+// ParsePosition parses a string and returns an option-type for positions.
+// It will never return an error, but rather an unset position in case of illegal input.
+func ParsePosition(s string) PositionT {
+	if p, ok := positionStringMap[s]; ok {
+		return SomePosition(p)
+	}
+	return PositionT{}
+}
+
+// PositionOption returns an optional position type from properties.
+// Properties `top`, `right`, `bottom` and `left` will be made accessable as option types,
+// if appropriate.
+//
+// Will never return an error, even with illegal input, but instead will then
+// return an unset position.
+//
+func PositionOption(styler style.Styler) PositionT {
+	pos := GetLocalProperty(styler.Styles(), "position")
+	if pos == style.NullStyle {
+		return PositionT{}
+	}
+	p := ParsePosition(string(pos))
+	if !p.IsNone() && p.Unwrap() != PositionStatic {
+		p.Offsets = make([]DimenT, 4)
+		p.Offsets[0] = DimenOption(GetLocalProperty(styler.Styles(), "top"))
+		p.Offsets[1] = DimenOption(GetLocalProperty(styler.Styles(), "right"))
+		p.Offsets[2] = DimenOption(GetLocalProperty(styler.Styles(), "bottom"))
+		p.Offsets[3] = DimenOption(GetLocalProperty(styler.Styles(), "left"))
+	}
+	return p
 }

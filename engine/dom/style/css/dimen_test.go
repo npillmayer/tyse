@@ -1,4 +1,4 @@
-package style
+package css
 
 import (
 	"testing"
@@ -8,6 +8,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/option"
+	"github.com/npillmayer/tyse/engine/dom/style"
 )
 
 func TestDimen(t *testing.T) {
@@ -15,14 +16,14 @@ func TestDimen(t *testing.T) {
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	p := Property("100pt")
-	d := p.DimenOption()
+	p := style.Property("100pt")
+	d := DimenOption(p)
 	if d.Unwrap() != dimen.Dimen(100)*dimen.PT {
 		t.Errorf("expected 100 PT (%d), have %d", 100*dimen.PT, d)
 	}
 	//
-	p = Property("auto")
-	d = p.DimenOption()
+	p = style.Property("auto")
+	d = DimenOption(p)
 	x, err := d.Match(option.Of{
 		option.None: "NONE",
 		Auto:        "AUTO",

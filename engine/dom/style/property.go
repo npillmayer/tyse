@@ -36,7 +36,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -275,7 +274,7 @@ var groupNameFromPropertyKey = map[string]string{
 
 // isCascading returns wether the standard behaviour for a propery is to be
 // inherited or not, i.e., a call to retrieve its value will cascade.
-func isCascading(key string) bool {
+func IsCascading(key string) bool {
 	if strings.HasPrefix(key, "list-style") {
 		return true
 	}
@@ -427,7 +426,7 @@ func (pmap *PropertyMap) GetPropertyValue(key string, node *tree.Node, styler In
 		}
 	}
 	// not found in local dicts => cascade, if allowed
-	if p == "inherit" || isCascading(key) {
+	if p == "inherit" || IsCascading(key) {
 		groupname := GroupNameFromPropertyKey(key)
 		var group *PropertyGroup
 		//func (pg *PropertyGroup) Cascade(key string) *PropertyGroup {
@@ -651,94 +650,6 @@ func InitializeDefaultPropertyValues(additionalProps []KeyValue) *PropertyMap {
 	*/
 
 	return &PropertyMap{m}
-}
-
-// --- Package Level Functions ------------------------------------------
-
-/*
-func GetCascadedProperty(sn *styledtree.StyNode, key string) (Property, error) {
-	groupname := GroupNameFromPropertyKey(key)
-	var group *PropertyGroup
-	for sn != nil && group == nil {
-		group = sn.ComputedStyles().Group(groupname)
-		sn = sn.ParentNode()
-	}
-	if group == nil {
-		errmsg := fmt.Sprintf("Cannot find ancestor with prop-group %s -- did you create global properties?", groupname)
-		return Property(""), errors.New(errmsg)
-	}
-	return group.Cascade(key).Get(key), nil // must succeed
-}
-*/
-
-// GetCascadedProperty gets the value of a property. The search cascades to
-// parent property maps, if available.
-//
-// Clients will usually call GetProperty(…) instead as this will respect
-// CSS semantics for inherited properties.
-//
-// The call to GetCascadedProperty will flag an error if the style property
-// isn't found (which should not happen, as every property should be included
-// in the 'user-agent' default style properties).
-func GetCascadedProperty(n *tree.Node, key string, sty Interf) (Property, error) {
-	//
-	groupname := GroupNameFromPropertyKey(key)
-	var group *PropertyGroup
-	for n != nil && group == nil {
-		styler := sty(n)
-		group = styler.Styles().Group(groupname)
-		n = n.Parent()
-	}
-	if group == nil {
-		errmsg := fmt.Sprintf("Cannot find ancestor with prop-group %s -- did you create global properties?", groupname)
-		return NullStyle, errors.New(errmsg)
-	}
-	p, _ := group.Cascade(key).Get(key)
-	return p, nil // must succeed
-}
-
-// GetProperty gets the value of a property. If the property is not set
-// locally on the style node and the property is inheritable, he search
-// cascades to parent property maps, if available.
-//
-// The call to GetProperty will flag an error if the style property isn't found
-// (which should not happen, as every property should be included in the
-// 'user-agent' default style properties).
-func GetProperty(n *tree.Node, key string, sty Interf) (Property, error) {
-	if nonInherited[key] {
-		T().Debugf("Property %s is not inherited", key)
-		styler := sty(n)
-		p, ok := GetLocalProperty(styler.Styles(), key)
-		if !ok {
-			p = GetDefaultProperty(styler, key)
-		}
-		return p, nil
-	}
-	return GetCascadedProperty(n, key, sty)
-}
-
-/*
-func GetLocalProperty(sn *styledtree.StyNode, key string) (Property, bool) {
-	groupname := GroupNameFromPropertyKey(key)
-	var group *PropertyGroup
-	group = sn.ComputedStyles().Group(groupname)
-	if group == nil {
-		return "", false
-	}
-	return group.Get(key), true
-}
-*/
-
-// GetLocalProperty returns a style property value, if it is set locally
-// for a styled node's property map. No cascading is performed.
-func GetLocalProperty(pmap *PropertyMap, key string) (Property, bool) {
-	groupname := GroupNameFromPropertyKey(key)
-	var group *PropertyGroup
-	group = pmap.Group(groupname)
-	if group == nil {
-		return "", false
-	}
-	return group.Get(key)
 }
 
 // --------------------------------------------------------------------------

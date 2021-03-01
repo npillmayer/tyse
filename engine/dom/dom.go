@@ -20,7 +20,8 @@ import (
 // A W3CNode is common type from which various types of DOM API objects inherit.
 // This allows these types to be treated similarly.
 type W3CNode struct {
-	stylednode *styledtree.StyNode
+	//stylednode *styledtree.StyNode
+	*styledtree.StyNode
 }
 
 var _ w3cdom.Node = &W3CNode{}
@@ -64,12 +65,13 @@ func NodeAsTreeNode(domnode w3cdom.Node) (*tree.Node, bool) {
 		T().Errorf("DOM node has not been created from w3cdom.go")
 		return nil, false
 	}
-	return &w.stylednode.Node, true
+	//return &w.stylednode.Node, true
+	return &w.Node, true
 }
 
 // HTMLNode returns the HTML parse node this DOM node is derived from.
 func (w *W3CNode) HTMLNode() *html.Node {
-	return w.stylednode.HTMLNode()
+	return w.HTMLNode()
 }
 
 // IsRoot returns wether this node is the root node of the styled tree.
@@ -89,7 +91,7 @@ func (w *W3CNode) NodeType() html.NodeType {
 	if w == nil {
 		return html.ErrorNode
 	}
-	return w.stylednode.HTMLNode().Type
+	return w.HTMLNode().Type
 }
 
 // NodeName read-only property returns the name of the current Node as a string.
@@ -105,7 +107,7 @@ func (w *W3CNode) NodeName() string {
 	if w == nil {
 		return ""
 	}
-	h := w.stylednode.HTMLNode()
+	h := w.HTMLNode()
 	switch h.Type {
 	case html.DocumentNode:
 		return "#document"
@@ -123,7 +125,7 @@ func (w *W3CNode) NodeValue() string {
 	if w == nil {
 		return ""
 	}
-	h := w.stylednode.HTMLNode()
+	h := w.HTMLNode()
 	if h.Type == html.TextNode {
 		return h.Data
 	}
@@ -255,11 +257,11 @@ func (w *W3CNode) Attributes() w3cdom.NamedNodeMap {
 	if w == nil {
 		return emptyNodeMap
 	}
-	h := w.stylednode.HTMLNode()
+	h := w.HTMLNode()
 	switch h.Type {
 	case html.DocumentNode:
 	case html.ElementNode:
-		return nodeMapFor(w.stylednode)
+		return nodeMapFor(w.StyNode)
 	}
 	return emptyNodeMap
 }
@@ -294,10 +296,12 @@ func (w *W3CNode) ComputedStyles() w3cdom.ComputedStyles {
 	if w == nil {
 		return nil
 	}
-	return &computedStyles{w, w.stylednode.Styles()}
+	return &computedStyles{w, w.Styles()}
 }
 
-// ComputedStyles is a proxy type for a node's styles.
+// --- computed styles -------------------------------------------------------
+
+// computedStyles is a little proxy type for a node's styles.
 //
 // TODO include pseudo-elements => implement
 //
@@ -326,6 +330,10 @@ func (cstyles *computedStyles) HTMLNode() *html.Node {
 	return cstyles.domnode.HTMLNode()
 }
 
+func (cstyles *computedStyles) StylesCascade() style.Styler {
+	return cstyles.domnode.StylesCascade()
+}
+
 var _ style.Styler = &computedStyles{} // implementing style.Styler may be useful
 
 // Helper implementing style.Interf
@@ -339,7 +347,7 @@ func (cstyles *computedStyles) GetPropertyValue(key string) style.Property {
 	if cstyles == nil {
 		return style.NullStyle
 	}
-	node := &cstyles.domnode.stylednode.Node
+	node := &cstyles.domnode.Node
 	return cstyles.propsMap.GetPropertyValue(key, node, styler)
 }
 
@@ -557,7 +565,7 @@ func (w *W3CNode) XPath() *xpath.XPath {
 	if w == nil {
 		return nil
 	}
-	nav := xpathadapter.NewNavigator(w.stylednode)
+	nav := xpathadapter.NewNavigator(w.StyNode)
 	xp, err := xpath.NewXPath(nav, xpathadapter.CurrentNode)
 	if err != nil {
 		T().Errorf("dom xpath: %v", err.Error())
@@ -571,5 +579,5 @@ func (w *W3CNode) Walk() *tree.Walker {
 	if w == nil {
 		return nil
 	}
-	return tree.NewWalker(&w.stylednode.Node)
+	return tree.NewWalker(&w.Node)
 }

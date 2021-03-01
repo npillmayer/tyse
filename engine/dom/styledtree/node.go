@@ -3,7 +3,7 @@ package styledtree
 /*
 BSD License
 
-Copyright (c) 2017–20, Norbert Pillmayer
+Copyright (c) 2017–21, Norbert Pillmayer
 
 All rights reserved.
 
@@ -90,7 +90,36 @@ func (sn *StyNode) AsStyler() style.Styler {
 	return sn
 }
 
-// Creator returns a style-creator for use in CSSOM
+// HTMLNode gets the HTML DOM node corresponding to this styled node.
+func (sn *StyNode) HTMLNode() *html.Node {
+	return sn.Payload.(*StyNode).htmlNode
+}
+
+// StylesCascade gets the upwards to the enclosing style set.
+func (sn *StyNode) StylesCascade() style.Styler {
+	enclosingStyles := Node(sn.Parent())
+	if enclosingStyles == nil {
+		T().Errorf("styled tree: enclosing style set is null! user-agent styles unset?")
+	}
+	return enclosingStyles.AsStyler()
+}
+
+// Styles is part of interface style.Styler.
+func (sn *StyNode) Styles() *style.PropertyMap {
+	return sn.computedStyles
+}
+
+// SetStyles sets the styling properties of a styled node.
+func (sn *StyNode) SetStyles(styles *style.PropertyMap) {
+	sn.computedStyles = styles
+}
+
+// --- styled-node creator ---------------------------------------------------
+
+// Creator returns a style-creator for use in CSSOM.
+// The returned style.NodeCreator will then build up an instance of a styled tree
+// with node type styledtree.StyNode.
+//
 func Creator() style.NodeCreator {
 	return creator{}
 }
@@ -109,184 +138,4 @@ func (c creator) SetStyles(n *tree.Node, m *style.PropertyMap) {
 	Node(n).SetStyles(m)
 }
 
-// ----------------------------------------------------------------------
-
-// HTMLNode gets the HTML DOM node corresponding to this styled node.
-func (sn *StyNode) HTMLNode() *html.Node {
-	return sn.Payload.(*StyNode).htmlNode
-}
-
-/*
-// ParentNode returns the parent node or nil (for the root of the tree).
-func (sn Node) ParentNode() *Node {
-	return sn.parent
-}
-
-// ChildCount returns the number of children-nodes for a styled node.
-func (sn Node) ChildCount() int {
-	return sn.children.length()
-}
-
-// Child is a safe way to get a children-node of a styled node.
-func (sn Node) ChildNode(n int) (*Node, bool) {
-	if sn.children.length() <= n {
-		return nil, false
-	}
-	return sn.children.child(n), true
-}
-
-// AddChild inserts a new child node into the tree.
-// The newly inserted node is connected to this node as its parent.
-//
-// This operation is concurrency-safe.
-func (sn *Node) AddChild(ch *Node) {
-	if ch == nil {
-		return
-	}
-	sn.children.addChild(ch, sn)
-}
-
-// ParentNode returns the parent node of this node, as a style.TreeNode.
-//
-// Interface style.TreeNode.
-func (sn StyNode) ParentNode() style.TreeNode {
-	return sn.Parent().Payload.(*StyNode)
-}
-
-// ChildNode returns the child at position n, as a style.TreeNode
-//
-// Interface style.TreeNode.
-func (sn StyNode) ChildNode(n int) style.TreeNode {
-	ch, _ := sn.Child(n)
-	return ch.Payload.(*StyNode)
-}
-*/
-
-// ----------------------------------------------------------------------
-
-// Styles is part of interface style.Styler.
-func (sn *StyNode) Styles() *style.PropertyMap {
-	return sn.computedStyles
-}
-
-// SetStyles sets the styling properties of a styled node.
-func (sn *StyNode) SetStyles(styles *style.PropertyMap) {
-	sn.computedStyles = styles
-}
-
-// ----------------------------------------------------------------------
-
-/*
-type childrenSlice struct {
-	sync.RWMutex
-	slice []*Node
-}
-
-func (chs *childrenSlice) length() int {
-	chs.RLock()
-	defer chs.RUnlock()
-	return len(chs.slice)
-}
-
-func (chs *childrenSlice) addChild(child *Node, parent *Node) {
-	if child == nil {
-		return
-	}
-	chs.Lock()
-	defer chs.Unlock()
-	chs.slice = append(chs.slice, child)
-	child.parent = parent
-}
-
-func (chs *childrenSlice) child(n int) *Node {
-	if chs.length() == 0 || n < 0 || n >= chs.length() {
-		return nil
-	}
-	chs.RLock()
-	defer chs.RUnlock()
-	return chs.slice[n]
-}
-*/
-
-// ----------------------------------------------------------------------
-
-/*
-type StyledNodeQuery struct {
-	styledTree *Node
-	selection  Selection
-}
-
-type Selection []*Node
-
-func (sel Selection) First() *Node {
-	if len(sel) > 0 {
-		return sel[0]
-	}
-	return nil
-}
-
-func QueryFor(sn style.StyledNode) (*StyledNodeQuery, error) {
-	node, ok := sn.(*Node)
-	if !ok {
-		return nil, errors.New("Cannot query unknown type of styled node")
-	}
-	return &StyledNodeQuery{node, make([]*Node, 0, 10)}, nil
-}
-
-func (snq *StyledNodeQuery) FindElement(e string) Selection {
-	snq.selection = collect(snq.styledTree, func(n *Node) bool {
-		return n.node.Type == html.ElementNode && strings.EqualFold(n.node.Data, e)
-	})
-	return snq.selection
-}
-
-func (snq *StyledNodeQuery) FindStyledNodeFor(htmlNode *html.Node) *Node {
-	sn := find(snq.styledTree, func(n *Node) bool {
-		return n.node == htmlNode
-	})
-	if sn != nil {
-		snq.selection = []*Node{sn}
-		return sn
-	}
-	snq.selection = nil
-	return nil
-}
-
-func (snq *StyledNodeQuery) findThisNode(nodeToFind *Node) *Node {
-	return find(snq.styledTree, func(n *Node) bool {
-		return n == nodeToFind
-	})
-}
-
-// Helper to find nodes matching a predicate. Currently works recursive.
-// Returns a node or nil.
-func find(node *Node, matcher func(n *Node) bool) *Node {
-	if node == nil {
-		return nil
-	}
-	if matcher(node) {
-		return node
-	}
-	for _, c := range node.children {
-		if f := find(c, matcher); f != nil {
-			return f
-		}
-	}
-	return nil
-}
-
-// Helper to collect nodes matching a predicate. Currently works recursive.
-func collect(node *Node, matcher func(n *Node) bool) (sel Selection) {
-	if node == nil {
-		return nil
-	}
-	if matcher(node) {
-		sel = append(sel, node)
-		return
-	}
-	for _, c := range node.children {
-		sel = collect(c, matcher)
-	}
-	return
-}
-*/
+var _ style.NodeCreator = creator{}

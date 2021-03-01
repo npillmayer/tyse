@@ -10,6 +10,7 @@ import (
 type Styler interface {
 	HTMLNode() *html.Node
 	Styles() *PropertyMap
+	StylesCascade() Styler
 }
 
 // Interf is a mapper from a concrete tree node to an interface

@@ -1,17 +1,12 @@
 /*
-Package styledtree is a straightforward default implementation of a styled document tree.
+Package css provides functionality for CSS styling.
 
-Overview
+Status
 
-This is an implementation of style.TreeNode and of cssom.StyledNode.
-Using a builder type, cssom.Style() will create a styled tree from an
-HTML parse tree and a CSSOM. The resulting styled tree exposes interface
-style.TreeNode for every node and may be manipulated via an API.
+This is a very first draft. It is unstable and the API will change without
+notice. Please be patient.
 
-This is the default implementation used by the engine. However, for
-interactive use it may be appropriate to create a styled tree derived
-from another type of styled node. The engine's design should fully
-support this kind of switch.
+_______________________________________________________________________________
 
 BSD License
 
@@ -44,10 +39,8 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
-package styledtree
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
+package css
 
 import (
 	"github.com/npillmayer/schuko/gtrace"
