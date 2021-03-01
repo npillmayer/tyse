@@ -3,7 +3,7 @@ package style
 /*
 BSD License
 
-Copyright (c) 2017–20, Norbert Pillmayer
+Copyright (c) 2017–21, Norbert Pillmayer
 
 All rights reserved.
 

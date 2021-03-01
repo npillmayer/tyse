@@ -36,8 +36,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
 package dimen
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"regexp"
+	"strconv"
 )
 
 // Online dimension conversion for print:
@@ -49,16 +52,14 @@ type Dimen int32
 
 // Some pre-defined dimensions
 const (
-	SP Dimen = 1       // scaled point = BP / 65536
-	BP Dimen = 65536   // big point (PDF) = 1/72 inch
-	PT Dimen = 65291   // printers point 1/72.27 inch
-	MM Dimen = 185771  // millimeters
-	CM Dimen = 1857710 // centimeters
-	IN Dimen = 4718592 // inch
+	Zero Dimen = 0
+	SP   Dimen = 1       // scaled point = BP / 65536
+	BP   Dimen = 65536   // big point (PDF) = 1/72 inch
+	PT   Dimen = 65291   // printers point 1/72.27 inch
+	MM   Dimen = 185771  // millimeters
+	CM   Dimen = 1857710 // centimeters
+	IN   Dimen = 4718592 // inch
 )
-
-// Origin is origin
-var Origin = Point{0, 0}
 
 // Infinity is the largest possible dimension
 const Infinity = math.MaxInt32
@@ -91,6 +92,9 @@ type Point struct {
 	X, Y Dimen
 }
 
+// Origin is origin
+var Origin = Point{0, 0}
+
 // Shift a point along a vector.
 func (p *Point) Shift(vector Point) *Point {
 	p.X += vector.X
@@ -113,6 +117,47 @@ func (r Rect) Width() Dimen {
 // of bottom-right and top-left corner.
 func (r Rect) Height() Dimen {
 	return r.BotR.Y - r.TopL.Y
+}
+
+// ---------------------------------------------------------------------------
+
+var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[cminpxtc]{2})?$`)
+
+// ParseDimen parses a string to return a dimension. Syntax is CSS Unit.
+// If a percentage value is given (`80%`), the second return value will be true.
+//
+func ParseDimen(s string) (Dimen, bool, error) {
+	d := dimenPattern.FindStringSubmatch(s)
+	if len(d) < 2 {
+		return 0, false, errors.New("format error parsing dimension")
+	}
+	scale := SP
+	ispcnt := false
+	if len(d) > 2 {
+		switch d[2] {
+		case "pt", "PT":
+			scale = PT
+		case "mm", "MM":
+			scale = MM
+		case "bp", "px", "BP", "PX":
+			scale = BP
+		case "cm", "CM":
+			scale = CM
+		case "in", "IN":
+			scale = IN
+		case "sp", "SP", "":
+			scale = SP
+		case "%":
+			scale, ispcnt = 1, true
+		default:
+			return 0, false, errors.New("format error parsing dimension")
+		}
+	}
+	n, err := strconv.Atoi(d[1])
+	if err != nil {
+		return 0, false, errors.New("format error parsing dimension")
+	}
+	return Dimen(n) * scale, ispcnt, nil
 }
 
 // ---------------------------------------------------------------------------
