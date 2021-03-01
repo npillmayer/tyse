@@ -184,34 +184,34 @@ func (o Int64T) String() string {
 
 // --- reference types -------------------------------------------------------
 
-type refOption struct {
-	value interface{}
-	t     MaybeOption
+type RefT struct {
+	ref interface{}
 }
 
-func (o refOption) Equals(interface{}) bool {
-	return false
+func (o RefT) Equals(other interface{}) bool {
+	return o.ref == other
 }
 
-func (o refOption) IsNone() bool {
-	return o.value == nil
+func (o RefT) IsNone() bool {
+	return o.ref == nil
 }
 
-// func (o refOption) Value() expr {
-// 	return int(o)
-// }
-
-func Something(x interface{}) Type {
-	// switch o := x.(type) {
-	// case int:
-	// 	return refOption{value: o, t: Int}
-	// // case float64:
-	// // 	o.t = Float
-	// default:
-	// }
-	return refOption{value: x}
+func (o RefT) Unwrap() interface{} {
+	return o.ref
 }
 
-func (o refOption) Match(choices interface{}) (value interface{}, err error) {
+func Something(x interface{}) RefT {
+	return RefT{ref: x}
+}
+
+func Nothing() RefT {
+	return RefT{ref: nil}
+}
+
+func (o RefT) Match(choices interface{}) (value interface{}, err error) {
 	return Match(o, choices)
 }
+
+var _ Type = RefT{}
+
+// ---------------------------------------------------------------------------

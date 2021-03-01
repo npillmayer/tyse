@@ -67,6 +67,27 @@ func TestOptionOf(t *testing.T) {
 	if y1.(int) != 99 {
 		t.Errorf("expected SomeInt(42) to match to 99, is %d", y1)
 	}
+	//t.Fail()
+}
+
+func TestOptionRef(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	var y1 interface{}
+	x := option.Something("hey")
+	t.Logf("x = %v, x.T = %T, x.unwrap = %v", x, x, x.Unwrap())
+	y1, _ = x.Match(option.Of{
+		option.None: 0,
+		"hey":       99,
+		option.Some: 1,
+	})
+	//
+	t.Logf("y1 = %d", y1)
+	if y1.(int) != 99 {
+		t.Errorf("expected Something(hey) to match to 99, is %d", y1)
+	}
 	t.Fail()
 }
 
