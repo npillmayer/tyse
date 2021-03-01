@@ -71,9 +71,9 @@ func (p Property) IsInitial() bool {
 	return p == "initial"
 }
 
-// IsInherited denotes if a property is of inheritence-type "inheritet"
-func (p Property) IsInherited() bool {
-	return p == "inherited"
+// IsInherit denotes if a property is of inheritence-type "inherit"
+func (p Property) IsInherit() bool {
+	return p == "inherit"
 }
 
 // IsEmpty checks wether a property is empty, i.e. the null-string.
@@ -553,7 +553,7 @@ func InitializeDefaultPropertyValues(additionalProps []KeyValue) *PropertyMap {
 	m[PGRegion] = region
 
 	display := NewPropertyGroup(PGDisplay)
-	display.Set("display", "inline")
+	display.Set("display", "block")
 	display.Set("float", "none")
 	display.Set("visibility", "visible")
 	display.Set("position", "static")
