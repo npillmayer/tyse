@@ -8,6 +8,7 @@ import (
 	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
 	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
@@ -321,8 +322,7 @@ func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
 // Bidi directions in HTML may either be set with an attribute `dir` (highest
 // priority) or with CSS property `direction`. We treat L2R as the default,
 // only switching it for explicit setting of R2L.
-func findEmbeddingBidiDirection(pnode w3cdom.Node) (bidi.Direction, bool) {
-	eBidiDir, explicit := bidi.LeftToRight, false
+func findEmbeddingBidiDirection(pnode w3cdom.Node) (eBidiDir bidi.Direction, explicit bool) {
 	attrset := false
 	if pnode.HasAttributes() {
 		dirattr := pnode.Attributes().GetNamedItem("dir")
@@ -332,13 +332,15 @@ func findEmbeddingBidiDirection(pnode w3cdom.Node) (bidi.Direction, bool) {
 		}
 	}
 	if !attrset {
-		propmap := pnode.ComputedStyles().Styles()
 		var textDir style.Property
-		textDir, explicit = style.GetLocalProperty(propmap, "direction")
-		//textDir := pnode.ComputedStyles().GetPropertyValue("direction")
+		textDir = css.GetLocalProperty(pnode.ComputedStyles().Styles(), "direction")
 		if textDir == "rtl" {
 			eBidiDir = bidi.RightToLeft
-			explicit = true // TODO only set if property is local to pnode
+			explicit = true
+		}
+		textDir = pnode.ComputedStyles().GetPropertyValue("direction")
+		if textDir == "rtl" {
+			eBidiDir = bidi.RightToLeft
 		}
 	}
 	return eBidiDir, explicit

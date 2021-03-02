@@ -117,6 +117,18 @@ type StyledBox struct {
 	Styling *Styling
 }
 
+func (box *Box) HasFixedWidth(includeMargins bool) bool {
+	if includeMargins {
+		if !box.Margins[Left].IsAbsolute() || !box.Margins[Right].IsAbsolute() {
+			return false
+		}
+	}
+	if box.W.IsAbsolute() {
+		return true
+	}
+	return false
+}
+
 func (box *Box) ContentWidth() css.DimenT {
 	return box.W
 }

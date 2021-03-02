@@ -10,7 +10,11 @@ import (
 )
 
 func OutlineParshape(pbox *boxtree.PrincipalBox, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
-	boundingBox := pbox.Box.Box // TODO check for nil
+	if pbox.Box == nil || !pbox.Box.Box.HasFixedWidth(false) {
+		T().Errorf("outline parshape cannot be calculated for unfixed box")
+		panic("TODO")
+	}
+	boundingBox := pbox.Box.Box
 	T().Infof("parshape: bounding box = %v", boundingBox.Rect)
 	polygon := paragraphPolygon(&boundingBox, leftAlign, rightAlign)
 	T().Debugf("polygon = %v", polygon)
@@ -19,7 +23,7 @@ func OutlineParshape(pbox *boxtree.PrincipalBox, leftAlign, rightAlign []*frame.
 	}
 	return polygonParshape{
 		lineskip: 12 * dimen.PT,
-		width:    pbox.Box.Box.Width(),
+		width:    pbox.Box.Box.ContentWidth().Unwrap(),
 		polygon:  polygon,
 	}
 }
@@ -61,7 +65,10 @@ func paragraphPolygon(pbox *frame.Box, leftAlign, rightAlign []*frame.Box) *isoP
 	parPolygon := &isoPolygon{
 		stack: []isoBox{{ // inner box of paragraph's principal box
 			TopL: pbox.TopL,
-			BotR: pbox.BotR,
+			BotR: dimen.Point{
+				X: pbox.TopL.X + pbox.W.Unwrap(),
+				Y: pbox.TopL.Y + pbox.H.Unwrap(),
+			},
 		}},
 	}
 	leftaligned := make([]isoBox, 0, len(leftAlign))
@@ -135,14 +142,12 @@ func (b isoBox) String() string {
 
 func box2box(f *frame.Box) isoBox {
 	b := isoBox{}
-	b.TopL.X = f.TopL.X - f.Padding[frame.Left] - f.BorderWidth[frame.Left] -
-		f.Margins[frame.Left]
-	b.TopL.Y = f.TopL.Y - f.Padding[frame.Top] - f.BorderWidth[frame.Top] -
-		f.Margins[frame.Top]
-	b.BotR.X = f.BotR.X + f.Padding[frame.Left] + f.BorderWidth[frame.Left] +
-		f.Margins[frame.Left]
-	b.BotR.Y = f.BotR.Y + f.Padding[frame.Top] + f.BorderWidth[frame.Top] +
-		f.Margins[frame.Top]
+	b.TopL.X = f.TopL.X - f.Padding[frame.Left] - f.BorderWidth[frame.Left] - f.Margins[frame.Left].Unwrap()
+	b.TopL.Y = f.TopL.Y - f.Padding[frame.Top] - f.BorderWidth[frame.Top] - f.Margins[frame.Top].Unwrap()
+	b.BotR = dimen.Point{
+		X: f.TopL.X + f.W.Unwrap() + f.Padding[frame.Left] + f.BorderWidth[frame.Left] + f.Margins[frame.Left].Unwrap(),
+		Y: f.TopL.Y + f.H.Unwrap() + f.Padding[frame.Top] + f.BorderWidth[frame.Top] + f.Margins[frame.Top].Unwrap(),
+	}
 	return b
 }
 

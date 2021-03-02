@@ -10,6 +10,7 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/khipu"
@@ -83,7 +84,8 @@ func TestBreakParagraph(t *testing.T) {
 	k, _ := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	//t.Logf("khipu = %v", k)
 	pbox := boxtree.NewPrincipalBox(p, frame.BlockMode)
-	pbox.Box.BotR = dimen.Point{X: 60 * 10 * dimen.BP, Y: 10 * dimen.CM}
+	pbox.Box.W = css.SomeDimen(60 * 10 * dimen.BP)
+	pbox.Box.H = css.SomeDimen(10 * dimen.CM)
 	var err error
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	pbox, err = BreakParagraph(k, pbox, regs)
@@ -109,7 +111,8 @@ func TestInlineBoxes(t *testing.T) {
 	regs := parameters.NewTypesettingRegisters()
 	k, _ := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	//t.Logf("khipu = %v", k)
-	pbox.Box.BotR = dimen.Point{X: 60 * 10 * dimen.BP, Y: 10 * dimen.CM}
+	pbox.Box.W = css.SomeDimen(60 * 10 * dimen.BP)
+	pbox.Box.H = css.SomeDimen(10 * dimen.CM)
 	var err error
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	pbox, err = BreakParagraph(k, pbox, regs)

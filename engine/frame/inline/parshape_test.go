@@ -7,6 +7,7 @@ import (
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/dimen"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
@@ -57,19 +58,23 @@ func makeIsoBox(a, b, c, d dimen.Dimen) isoBox {
 func makePara() (*boxtree.PrincipalBox, []*frame.Box, []*frame.Box) {
 	para := boxtree.NewPrincipalBox(nil, frame.BlockMode)
 	para.Box = &frame.StyledBox{}
-	para.Box.BotR = dimen.Point{X: 500, Y: 800}
+	para.Box.W = css.SomeDimen(500)
+	para.Box.W = css.SomeDimen(800)
 	//
 	lalgn1 := frame.Box{}
 	lalgn1.TopL = dimen.Point{X: 0, Y: 0}
-	lalgn1.BotR = dimen.Point{X: 100, Y: 20}
+	lalgn1.W = css.SomeDimen(100)
+	lalgn1.W = css.SomeDimen(20)
 	//
 	lalgn2 := frame.Box{}
 	lalgn2.TopL = dimen.Point{X: 0, Y: 20}
-	lalgn2.BotR = dimen.Point{X: 200, Y: 50}
+	lalgn1.W = css.SomeDimen(200)
+	lalgn1.W = css.SomeDimen(50)
 	//
 	ralgn := frame.Box{}
 	ralgn.TopL = dimen.Point{X: 300, Y: 500}
-	ralgn.BotR = dimen.Point{X: 500, Y: 800}
+	lalgn1.W = css.SomeDimen(500)
+	lalgn1.W = css.SomeDimen(800)
 	//
 	return para, []*frame.Box{&lalgn1, &lalgn2}, []*frame.Box{&ralgn}
 }

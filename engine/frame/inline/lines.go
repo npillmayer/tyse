@@ -158,12 +158,15 @@ func FindParaWidthAndText(pbox *ParagraphBox, rootctx boxtree.Context) (
 		// then move on to the paragraphs context
 		rootctx = ctx
 	}
-	if pbox.Box.Width() == 0 {
-		pbox.Box.BotR = dimen.Point{
-			X: pbox.Box.TopL.X + 60*10*dimen.BP,
-			Y: dimen.Infinity,
-		}
+	if !pbox.Box.W.IsAbsolute() {
+		panic("width of paragraph's box not known")
 	}
+	// if pbox.Box.Width() == 0 {
+	// 	pbox.Box.BotR = dimen.Point{
+	// 		X: pbox.Box.TopL.X + 60*10*dimen.BP,
+	// 		Y: dimen.Infinity,
+	// 	}
+	// }
 	return blocks, rootctx, nil
 	/*
 		pbox, err = BreakParagraph(k, pbox, regs)
