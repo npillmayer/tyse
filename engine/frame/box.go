@@ -40,6 +40,7 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/core/option"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
 )
 
@@ -49,15 +50,20 @@ type Rect struct {
 	H    css.DimenT
 }
 
+type Size struct {
+	W css.DimenT
+	H css.DimenT
+}
+
 // Box type, following the CSS box model.
 type Box struct {
-	Rect
-	Min             dimen.Point
-	Max             dimen.Point
-	BoxSizingExtend bool           // box-sizing = border-box ?
-	Padding         [4]dimen.Dimen // inside of border
-	BorderWidth     [4]dimen.Dimen // thickness of border
-	Margins         [4]css.DimenT  // outside of border, maybe unknown
+	Rect            // either content box or border box, depending on box-sizing
+	Min             Size
+	Max             Size
+	BorderBoxSizing bool          // box-sizing = border-box ?
+	Padding         [4]css.DimenT // inside of border
+	BorderWidth     [4]css.DimenT // thickness of border
+	Margins         [4]css.DimenT // outside of border, maybe unknown
 }
 
 // For padding, margins, etc. 4-way values always start at the top and travel
@@ -117,69 +123,136 @@ type StyledBox struct {
 	Styling *Styling
 }
 
-func (box *Box) HasFixedWidth(includeMargins bool) bool {
+// --- Handling of box dimensions --------------------------------------------
+
+// ContentWidth returns the width of the content box.
+// If this box has box-sizing set to `border-box` and the width dimensions do
+// not have fixed values, an unset dimension is returned.
+func (box *Box) ContentWidth() css.DimenT {
+	if !box.BorderBoxSizing {
+		return box.W
+	}
+	if box.HasFixedBorderBoxWidth(false) {
+		w := box.W.Unwrap()
+		w -= box.Padding[Left].Unwrap()
+		w -= box.Padding[Right].Unwrap()
+		w -= box.BorderWidth[Left].Unwrap()
+		w -= box.BorderWidth[Right].Unwrap()
+		return css.SomeDimen(w)
+	}
+	return css.Dimen()
+}
+
+// FixContentWidth sets a known value for the width of the content box.
+// If padding or border have any %-relative values, those will be set to fixed
+// dimensions as well.
+// If box has box-sizing set to `border-box` and one of the width dimensions is
+// of unknown value, false is returned and the content width is not set.
+func (box *Box) FixContentWidth(w dimen.Dimen) bool {
+	box.FixPaddingAndBorderWidth(w)
+	//box.FixBorderBoxPaddingAndBorderWidth(w)
+	if box.BorderBoxSizing {
+		if !box.Padding[Left].IsAbsolute() || !box.Padding[Right].IsAbsolute() ||
+			!box.BorderWidth[Left].IsAbsolute() || !box.BorderWidth[Right].IsAbsolute() {
+			return false
+		}
+		w += box.Padding[Left].Unwrap()
+		w += box.Padding[Right].Unwrap()
+		w += box.BorderWidth[Left].Unwrap()
+		w += box.BorderWidth[Right].Unwrap()
+	}
+	box.W = css.SomeDimen(w)
+	return true
+}
+
+// HasFixedBorderBoxWidth return true if box.W, horizontal margins and border width for
+// left and right border have fixed (known) values.
+// If includeMargins is true, left and right margins are checked as well.
+func (box *Box) HasFixedBorderBoxWidth(includeMargins bool) bool {
 	if includeMargins {
 		if !box.Margins[Left].IsAbsolute() || !box.Margins[Right].IsAbsolute() {
 			return false
 		}
 	}
-	if box.W.IsAbsolute() {
-		return true
+	if !box.Padding[Left].IsAbsolute() || !box.Padding[Right].IsAbsolute() ||
+		!box.BorderWidth[Left].IsAbsolute() || !box.BorderWidth[Right].IsAbsolute() ||
+		!box.W.IsAbsolute() {
+		return false
 	}
-	return false
+	return true
 }
 
-func (box *Box) ContentWidth() css.DimenT {
-	return box.W
-}
-
-func (box *Box) SetContentWidth(w dimen.Dimen, shrink bool) {
-	if shrink {
-		w -= box.Padding[Left]
-		w -= box.Padding[Right]
-		w -= box.BorderWidth[Left]
-		w -= box.BorderWidth[Right]
+// BorderBoxWidth returns the width of a box, including padding and border.
+// If box has box-sizing set to `content-box`and at least one of the dimensions
+// is not of fixed value, an unset dimension is returned.
+func (box *Box) BorderBoxWidth() css.DimenT {
+	if box.BorderBoxSizing {
+		return box.W
 	}
-	box.W = css.SomeDimen(w)
-}
-
-func (box *Box) Width() css.DimenT {
-	if box.W.IsAbsolute() {
-		return css.SomeDimen(box.W.Unwrap() + box.Padding[Left] + box.Padding[Right] +
-			box.BorderWidth[Left] + box.BorderWidth[Right])
+	if box.HasFixedBorderBoxWidth(false) {
+		w := box.W.Unwrap()
+		w += box.Padding[Left].Unwrap()
+		w += box.Padding[Right].Unwrap()
+		w += box.BorderWidth[Left].Unwrap()
+		w += box.BorderWidth[Right].Unwrap()
+		return css.SomeDimen(w)
 	}
-	return box.W
+	return css.Dimen()
 }
 
-// SetWidth sets a known width for a box. If box.BoxSizingExtend is set,
-// padding and border have to be set beforehand to have a correct result
+// FixBorderBoxWidth sets a known width for a box.
+//
+// If box has box-sizing set to `content-box` and at least one of the
+// internal widths has a variable value, the size is not set.
+// Otherwise padding and border have to be set beforehand to have a correct result
 // for the width-calculation.
-func (box *Box) SetWidth(w dimen.Dimen) {
-	if box.BoxSizingExtend {
-		box.W = css.SomeDimen(w - box.Padding[Left] - box.Padding[Right] -
-			box.BorderWidth[Left] - box.BorderWidth[Right])
-	} else {
+//
+// Will return true if all inner horizontal dimensions (i.e., excluding
+// margins) are fixed.
+func (box *Box) FixBorderBoxWidth(w dimen.Dimen) bool {
+	if box.BorderBoxSizing {
 		box.W = css.SomeDimen(w)
+		return box.FixBorderSizedBoxPaddingAndBorderWidth(w)
 	}
+	if !box.Padding[Left].IsAbsolute() || !box.Padding[Right].IsAbsolute() ||
+		!box.BorderWidth[Left].IsAbsolute() || !box.BorderWidth[Right].IsAbsolute() {
+		return false
+	}
+	w -= box.Padding[Left].Unwrap()
+	w -= box.Padding[Right].Unwrap()
+	w -= box.BorderWidth[Left].Unwrap()
+	w -= box.BorderWidth[Right].Unwrap()
+	box.W = css.SomeDimen(w)
+	return true
 }
 
+// TotalWidth returns the overall width of a box, including margins.
+// If one of the dimensions is not of fixed value, an unset dimension is returned.
 func (box *Box) TotalWidth() css.DimenT {
-	w := box.Width()
-	if w.IsAbsolute() && box.Margins[Left].IsAbsolute() && box.Margins[Right].IsAbsolute() {
-		full := w.Unwrap() + box.Margins[Left].Unwrap() + box.Margins[Right].Unwrap()
-		return css.SomeDimen(full)
+	if box.HasFixedBorderBoxWidth(true) {
+		w := box.BorderBoxWidth().Unwrap()
+		w += box.Margins[Left].Unwrap()
+		w += box.Margins[Right].Unwrap()
+		return css.SomeDimen(w)
 	}
-	if w.IsAbsolute() {
-		return css.Dimen()
-	}
-	return box.W
+	return css.Dimen()
 }
 
-func (box *Box) FullHeight() dimen.Dimen {
+// Height functions not ot yet implemented.
+func (box *Box) TotalHeight() dimen.Dimen {
 	panic("TODO")
 	// return box.BotR.Y + box.Padding[Bottom] + box.BorderWidth[Bottom] + box.Margins[Bottom] -
 	// 	box.TopL.Y - box.Padding[Top] - box.BorderWidth[Top] - box.Margins[Top]
 }
+
+// SetWidth sets the width of a box. Depending on wether `box-sizing` is
+// set to `content-box` (default) or `border-box`, this box.W will then
+// reflect either the content box width or the border box width.
+func (box *Box) SetWidth(w css.DimenT) {
+	box.W = w
+}
+
+// ---------------------------------------------------------------------------
 
 // CollapseMargins returns the greater margin between bottom margin of box1 and
 // top margin of box2, and the smaller one as the second return value.
@@ -197,4 +270,78 @@ func CollapseMargins(box1, box2 *Box) (css.DimenT, css.DimenT) {
 	}
 	return css.MaxDimen(box1.Margins[Bottom], box2.Margins[Top]),
 		css.MinDimen(box1.Margins[Bottom], box2.Margins[Top])
+}
+
+// FixPaddingAndBorderWidth fixes padding and boder width values of %-dimension
+// if the content-width of box is fixed.
+//
+// Will return true if all 4 paddings have fixed dimensions.
+//
+// The padding size is relative to the width of that element’s content area
+// (i.e. the width inside, and not including, the padding, border and margin of
+// the element).
+// So, if your <h1> is 500px wide, 10% padding = 0.1 × 500 pixels = 50 pixels.
+// Note that top and bottom padding will also be 10% of the _width_ of the element,
+// not 10% of the height of the element.
+func (box *Box) FixPaddingAndBorderWidth(w dimen.Dimen) bool {
+	fixed := true
+	for dir := Top; dir <= Left; dir++ {
+		if box.Padding[dir].UnitString() == "%" {
+			p := box.Padding[dir].Unwrap()
+			box.Padding[dir] = css.SomeDimen(p * w / 100)
+		}
+		if box.BorderWidth[dir].UnitString() == "%" {
+			p := box.BorderWidth[dir].Unwrap()
+			box.BorderWidth[dir] = css.SomeDimen(p * w / 100)
+		}
+		if !box.Padding[dir].IsAbsolute() || !box.BorderWidth[dir].IsAbsolute() {
+			fixed = false
+		}
+	}
+	return fixed
+}
+
+func (box *Box) FixBorderSizedBoxPaddingAndBorderWidth(w dimen.Dimen) bool {
+	if !box.BorderBoxSizing {
+		panic("content box sizing set, cannot fix border box")
+	}
+	pcnt, total := 100, int(w)
+	addPcnt := func(p interface{}) interface{} {
+		pcnt += p.(int)
+		return 0
+	}
+	subtrTotal := func(t interface{}) interface{} {
+		total -= t.(int)
+		return 0
+	}
+	x := box.Padding[Left]
+	if _, err := x.Match(option.Of{
+		css.FixedValue: subtrTotal, // total = total - x
+		"%":            addPcnt,    // pcnt = pcnt + x
+	}); err != nil { // for other than fixed and %
+		return false
+	}
+	x = box.Padding[Right]
+	if _, err := x.Match(option.Of{
+		css.FixedValue: subtrTotal, // total = total - x
+		"%":            addPcnt,    // pcnt = pcnt + x
+	}); err != nil { // for other than fixed and %
+		return false
+	}
+	x = box.BorderWidth[Left]
+	if _, err := x.Match(option.Of{
+		css.FixedValue: subtrTotal, // total = total - x
+		"%":            addPcnt,    // pcnt = pcnt + x
+	}); err != nil { // for other than fixed and %
+		return false
+	}
+	x = box.BorderWidth[Right]
+	if _, err := x.Match(option.Of{
+		css.FixedValue: subtrTotal, // total = total - x
+		"%":            addPcnt,    // pcnt = pcnt + x
+	}); err != nil { // for other than fixed and %
+		return false
+	}
+	unit := total / pcnt
+	return box.FixPaddingAndBorderWidth(dimen.Dimen(unit * 100))
 }

@@ -141,13 +141,15 @@ func (b isoBox) String() string {
 // }
 
 func box2box(f *frame.Box) isoBox {
-	b := isoBox{}
-	b.TopL.X = f.TopL.X - f.Padding[frame.Left] - f.BorderWidth[frame.Left] - f.Margins[frame.Left].Unwrap()
-	b.TopL.Y = f.TopL.Y - f.Padding[frame.Top] - f.BorderWidth[frame.Top] - f.Margins[frame.Top].Unwrap()
-	b.BotR = dimen.Point{
-		X: f.TopL.X + f.W.Unwrap() + f.Padding[frame.Left] + f.BorderWidth[frame.Left] + f.Margins[frame.Left].Unwrap(),
-		Y: f.TopL.Y + f.H.Unwrap() + f.Padding[frame.Top] + f.BorderWidth[frame.Top] + f.Margins[frame.Top].Unwrap(),
+	if !f.HasFixedBorderBoxWidth(true) {
+		return nullbox
 	}
+	w := f.TotalWidth()
+	b := isoBox{}
+	outer := f.OuterBox()
+	b.TopL = outer.TopL
+	b.BotR.X = outer.TopL.X + w
+	b.TopL.Y = outer.TopL.Y + 3*dimen.CM // TODO
 	return b
 }
 

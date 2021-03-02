@@ -193,28 +193,15 @@ func makeAttributeAction(root boxtree.Container) tree.Action {
 		//
 		font := "style.font()" // TODO
 		//
-		borderSizing := style("box-sizing") == "border-box"
-		c.CSSBox().BoxSizingExtend = borderSizing
-		w := css.DimenOption(style("width"))
-		w = scale(w, view, frame.Left, font)
-		h := css.DimenOption(style("height"))
-		h = scale(w, view, frame.Top, font)
-		if borderSizing {
-			c.CSSBox().SetWidth(w)
-			c.CSSBox().SetHeight(h)
-		} else {
-			c.CSSBox().W = w
-			c.CSSBox().H = h
-		}
 		// TODO min-/max-w + h
 		pt := css.DimenOption(style("padding-top"))
-		c.CSSBox().Padding[frame.Top] = scale(pt, view, frame.Top, font).Unwrap()
+		c.CSSBox().Padding[frame.Top] = scale(pt, view, frame.Top, font)
 		pr := css.DimenOption(style("padding-right"))
-		c.CSSBox().Padding[frame.Right] = scale(pr, view, frame.Right, font).Unwrap()
+		c.CSSBox().Padding[frame.Right] = scale(pr, view, frame.Right, font)
 		pb := css.DimenOption(style("padding-bottom"))
-		c.CSSBox().Padding[frame.Bottom] = scale(pb, view, frame.Bottom, font).Unwrap()
+		c.CSSBox().Padding[frame.Bottom] = scale(pb, view, frame.Bottom, font)
 		pl := css.DimenOption(style("padding-left"))
-		c.CSSBox().Padding[frame.Left] = scale(pl, view, frame.Left, font).Unwrap()
+		c.CSSBox().Padding[frame.Left] = scale(pl, view, frame.Left, font)
 		// TODO borders...
 		mt := css.DimenOption(style("margin-top"))
 		c.CSSBox().Margins[frame.Top] = scale(mt, view, frame.Top, font)
@@ -224,6 +211,15 @@ func makeAttributeAction(root boxtree.Container) tree.Action {
 		c.CSSBox().Margins[frame.Bottom] = scale(mb, view, frame.Bottom, font)
 		ml := css.DimenOption(style("margin-left"))
 		c.CSSBox().Margins[frame.Left] = scale(ml, view, frame.Left, font)
+		//
+		borderSizing := style("box-sizing") == "border-box"
+		c.CSSBox().BorderBoxSizing = borderSizing
+		w := css.DimenOption(style("width"))
+		w = scale(w, view, frame.Left, font)
+		h := css.DimenOption(style("height"))
+		h = scale(w, view, frame.Top, font)
+		c.CSSBox().W = w
+		c.CSSBox().H = h
 		//
 		//pos := css.PositionOption(c.DOMNode()) // later during re-ordering
 		//

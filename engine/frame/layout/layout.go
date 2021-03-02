@@ -142,7 +142,7 @@ func LayoutInlineFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRo
 func SolveWidthTopDown(c boxtree.Container, enclosing dimen.Dimen) (*frame.Box, error) {
 	var box *frame.Box
 	// TODO fix relative width,margins => resolve against enclosing
-	width := c.CSSBox().Width()
+	width := c.CSSBox().BorderBoxWidth()
 	calc, err := width.Match(option.Of{
 		option.None:       calcWidthAsRest, // default is `auto`
 		css.Auto:          calcWidthAsRest,
@@ -235,7 +235,7 @@ func distributeMarginSpace(c boxtree.Container, w, enclosing dimen.Dimen) *frame
 	box.TopL = c.CSSBox().TopL
 	remaining := enclosing - w
 	if remaining == 0 { // TODO fit into general case
-		box.SetWidth(w)
+		box.FixBorderBoxWidth(w)
 	} else {
 		left := c.CSSBox().Margins[frame.Left]
 		right := c.CSSBox().Margins[frame.Right]
@@ -248,7 +248,7 @@ func distributeMarginSpace(c boxtree.Container, w, enclosing dimen.Dimen) *frame
 		r := remaining - l.(dimen.Dimen)
 		box.Margins[frame.Left] = css.SomeDimen(l.(dimen.Dimen))
 		box.Margins[frame.Right] = css.SomeDimen(r)
-		box.SetWidth(w)
+		box.FixBorderBoxWidth(w)
 	}
 	return box
 }
