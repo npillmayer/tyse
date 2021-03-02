@@ -114,7 +114,7 @@ func (o DimenT) Equals(other interface{}) bool {
 	case string:
 		switch i {
 		case "%":
-			return o.IsRelative()
+			return o.flags&dimenPRCNT > 0
 		}
 	}
 	return false
