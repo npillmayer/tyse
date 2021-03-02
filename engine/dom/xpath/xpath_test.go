@@ -9,6 +9,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/logrusadapter"
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/dom/style/cssom"
 	"github.com/npillmayer/tyse/engine/dom/style/cssom/douceuradapter"
 	"github.com/npillmayer/tyse/engine/dom/styledtree"
@@ -101,7 +102,8 @@ func assertProperty(nodes []*tree.Node, key string) props {
 	var pp props
 	sncreat := styledtree.Creator()
 	for _, sn := range nodes {
-		p, _ := style.GetCascadedProperty(sn, key, sncreat.ToStyler)
+		styler := sncreat.ToStyler(sn)
+		p, _ := css.GetCascadedProperty(styler, key)
 		T.Debugf("property %s of %s = %s", key, sn, p)
 		pp = append(pp, p)
 	}
