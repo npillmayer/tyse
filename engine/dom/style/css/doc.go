@@ -48,6 +48,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
 package css
 
+// see
+// https://developer.mozilla.org/en-US/docs/Web/CSS/Reference#dom-css_cssom
+
 import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"

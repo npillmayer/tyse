@@ -163,7 +163,7 @@ func (box *Box) SetWidth(w dimen.Dimen) {
 	}
 }
 
-func (box *Box) FullWidth() css.DimenT {
+func (box *Box) TotalWidth() css.DimenT {
 	w := box.Width()
 	if w.IsAbsolute() && box.Margins[Left].IsAbsolute() && box.Margins[Right].IsAbsolute() {
 		full := w.Unwrap() + box.Margins[Left].Unwrap() + box.Margins[Right].Unwrap()

@@ -7,6 +7,7 @@ import (
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
@@ -51,10 +52,14 @@ func buildDOM(t *testing.T) *dom.W3CNode {
 }
 
 func TestW3CDoc(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
-	defer teardown()
+	gtrace.EngineTracer = gologadapter.New()
+	gtrace.CommandTracer.SetTraceLevel(tracing.LevelDebug)
+	//defer teardown()
+	//
 	root := buildDOM(t)
+	//
 	t.Logf("root is RootNode: %v", root.IsRoot())
+	t.Logf("root = %+v", root)
 	t.Logf("root is Doc-Node: %v", root.IsDocument())
 	if !root.IsDocument() {
 		t.Logf("root node is %s", root.NodeName())

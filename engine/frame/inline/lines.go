@@ -17,13 +17,14 @@ import (
 
 // LineBox is a type for CSS inline text boxes.
 type LineBox struct {
-	tree.Node
-	Box      *frame.Box
-	khipu    *khipu.Khipu
-	indent   dimen.Dimen // horizontal offset of the text within the line box
-	pos      int64       // start position within the khipu
-	length   int64       // length of the segment for this line
-	ChildInx uint32      // this box represents a text node at #ChildInx of the principal box
+	boxtree.Base
+	//tree.Node
+	Box    *frame.Box
+	khipu  *khipu.Khipu
+	indent dimen.Dimen // horizontal offset of the text within the line box
+	pos    int64       // start position within the khipu
+	length int64       // length of the segment for this line
+	//ChildInx uint32      // this box represents a text node at #ChildInx of the principal box
 }
 
 func NewLineBox(k *khipu.Khipu, start, length int64, indent dimen.Dimen) *LineBox {

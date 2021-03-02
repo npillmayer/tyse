@@ -24,9 +24,63 @@ import (
   approach step-by-step.
 */
 
+var ErrUnfixedscaledUnit error = errors.New("font/view dependent dimension must be fixed")
 var ErrEnclosingWidthNotFixed error = errors.New("enclosing width not fixed")
 var ErrContentScaling error = errors.New("box scales with content")
 var ErrNotAPercentageDimension error = errors.New("input dimension not a percentage dimension")
+
+/*
+  For top-down measurements, enclosing containers are responsible for calculation
+  the enclosing width for sub-containers. This includes checking the type of the child
+  as well as checking for child.IsFlowRoot() and possibly subtracting float widths.
+*/
+
+/*
+  We normalize parameters for two reasons:
+  1. parameters tend to be numerous for layout functions and mostly are very similar
+  2. I intend to parallelize tree traversals for layout in the future, and for this
+     we need a clear understanding of input vs output.
+*/
+type inheritedParams struct {
+	flowRoot *boxtree.FlowRoot
+	W        css.DimenT // enclosing width    fixed ?
+}
+
+type synthesizedParams struct {
+	W       dimen.Dimen
+	H       dimen.Dimen
+	lastErr error
+}
+
+// potentially recursive call to nested containers
+func CalcBlockWidth(c boxtree.Container, inherited inheritedParams) (syn synthesizedParams) {
+	// case c.Box.W is Font or View dependent: should have been done already => error
+	// case c.Box.W is Content dependent: call calc on nested block
+	// case c.Box.W is absolute: we're done
+	w, err := c.CSSBox().TotalWidth().Match(option.Of{
+		option.None:    nil, // defaults to `auto`
+		css.FontScaled: option.Fail(ErrUnfixedscaledUnit),
+		css.ViewScaled: option.Fail(ErrUnfixedscaledUnit),
+		css.FixedValue: c.CSSBox().TotalWidth().Unwrap(),
+		option.Some:    nil,
+	})
+	if err != nil {
+		syn.lastErr = err
+		return
+	}
+	if w != nil {
+		syn.W = w.(dimen.Dimen)
+		return
+	}
+	// if c.ctx.isFlowRoot:
+	//      tell flow root to layout floats
+	//      subtract floats' width from enclosing width
+	//
+	// Now we're ready to:
+	// SolveWidthTopDown(c boxtree.Container, enclosing dimen.Dimen) (*frame.Box, error)
+	//
+	return
+}
 
 func LayoutBlockFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRoot) *frame.Box {
 	// C = ctx.container
@@ -47,8 +101,11 @@ func LayoutBlockFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRoo
 	// (ANON is at end of ctx)
 	//
 	// alternative B:
+	// layout B:
+	//     find width of B and fix margins
+	//     layout B.ctx
 	// collect container B
-	// layout B.ctx
+	//     append B with relative offset to C
 	//
 	return nil
 }

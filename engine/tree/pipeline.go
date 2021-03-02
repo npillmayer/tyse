@@ -3,7 +3,7 @@ package tree
 /*
 BSD License
 
-Copyright (c) 2017–20, Norbert Pillmayer
+Copyright (c) 2017–21, Norbert Pillmayer
 
 All rights reserved.
 
@@ -246,7 +246,7 @@ type pipeline struct {
 // newPipeline creates an empty pipeline.
 func newPipeline() *pipeline {
 	pipe := &pipeline{}
-	pipe.errors = make(chan error, 3)
+	pipe.errors = make(chan error, 20)
 	pipe.input = make(chan nodePackage, 10)
 	pipe.results = pipe.input // short-curcuit, will be filled with filters
 	return pipe

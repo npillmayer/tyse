@@ -69,11 +69,6 @@ func NodeAsTreeNode(domnode w3cdom.Node) (*tree.Node, bool) {
 	return &w.Node, true
 }
 
-// HTMLNode returns the HTML parse node this DOM node is derived from.
-func (w *W3CNode) HTMLNode() *html.Node {
-	return w.HTMLNode()
-}
-
 // IsRoot returns wether this node is the root node of the styled tree.
 func (w *W3CNode) IsRoot() bool {
 	return w.ParentNode() == nil
@@ -81,8 +76,11 @@ func (w *W3CNode) IsRoot() bool {
 
 // IsDocument returns wether this node is the document node of the styled tree.
 func (w *W3CNode) IsDocument() bool {
+	if w.ParentNode() == nil {
+		return false
+	}
 	parent := w.ParentNode().(*W3CNode)
-	return w.ParentNode() != nil && parent.HTMLNode() == w.HTMLNode()
+	return parent.HTMLNode() == w.HTMLNode()
 }
 
 // NodeType returns the type of the underlying HTML node, something like
@@ -557,7 +555,8 @@ func FromHTMLParseTree(h *html.Node, css cssom.StyleSheet) *W3CNode {
 		T().Errorf("Cannot style test document: %s", err.Error())
 		return nil
 	}
-	return domify(stytree)
+	d := domify(stytree)
+	return d
 }
 
 // XPath creates an xpath navigator with start position w.

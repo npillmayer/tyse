@@ -23,7 +23,7 @@ const (
 
 var allDisplayModes = []DisplayMode{
 	DisplayNone, BlockMode, InlineMode, ListItemMode, FlowRoot, FlexMode,
-	GridMode, TableMode, InnerBlockMode,
+	GridMode, TableMode, InnerBlockMode, InnerInlineMode,
 }
 
 // Outer returns outer mode
@@ -91,9 +91,9 @@ func (disp DisplayMode) Symbol() string {
 	//if disp == FlowMode {
 	//return "\u25a7"
 	//} else
-	if disp.Contains(BlockMode) {
+	if disp.Contains(BlockMode) || disp.Contains(InnerBlockMode) {
 		return "\u25a9"
-	} else if disp.Contains(InlineMode) {
+	} else if disp.Contains(InlineMode) || disp.Contains(InnerInlineMode) {
 		return "\u25ba"
 	} else if disp.Contains(FlexMode) {
 		return "\u25a4"
@@ -103,6 +103,8 @@ func (disp DisplayMode) Symbol() string {
 		return "\u25a3"
 	} else if disp.Contains(TableMode) {
 		return "\u25a5"
+	} else if disp == NoMode {
+		return "–"
 	}
 	return "?"
 }

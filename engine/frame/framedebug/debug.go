@@ -32,6 +32,8 @@ func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer) {
 	gparams.BoxTmpl, _ = template.New("box").Funcs(
 		template.FuncMap{
 			"shortstring": shortText,
+			"istext":      isTextBox,
+			"label":       label,
 		}).Parse(boxTmpl)
 	gparams.EdgeTmpl = template.Must(template.New("boxedge").Parse(edgeTmpl))
 	err = header.Execute(w, gparams)
@@ -99,9 +101,10 @@ type cbox struct {
 
 func shortText(box *cbox) string {
 	txt := box.N.NodeValue()
-	disp := box.C.DisplayMode()
-	sym := disp.Symbol()
-	s := fmt.Sprintf("\"%s\u2000\\\"", sym)
+	//disp := box.C.DisplayMode()
+	//sym := disp.Symbol()
+	//s := fmt.Sprintf("\"%s\u2000\\\"", sym)
+	s := fmt.Sprintf("\"%s\u2000\\\"", "T")
 	if len(txt) > 10 {
 		s += txt[:10] + "…\\\"\""
 	} else {
@@ -131,14 +134,24 @@ func edge(c1 boxtree.Container, c2 boxtree.Container, w io.Writer, dict map[boxt
 
 // ---------------------------------------------------------------------------
 
+func label(c boxtree.Container) string {
+	switch b := c.(type) {
+	case *boxtree.PrincipalBox:
+		return "\"" + PrincipalLabel(b) + "\""
+	case *boxtree.AnonymousBox:
+		return "\"" + AnonLabel(b) + "\""
+	}
+	return "\"?\""
+}
+
 func PrincipalLabel(pbox *boxtree.PrincipalBox) string {
 	if pbox == nil {
 		return "<empty box>"
 	}
 	name := pbox.DOMNode().NodeName()
-	innerSym := pbox.DisplayMode().Symbol()
+	innerSym := pbox.DisplayMode().Inner().Symbol()
 	//outerSym := pbox.outerMode.Symbol()
-	outerSym := frame.NoMode.Symbol()
+	outerSym := pbox.DisplayMode().Outer().Symbol()
 	if pbox.Context() != nil {
 		if pbox.Context().Type() == boxtree.BlockFormattingContext {
 			outerSym = frame.BlockMode.Symbol()
@@ -146,17 +159,22 @@ func PrincipalLabel(pbox *boxtree.PrincipalBox) string {
 			outerSym = frame.InlineMode.Symbol()
 		}
 	}
-	//return fmt.Sprintf("%s %s %s", outerSym, innerSym, name)
 	return fmt.Sprintf("%s %s %s", outerSym, innerSym, name)
 }
 
-func String(anon *boxtree.AnonymousBox) string {
-	if anon == nil {
+//func String(anon *boxtree.AnonymousBox) string {
+func AnonLabel(c boxtree.Container) string {
+	if c == nil {
 		return "<empty anon box>"
 	}
-	innerSym := anon.DisplayMode().Inner().Symbol()
-	outerSym := anon.DisplayMode().Outer().Symbol()
+	innerSym := c.DisplayMode().Inner().Symbol()
+	outerSym := c.DisplayMode().Outer().Symbol()
 	return fmt.Sprintf("%s %s", outerSym, innerSym)
+}
+
+func isTextBox(c boxtree.Container) bool {
+	_, ok := c.(*boxtree.TextBox)
+	return ok
 }
 
 // --- Templates --------------------------------------------------------
@@ -167,8 +185,14 @@ const graphHeadTmpl = `digraph g {
    node [fontname = "{{ .Fontname }}" fontsize=12] ;
    edge [fontname = "{{ .Fontname }}" fontsize=12] ;
 `
+const boxTmpl = `{{ if istext .C }}
+{{ .Name }}	[ label={{ shortstring . }} shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+{{ else }}
+{{ .Name }}	[ label={{ label .C }} shape=box style=filled fillcolor=lightblue3 ] ;
+{{ end }}
+`
 
-const boxTmpl = `{{ if .C.IsAnonymous }}
+const nouseboxTmpl = `{{ if .C.IsAnonymous }}
 {{ if .C.IsText }}
 {{ .Name }}	[ label={{ shortstring . }} shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
 {{ else }}

@@ -19,13 +19,14 @@ import (
 )
 
 type ParagraphBox struct {
-	tree.Node                     // a paragraph box is a node within the layout tree
-	Box         *frame.StyledBox  // styled box for a DOM node
-	domNode     *dom.W3CNode      // the DOM node this PrincipalBox refers to
-	displayMode frame.DisplayMode // outer display mode
-	context     boxtree.Context   // principal boxes may establish a context
-	para        *Paragraph        // text of the paragraph
-	khipu       *khipu.Khipu      // khipu knots make from paragraph text
+	boxtree.Base
+	Box     *frame.StyledBox // styled box for a DOM node
+	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
+	context boxtree.Context  // principal boxes may establish a context
+	para    *Paragraph       // text of the paragraph
+	khipu   *khipu.Khipu     // khipu knots make from paragraph text
+	//tree.Node                     // a paragraph box is a node within the layout tree
+	//displayMode frame.DisplayMode // outer display mode
 }
 
 var _ boxtree.Container = &ParagraphBox{}
@@ -51,9 +52,9 @@ func (pbox *ParagraphBox) IsAnonymous() bool {
 }
 
 // DisplayMode returns the computed display mode of this box.
-func (pbox *ParagraphBox) DisplayMode() frame.DisplayMode {
-	return pbox.displayMode
-}
+// func (pbox *ParagraphBox) DisplayMode() frame.DisplayMode {
+// 	return pbox.displayMode
+// }
 
 // IsText will always return false for a paragraph box.
 func (pbox *ParagraphBox) IsText() bool {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/option"
@@ -31,6 +32,7 @@ const (
 	FontScaled    PropertyType = 4 // for option matching: dimension is font-dependent
 	ViewScaled    PropertyType = 5 // for option matching: dimension is viewport-dependent
 	ContentScaled PropertyType = 6 // for option matching: dimension is content-dependent
+	FixedValue    PropertyType = 7 // for option matching: dimension has fixed value
 )
 
 const (
@@ -56,7 +58,7 @@ const (
 	dimenVMIN    uint32 = 0x0700
 	dimenVMAX    uint32 = 0x0800
 	dimenPRCNT   uint32 = 0x0900
-	relativeMask uint32 = 0x00f0
+	relativeMask uint32 = 0xff00
 )
 
 // --- DimenT-----------------------------------------------------------------
@@ -110,6 +112,8 @@ func (o DimenT) Equals(other interface{}) bool {
 				o.flags&dimenVMIN > 0 || o.flags&dimenVMAX > 0
 		case ContentScaled:
 			return o.flags&contentMask > 0
+		case FixedValue:
+			return o.IsAbsolute()
 		}
 	case string:
 		switch i {
@@ -138,6 +142,17 @@ func (o DimenT) IsRelative() bool {
 // IsAbsolute returns true if o represents a valid absolute dimension.
 func (o DimenT) IsAbsolute() bool {
 	return o.flags == dimenAbsolute
+}
+
+// UnitString returns 'sp' (scaled points) for non-relative dimensions and a string
+// denoting the defined unit for relative dimensions.
+func (o DimenT) UnitString() string {
+	if o.IsRelative() {
+		if unit, ok := relUnitMap[o.flags&relativeMask]; ok {
+			return unit
+		}
+	}
+	return "sp"
 }
 
 func (o DimenT) String() string {
@@ -236,7 +251,8 @@ func ParseDimen(s string) (DimenT, error) {
 		case "", "sp", "SP":
 			scale = dimen.SP
 		default:
-			if unit, ok := relUnitStringMap[d[2]]; ok {
+			u := strings.ToLower(d[2])
+			if unit, ok := relUnitStringMap[u]; ok {
 				dim.flags = unit
 			} else {
 				return Dimen(), errors.New("format error parsing dimension")

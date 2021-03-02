@@ -7,7 +7,9 @@ package layout
 import (
 	"errors"
 
+	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/tree"
@@ -52,6 +54,7 @@ func BuildBoxTree(domRoot *dom.W3CNode) (boxtree.Container, error) {
 func prepareBoxCreator(dict *domToBoxAssoc) tree.Action {
 	dom2box := dict
 	action := func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
+		T().Errorf("generate ACTION")
 		domnode, err := dom.NodeFromTreeNode(node)
 		if err != nil {
 			T().Errorf("action 1: %s", err.Error())
@@ -76,6 +79,7 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 	T().Infof("making box for %s", domnode.NodeName())
 	box := NewBoxForDOMNode(domnode)
 	if box == nil { // legit, e.g. for "display:none"
+		T().Debugf("box is nil")
 		return nil, nil // will not descend to children of domnode
 	}
 	T().Infof("remembering %d/%s", domnode.NodeType(), domnode.NodeName())
@@ -90,11 +94,11 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 				var err error
 				switch b := box.(type) {
 				case *boxtree.PrincipalBox:
-					b.ChildInx = uint32(chpos)
-					err = p.AddChild(b)
+					//b.ChildInx = uint32(chpos)
+					err = p.AddChild(b, chpos)
 				case *boxtree.TextBox:
-					b.ChildInx = uint32(chpos)
-					err = p.AddTextChild(b)
+					//b.ChildInx = uint32(chpos)
+					err = p.AddTextChild(b, chpos)
 				default:
 					T().Errorf("Unknown box type for %v", box)
 				}
@@ -113,18 +117,6 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 }
 
 // ----------------------------------------------------------------------
-
-// TODO initialize box with style properties affection box layout:
-//    - padding
-//    - border
-//    - margin
-//    - width
-//    - height
-//    - box-sizing
-//
-// This is probably a separate run after the box tree is complete
-//
-// width := css.DimenOption(c.DOMNode().ComputedStyles().GetPropertyValue("width"))
 
 // NewBoxForDOMNode creates an adequately initialized box for a given DOM node.
 func NewBoxForDOMNode(domnode *dom.W3CNode) boxtree.Container {
@@ -160,4 +152,115 @@ func possiblyCreateMiniHierarchy(pbox *boxtree.PrincipalBox) {
 			T().Debugf("need marker for principal box")
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+
+// TODO initialize box with style properties affection box layout:
+//    - padding
+//    - border
+//    - margin
+//    - width
+//    - height
+//    - box-sizing
+//
+// This is probably a separate run after the box tree is complete
+//
+// width := css.DimenOption(c.DOMNode().ComputedStyles().GetPropertyValue("width"))
+
+func attributeBoxes(boxRoot *boxtree.PrincipalBox) error {
+	if boxRoot == nil {
+		return nil
+	}
+	walker := tree.NewWalker(boxRoot.TreeNode())
+	future := walker.TopDown(makeAttributeAction(boxRoot)).Promise()
+	_, err := future()
+	return err
+}
+
+// Tree action: attribute each box from CSS styles.
+func makeAttributeAction(root boxtree.Container) tree.Action {
+	view := viewFromBoxRoot(root)
+	//return func attributeFromCSS(node *tree.Node, unused *tree.Node, chpos int) (match *tree.Node, err error) {
+	return func(node *tree.Node, unused *tree.Node, chpos int) (match *tree.Node, err error) {
+		c := node.Payload.(boxtree.Container)
+		if c == nil {
+			return
+		}
+		T().Debugf("attributing container %+v", c.DOMNode().NodeName())
+		//
+		style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
+		//
+		font := "style.font()" // TODO
+		//
+		borderSizing := style("box-sizing") == "border-box"
+		c.CSSBox().BoxSizingExtend = borderSizing
+		w := css.DimenOption(style("width"))
+		w = scale(w, view, frame.Left, font)
+		h := css.DimenOption(style("height"))
+		h = scale(w, view, frame.Top, font)
+		if borderSizing {
+			c.CSSBox().SetWidth(w)
+			c.CSSBox().SetHeight(h)
+		} else {
+			c.CSSBox().W = w
+			c.CSSBox().H = h
+		}
+		// TODO min-/max-w + h
+		pt := css.DimenOption(style("padding-top"))
+		c.CSSBox().Padding[frame.Top] = scale(pt, view, frame.Top, font).Unwrap()
+		pr := css.DimenOption(style("padding-right"))
+		c.CSSBox().Padding[frame.Right] = scale(pr, view, frame.Right, font).Unwrap()
+		pb := css.DimenOption(style("padding-bottom"))
+		c.CSSBox().Padding[frame.Bottom] = scale(pb, view, frame.Bottom, font).Unwrap()
+		pl := css.DimenOption(style("padding-left"))
+		c.CSSBox().Padding[frame.Left] = scale(pl, view, frame.Left, font).Unwrap()
+		// TODO borders...
+		mt := css.DimenOption(style("margin-top"))
+		c.CSSBox().Margins[frame.Top] = scale(mt, view, frame.Top, font)
+		mr := css.DimenOption(style("margin-right"))
+		c.CSSBox().Margins[frame.Right] = scale(mr, view, frame.Right, font)
+		mb := css.DimenOption(style("margin-bottom"))
+		c.CSSBox().Margins[frame.Bottom] = scale(mb, view, frame.Bottom, font)
+		ml := css.DimenOption(style("margin-left"))
+		c.CSSBox().Margins[frame.Left] = scale(ml, view, frame.Left, font)
+		//
+		//pos := css.PositionOption(c.DOMNode()) // later during re-ordering
+		//
+		return
+	}
+}
+
+type view struct {
+	// TODO create this during DOM tree building
+	font string // TODO TypeFace
+	size dimen.Point
+}
+
+func viewFromBoxRoot(root boxtree.Container) *view {
+	return &view{
+		font: "view font",
+		size: dimen.DINA4,
+	}
+}
+
+func scale(d css.DimenT, view *view, dir int, font string) css.DimenT {
+	if d.IsRelative() {
+		if d.UnitString() == "rem" {
+			d = d.ScaleFromFont(view.font)
+		} else {
+			d = d.ScaleFromFont(font)
+		}
+		switch dir {
+		case frame.Top:
+			d = d.ScaleFromViewport(view.size.Y)
+		case frame.Right:
+			d = d.ScaleFromViewport(view.size.X)
+		case frame.Bottom:
+			d = d.ScaleFromViewport(view.size.Y)
+		case frame.Left:
+			d = d.ScaleFromViewport(view.size.X)
+		}
+	}
+	return d
 }
