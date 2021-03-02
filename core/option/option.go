@@ -69,22 +69,24 @@ func (of Of) Match(o Type) (value interface{}, err error) {
 		}
 	} else {
 		err = ErrCannotMatchValue
+		matched := false
 		for k, expr := range of {
 			if o.Equals(k) {
+				matched = true
 				Tracer().Debugf("matched expr=%T %v", expr, expr)
 				value, err = valueOrExpr(expr, o, Some)
 			}
 		}
-		if err != nil {
+		if !matched {
 			if expr, ok := of[Some]; ok {
 				Tracer().Debugf("matched some expr=%T %v", expr, expr)
 				value, err = valueOrExpr(expr, o, Some)
 			}
-			if err != nil {
-				Tracer().Errorf(err.Error())
-				if expr, ok := of[Error]; ok {
-					value, err = valueOrExpr(expr, o, Error)
-				}
+		}
+		if err != nil {
+			Tracer().Errorf(err.Error())
+			if expr, ok := of[Error]; ok {
+				value, err = valueOrExpr(expr, o, Error)
 			}
 		}
 	}
@@ -129,6 +131,43 @@ func valueOrExpr(op interface{}, value Type, t MaybeOption) (interface{}, error)
 		return x(value)
 	}
 	return op, nil
+}
+
+// Fail may be used as an option case, causing a Match to fail with an error.
+// The error will be returned by Match(…), unless caught with an option.Error
+// label.
+//
+//     _, err := o.Match(option.Of{
+//          option.None: …,
+//          99:          option.Fail(errors.New("99 is illegal")),
+//          option.Some: …,
+//     })
+//
+func Fail(err error) func(interface{}) (interface{}, error) {
+	localErr := err
+	return func(interface{}) (interface{}, error) {
+		return nil, localErr
+	}
+}
+
+// Safe wraps a Match's return values and drops the error value.
+func Safe(x interface{}, err error) interface{} {
+	return x
+}
+
+// WrapResult wraps the result of a function call, which must return a (value, error)
+// tuple.
+//
+// Attention: the wrapped call will be executed independently of the matching option.
+// Therefore it must not have side effects and should execute quickly.
+// Because of this “trap” this function will likely be dropped.
+//
+func WrapResult(x interface{}, err error) func(interface{}) (interface{}, error) {
+	localX := x
+	localErr := err
+	return func(interface{}) (interface{}, error) {
+		return localX, localErr
+	}
 }
 
 // --- Int64T-----------------------------------------------------------------
@@ -213,10 +252,3 @@ func (o RefT) Match(choices interface{}) (value interface{}, err error) {
 }
 
 var _ Type = RefT{}
-
-// ---------------------------------------------------------------------------
-
-// Safe wraps a Match's return values and drops the error value.
-func Safe(x interface{}, err error) interface{} {
-	return x
-}

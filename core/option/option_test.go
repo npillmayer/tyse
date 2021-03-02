@@ -67,7 +67,6 @@ func TestOptionOf(t *testing.T) {
 	if y1.(int) != 99 {
 		t.Errorf("expected SomeInt(42) to match to 99, is %d", y1)
 	}
-	//t.Fail()
 }
 
 func TestOptionRef(t *testing.T) {
@@ -88,7 +87,86 @@ func TestOptionRef(t *testing.T) {
 	if y1.(int) != 99 {
 		t.Errorf("expected Something(hey) to match to 99, is %d", y1)
 	}
-	t.Fail()
+}
+
+func TestOptionFail(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	x := option.SomeInt64(1)
+	t.Logf("x = %v, x.T = %T, x.unwrap = %v", x, x, x.Unwrap())
+	_, err := x.Match(option.Of{
+		option.None:  7,
+		1:            option.Fail(errors.New("Fail")),
+		option.Some:  x.Unwrap(),
+		option.Error: option.Fail(errors.New("Caught Fail")),
+	})
+	//
+	t.Logf("err = %v", err)
+	if err == nil {
+		t.Errorf("expected SomeInt(1) to match to an error, hasn't")
+	}
+	if err.Error() != "Caught Fail" {
+		t.Errorf("expected SomeInt(1) error to be caught, isn't")
+	}
+}
+
+func TestOptionWrap(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	x := option.SomeInt64(1)
+	t.Logf("x = %v, x.T = %T, x.unwrap = %v", x, x, x.Unwrap())
+	s, err := x.Match(option.Of{
+		option.None: "None",
+		option.Some: option.WrapResult(stringify(x.Unwrap())),
+	})
+	//
+	t.Logf("s = %+v, err = %v", s, err)
+	if err != nil {
+		t.Errorf("expected SomeInt(1) to match without error, hasn't")
+	}
+	if s == nil {
+		t.Errorf("expected int64(1) to match to non-nil result, didn't")
+	}
+	if str, ok := s.(string); ok {
+		if str != "Value = 1" {
+			t.Errorf("expected int64(1) to match to 'Value = 1', didn't")
+		}
+	} else {
+		t.Errorf("expected int64(1) to match to string, didn't")
+	}
+}
+
+func TestOptionWrapError(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	x := option.SomeInt64(1)
+	t.Logf("x = %v, x.T = %T, x.unwrap = %v", x, x, x.Unwrap())
+	s, err := x.Match(option.Of{
+		option.None:  "None",
+		option.Some:  option.WrapResult(nonsense(x.Unwrap())),
+		option.Error: "ERROR",
+	})
+	//
+	t.Logf("s = %+v, err = %v", s, err)
+	if err != nil {
+		t.Errorf("expected error from matching SomeInt(1) to be caught, isn't")
+	}
+	if s == nil {
+		t.Errorf("expected int64(1) to match to a non-nil result, didn't")
+	}
+	if str, ok := s.(string); ok {
+		if str != "ERROR" {
+			t.Errorf("expected int64(1) to match to string ERROR, didn't")
+		}
+	} else {
+		t.Errorf("expected int64(1) to match to string, didn't")
+	}
 }
 
 // ---------------------------------------------------------------------------
