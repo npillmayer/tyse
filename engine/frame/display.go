@@ -3,6 +3,8 @@ package frame
 import "bytes"
 
 // DisplayMode is a type for CSS property "display".
+//
+// TODO move to package css
 type DisplayMode uint16
 
 // Flags for box context and display mode (outer and inner).

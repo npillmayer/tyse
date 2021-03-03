@@ -54,7 +54,7 @@ func BuildBoxTree(domRoot *dom.W3CNode) (boxtree.Container, error) {
 func prepareBoxCreator(dict *domToBoxAssoc) tree.Action {
 	dom2box := dict
 	action := func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
-		T().Errorf("generate ACTION")
+		T().Infof("generate ACTION box creator")
 		domnode, err := dom.NodeFromTreeNode(node)
 		if err != nil {
 			T().Errorf("action 1: %s", err.Error())
@@ -166,6 +166,9 @@ func possiblyCreateMiniHierarchy(pbox *boxtree.PrincipalBox) {
 //
 // This is probably a separate run after the box tree is complete
 //
+// TODO initialize whitespace flags for TextBoxes
+// TODO initialize styling information for principal boxes
+//
 // width := css.DimenOption(c.DOMNode().ComputedStyles().GetPropertyValue("width"))
 
 func attributeBoxes(boxRoot *boxtree.PrincipalBox) error {
@@ -173,57 +176,133 @@ func attributeBoxes(boxRoot *boxtree.PrincipalBox) error {
 		return nil
 	}
 	walker := tree.NewWalker(boxRoot.TreeNode())
-	future := walker.TopDown(makeAttributeAction(boxRoot)).Promise()
+	future := walker.TopDown(makeAttributesAction(boxRoot)).Promise()
 	_, err := future()
 	return err
 }
 
 // Tree action: attribute each box from CSS styles.
-func makeAttributeAction(root boxtree.Container) tree.Action {
+func makeAttributesAction(root boxtree.Container) tree.Action {
+	T().Infof("generate ACTION attributer")
 	view := viewFromBoxRoot(root)
 	//return func attributeFromCSS(node *tree.Node, unused *tree.Node, chpos int) (match *tree.Node, err error) {
-	return func(node *tree.Node, unused *tree.Node, chpos int) (match *tree.Node, err error) {
+	return func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
 		c := node.Payload.(boxtree.Container)
 		if c == nil {
-			return
+			return nil, nil
 		}
-		T().Debugf("attributing container %+v", c.DOMNode().NodeName())
-		//
+		parent := parentNode.Payload.(boxtree.Container)
 		style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
-		//
-		font := "style.font()" // TODO
-		//
-		// TODO min-/max-w + h
-		pt := css.DimenOption(style("padding-top"))
-		c.CSSBox().Padding[frame.Top] = scale(pt, view, frame.Top, font)
-		pr := css.DimenOption(style("padding-right"))
-		c.CSSBox().Padding[frame.Right] = scale(pr, view, frame.Right, font)
-		pb := css.DimenOption(style("padding-bottom"))
-		c.CSSBox().Padding[frame.Bottom] = scale(pb, view, frame.Bottom, font)
-		pl := css.DimenOption(style("padding-left"))
-		c.CSSBox().Padding[frame.Left] = scale(pl, view, frame.Left, font)
-		// TODO borders...
-		mt := css.DimenOption(style("margin-top"))
-		c.CSSBox().Margins[frame.Top] = scale(mt, view, frame.Top, font)
-		mr := css.DimenOption(style("margin-right"))
-		c.CSSBox().Margins[frame.Right] = scale(mr, view, frame.Right, font)
-		mb := css.DimenOption(style("margin-bottom"))
-		c.CSSBox().Margins[frame.Bottom] = scale(mb, view, frame.Bottom, font)
-		ml := css.DimenOption(style("margin-left"))
-		c.CSSBox().Margins[frame.Left] = scale(ml, view, frame.Left, font)
-		//
-		borderSizing := style("box-sizing") == "border-box"
-		c.CSSBox().BorderBoxSizing = borderSizing
-		w := css.DimenOption(style("width"))
-		w = scale(w, view, frame.Left, font)
-		h := css.DimenOption(style("height"))
-		h = scale(w, view, frame.Top, font)
-		c.CSSBox().W = w
-		c.CSSBox().H = h
-		//
-		//pos := css.PositionOption(c.DOMNode()) // later during re-ordering
-		//
-		return
+		if c.Type() == boxtree.TypePrincipal {
+			T().Debugf("attributing container %+v", c.DOMNode().NodeName())
+			//
+			// TODO font handling
+			// https://developer.mozilla.org/en-US/docs/Web/CSS/font
+			font := style("font-family") // TODO family, size, style, weight
+			font = "style.font()"        // TODO
+			//
+			setSizingInformationForPrincipalBox(c, view, string(font))
+			setVisualStylesForPrincipalBox(c)
+			//pos := css.PositionOption(c.DOMNode()) // later during re-ordering
+			//
+		} else if c.Type() == boxtree.TypeText {
+			setWhitespaceProperties(c, parent)
+		}
+		return node, nil
+	}
+}
+
+func setSizingInformationForPrincipalBox(c boxtree.Container, view *view, font string) {
+	//
+	style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
+	// Padding
+	pt := css.DimenOption(style("padding-top"))
+	c.CSSBox().Padding[frame.Top] = scale(pt, view, frame.Top, font)
+	pr := css.DimenOption(style("padding-right"))
+	c.CSSBox().Padding[frame.Right] = scale(pr, view, frame.Right, font)
+	pb := css.DimenOption(style("padding-bottom"))
+	c.CSSBox().Padding[frame.Bottom] = scale(pb, view, frame.Bottom, font)
+	pl := css.DimenOption(style("padding-left"))
+	c.CSSBox().Padding[frame.Left] = scale(pl, view, frame.Left, font)
+	// Borders
+	bt := css.DimenOption(style("border-top-width"))
+	c.CSSBox().BorderWidth[frame.Top] = scale(bt, view, frame.Top, font)
+	br := css.DimenOption(style("border-right-width"))
+	c.CSSBox().BorderWidth[frame.Right] = scale(br, view, frame.Right, font)
+	bb := css.DimenOption(style("border-bottom-width"))
+	c.CSSBox().BorderWidth[frame.Bottom] = scale(bb, view, frame.Bottom, font)
+	bl := css.DimenOption(style("border-left-width"))
+	c.CSSBox().BorderWidth[frame.Left] = scale(bl, view, frame.Left, font)
+	// Margins
+	mt := css.DimenOption(style("margin-top"))
+	c.CSSBox().Margins[frame.Top] = scale(mt, view, frame.Top, font)
+	mr := css.DimenOption(style("margin-right"))
+	c.CSSBox().Margins[frame.Right] = scale(mr, view, frame.Right, font)
+	mb := css.DimenOption(style("margin-bottom"))
+	c.CSSBox().Margins[frame.Bottom] = scale(mb, view, frame.Bottom, font)
+	ml := css.DimenOption(style("margin-left"))
+	c.CSSBox().Margins[frame.Left] = scale(ml, view, frame.Left, font)
+	//
+	borderSizing := style("box-sizing") == "border-box"
+	c.CSSBox().BorderBoxSizing = borderSizing
+	w := css.DimenOption(style("width"))
+	w = scale(w, view, frame.Left, font)
+	h := css.DimenOption(style("height"))
+	h = scale(w, view, frame.Top, font)
+	c.CSSBox().W = w
+	c.CSSBox().H = h
+	// TODO min-/max-w + h
+}
+
+func setVisualStylesForPrincipalBox(c boxtree.Container) {
+	if c == nil || c.Type() != boxtree.TypePrincipal {
+		return // other container types cannot be styled
+	}
+	pbox := c.(*boxtree.PrincipalBox).Box                  // box with styles
+	style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
+	fgcolor := style("color").Color()
+	bgcolor := style("background-color").Color()
+	bcolor := style("border-top-color").Color()
+	if bcolor == nil && fgcolor != nil {
+		bcolor = fgcolor // border-color = currentcolor as defined by CSS spec
+	}
+	if bcolor != nil || fgcolor != nil || bgcolor != nil {
+		if pbox.Styles == nil {
+			pbox.Styles = &frame.Styling{}
+		}
+		pbox.Styles.Border.LineColor = bcolor
+		pbox.Styles.Colors.Foreground = fgcolor
+	}
+}
+
+/*
+                  New lines    Spaces and tabs     Text wrapping     End-of-line spaces
+				  ---------------------------------------------------------------------
+    normal        Collapse     Collapse            Wrap              Remove
+    nowrap        Collapse     Collapse            No wrap           Remove
+    pre           Preserve     Preserve            No wrap           Preserve
+    pre-wrap      Preserve     Preserve            Wrap              Hang
+    pre-line      Preserve     Collapse            Wrap              Remove
+    break-spaces  Preserve     Preserve            Wrap              Wrap
+*/
+func setWhitespaceProperties(c, parent boxtree.Container) {
+	if c != nil && parent != nil && c.Type() == boxtree.TypeText {
+		t := c.(*boxtree.TextBox)
+		ws := parent.DOMNode().ComputedStyles().GetPropertyValue("white-space")
+		switch ws {
+		case "nowrap":
+			t.WSCollapse = true
+			t.WSWrap = false
+		case "pre":
+			t.WSCollapse = false
+			t.WSWrap = false
+		case "pre-wrap", "pre-line", "break-spaces": // TODO
+			t.WSCollapse = false
+			t.WSWrap = true
+		default: // white-space = normal
+			t.WSCollapse = true
+			t.WSWrap = true
+		}
 	}
 }
 
@@ -247,16 +326,13 @@ func scale(d css.DimenT, view *view, dir int, font string) css.DimenT {
 		} else {
 			d = d.ScaleFromFont(font)
 		}
-		switch dir {
-		case frame.Top:
-			d = d.ScaleFromViewport(view.size.Y)
-		case frame.Right:
-			d = d.ScaleFromViewport(view.size.X)
-		case frame.Bottom:
-			d = d.ScaleFromViewport(view.size.Y)
-		case frame.Left:
-			d = d.ScaleFromViewport(view.size.X)
-		}
+		d = d.ScaleFromViewport(view.size.X, view.size.Y)
+		// switch dir {
+		// case frame.Top:
+		// case frame.Right:
+		// case frame.Bottom:
+		// case frame.Left:
+		// }
 	}
 	return d
 }

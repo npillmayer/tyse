@@ -13,6 +13,7 @@ import (
 
 // Container is an interface type for render tree nodes, i.e., boxes.
 type Container interface {
+	Type() Type
 	DOMNode() *dom.W3CNode
 	TreeNode() *tree.Node
 	CSSBox() *frame.Box
@@ -24,6 +25,15 @@ type Container interface {
 	//IsAnonymous() bool
 	//IsText() bool // TODO remove this
 }
+
+type Type uint8
+
+const (
+	TypeUnknown Type = iota
+	TypePrincipal
+	TypeText
+	TypeAnonymous
+)
 
 var _ Container = &PrincipalBox{}
 var _ Container = &AnonymousBox{}
@@ -136,8 +146,13 @@ func (pbox *PrincipalBox) CSSBox() *frame.Box {
 // An example would be a `<li>`-element: it will create two sub-boxes, one for the
 // list item marker and one for the item's text/content. Another example are anonymous
 // boxes, which will be generated for reconciling context/level-discrepancies.
-func (pbox *PrincipalBox) IsPrincipal() bool {
-	return (pbox.domNode != nil)
+// func (pbox *PrincipalBox) IsPrincipal() bool {
+// 	return (pbox.domNode != nil)
+// }
+
+// Type returns TypePrincipal
+func (pbox *PrincipalBox) Type() Type {
+	return TypePrincipal
 }
 
 // IsAnonymous will always return false for a container.
@@ -399,9 +414,13 @@ func (anon *AnonymousBox) CSSBox() *frame.Box {
 // }
 
 // DisplayMode returns the computed display mode of this box.
-func (anon *AnonymousBox) DisplayMode() frame.DisplayMode {
-	//return anon.outerMode, anon.innerMode
-	return anon.displayMode
+// func (anon *AnonymousBox) DisplayMode() frame.DisplayMode {
+// 	return anon.displayMode
+// }
+
+// Type returns TypeText
+func (pbox *TextBox) Type() Type {
+	return TypePrincipal
 }
 
 // func (anon *AnonymousBox) String() string {
@@ -439,8 +458,10 @@ func NewAnonymousBox(mode frame.DisplayMode) *AnonymousBox {
 type TextBox struct {
 	Base
 	//tree.Node              // a text box is a node within the layout tree
-	Box     *frame.Box   // text box cannot be explicitely styled
-	domNode *dom.W3CNode // the DOM text-node this box refers to
+	Box        *frame.Box   // text box cannot be explicitely styled
+	domNode    *dom.W3CNode // the DOM text-node this box refers to
+	WSCollapse bool
+	WSWrap     bool
 	//outerMode frame.DisplayMode  // container lives in this mode (block or inline)
 	//childInx uint32 // this box represents a text node at #ChildInx of the principal box
 }
@@ -462,6 +483,11 @@ func (tbox *TextBox) DOMNode() *dom.W3CNode {
 // CSSBox returns the underlying box of a render tree element.
 func (tbox *TextBox) CSSBox() *frame.Box {
 	return tbox.Box
+}
+
+// Type returns TypeAnonymous
+func (pbox *AnonymousBox) Type() Type {
+	return TypeAnonymous
 }
 
 // TreeNode returns the underlying tree node for a box.

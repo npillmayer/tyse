@@ -46,10 +46,15 @@ func (pbox *ParagraphBox) CSSBox() *frame.Box {
 	return &pbox.Box.Box
 }
 
-// IsAnonymous will always return false for a paragraph container.
-func (pbox *ParagraphBox) IsAnonymous() bool {
-	return false
+// Type returns TypeParagraph
+func (pbox *ParagraphBox) Type() boxtree.Type {
+	return TypeParagraph
 }
+
+// IsAnonymous will always return false for a paragraph container.
+// func (pbox *ParagraphBox) IsAnonymous() bool {
+// 	return false
+// }
 
 // DisplayMode returns the computed display mode of this box.
 // func (pbox *ParagraphBox) DisplayMode() frame.DisplayMode {
@@ -57,9 +62,9 @@ func (pbox *ParagraphBox) IsAnonymous() bool {
 // }
 
 // IsText will always return false for a paragraph box.
-func (pbox *ParagraphBox) IsText() bool {
-	return false
-}
+// func (pbox *ParagraphBox) IsText() bool {
+// 	return false
+// }
 
 func (pbox *ParagraphBox) Context() boxtree.Context {
 	if pbox.context == nil {

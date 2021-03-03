@@ -120,10 +120,19 @@ type Styling struct {
 // StyledBox is a type for a fully stylable box.
 type StyledBox struct {
 	Box
-	Styling *Styling
+	Styles *Styling
 }
 
 // --- Handling of box dimensions --------------------------------------------
+
+// SetWidth sets the width of a box. Depending on wether `box-sizing` is
+// set to `content-box` (default) or `border-box`, this box.W will then
+// reflect either the content box width or the border box width.
+//
+// TODO remove this ?
+func (box *Box) SetWidth(w css.DimenT) {
+	box.W = w
+}
 
 // ContentWidth returns the width of the content box.
 // If this box has box-sizing set to `border-box` and the width dimensions do
@@ -239,17 +248,18 @@ func (box *Box) TotalWidth() css.DimenT {
 }
 
 // Height functions not ot yet implemented.
-func (box *Box) TotalHeight() dimen.Dimen {
-	panic("TODO")
-	// return box.BotR.Y + box.Padding[Bottom] + box.BorderWidth[Bottom] + box.Margins[Bottom] -
-	// 	box.TopL.Y - box.Padding[Top] - box.BorderWidth[Top] - box.Margins[Top]
+//
+// TODO
+func (box *Box) TotalHeight() css.DimenT {
+	return css.SomeDimen(100 * dimen.BP)
 }
 
-// SetWidth sets the width of a box. Depending on wether `box-sizing` is
-// set to `content-box` (default) or `border-box`, this box.W will then
-// reflect either the content box width or the border box width.
-func (box *Box) SetWidth(w css.DimenT) {
-	box.W = w
+func (box *Box) OuterBox() Rect {
+	return Rect{
+		TopL: box.TopL,
+		W:    box.TotalWidth(),
+		H:    box.TotalHeight(),
+	}
 }
 
 // ---------------------------------------------------------------------------

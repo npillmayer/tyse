@@ -10,7 +10,7 @@ import (
 )
 
 func OutlineParshape(pbox *boxtree.PrincipalBox, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
-	if pbox.Box == nil || !pbox.Box.Box.HasFixedWidth(false) {
+	if pbox.Box == nil || !pbox.CSSBox().HasFixedBorderBoxWidth(false) {
 		T().Errorf("outline parshape cannot be calculated for unfixed box")
 		panic("TODO")
 	}
@@ -140,15 +140,19 @@ func (b isoBox) String() string {
 // 	return iso
 // }
 
+// will return nullbox if dimensions of f are not fixed.
 func box2box(f *frame.Box) isoBox {
 	if !f.HasFixedBorderBoxWidth(true) {
 		return nullbox
 	}
 	w := f.TotalWidth()
+	if !w.IsAbsolute() {
+		return nullbox
+	}
 	b := isoBox{}
 	outer := f.OuterBox()
 	b.TopL = outer.TopL
-	b.BotR.X = outer.TopL.X + w
+	b.BotR.X = outer.TopL.X + w.Unwrap()
 	b.TopL.Y = outer.TopL.Y + 3*dimen.CM // TODO
 	return b
 }

@@ -15,6 +15,12 @@ import (
 
 // --- Line Boxes ------------------------------------------------------------
 
+// TypeLine and TypeParagraph are additional container types defined in this package.
+const (
+	TypeLine      boxtree.Type = boxtree.TypeAnonymous + 1
+	TypeParagraph boxtree.Type = TypeLine + 1
+)
+
 // LineBox is a type for CSS inline text boxes.
 type LineBox struct {
 	boxtree.Base
@@ -59,25 +65,30 @@ func (lbox *LineBox) CSSBox() *frame.Box {
 	return lbox.Box
 }
 
-// IsAnonymous will always return true for a line box.
-func (lbox *LineBox) IsAnonymous() bool {
-	return false
+// Type returns TypeLine
+func (pbox *LineBox) Type() boxtree.Type {
+	return TypeLine
 }
+
+// IsAnonymous will always return true for a line box.
+// func (lbox *LineBox) IsAnonymous() bool {
+// 	return false
+// }
 
 // IsText will always return false for a line box.
-func (lbox *LineBox) IsText() bool {
-	return false
-}
+// func (lbox *LineBox) IsText() bool {
+// 	return false
+// }
 
 // DisplayMode always returns inline.
-func (lbox *LineBox) DisplayMode() frame.DisplayMode {
-	return frame.InlineMode
-}
+// func (lbox *LineBox) DisplayMode() frame.DisplayMode {
+// 	return frame.InlineMode
+// }
 
 // ChildIndices returns 0, 0.
-func (lbox *LineBox) ChildIndices() (uint32, uint32) {
-	return 0, 0
-}
+// func (lbox *LineBox) ChildIndices() (uint32, uint32) {
+// 	return 0, 0
+// }
 
 func (lbox *LineBox) Context() boxtree.Context {
 	return nil

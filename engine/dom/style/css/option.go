@@ -144,6 +144,37 @@ func (o DimenT) IsAbsolute() bool {
 	return o.flags == dimenAbsolute
 }
 
+// TODO
+func (o DimenT) ScaleFromFont(font string) DimenT {
+	if o.IsRelative() {
+		switch o.UnitString() {
+		case "EM", "REM":
+			return SomeDimen(10 * dimen.PT)
+		case "EX":
+			return SomeDimen(5 * 10 * dimen.PT)
+		case "CH":
+			return SomeDimen(8 * 10 * dimen.PT)
+		}
+	}
+	return o
+}
+
+func (o DimenT) ScaleFromViewport(w, h dimen.Dimen) DimenT {
+	if o.IsRelative() {
+		switch o.UnitString() {
+		case "VW":
+			return SomeDimen(o.Unwrap() * w / 100)
+		case "VH":
+			return SomeDimen(o.Unwrap() * h / 100)
+		case "VMIN":
+			return SomeDimen(o.Unwrap() * dimen.Min(w, h) / 100)
+		case "VMAX":
+			return SomeDimen(o.Unwrap() * dimen.Max(w, h) / 100)
+		}
+	}
+	return o
+}
+
 // UnitString returns 'sp' (scaled points) for non-relative dimensions and a string
 // denoting the defined unit for relative dimensions.
 func (o DimenT) UnitString() string {
