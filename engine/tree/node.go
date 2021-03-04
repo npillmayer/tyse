@@ -120,22 +120,24 @@ func (node *Node) ChildCount() int {
 
 // Child is a concurrency-safe way to get a children-node of a node.
 func (node *Node) Child(n int) (*Node, bool) {
-	if node.children.length() <= n {
+	if n < 0 || node.children.length() <= n {
 		return nil, false
 	}
-	return node.children.child(n), true
+	ch := node.children.child(n)
+	return ch, ch != nil
 }
 
 // Children returns a slice with all children of a node.
-func (node *Node) Children() []*Node {
-	return node.children.asSlice()
+// If omitNilChildren is set, empty children aren't included in the slice
+func (node *Node) Children(omitNilChildren bool) []*Node {
+	return node.children.asSlice(omitNilChildren)
 }
 
 // IndexOfChild returns the index of a child within the list of children
-// of its parent.
+// of its parent. ch may not be nil.
 func (node *Node) IndexOfChild(ch *Node) int {
 	if node.ChildCount() > 0 {
-		children := node.Children()
+		children := node.Children(false)
 		for i, child := range children {
 			if ch == child {
 				return i
@@ -231,12 +233,14 @@ func (chs *childrenSlice) child(n int) *Node {
 	return chs.slice[n]
 }
 
-func (chs *childrenSlice) asSlice() []*Node {
+func (chs *childrenSlice) asSlice(omitNilCh bool) []*Node {
 	chs.RLock()
 	defer chs.RUnlock()
-	children := make([]*Node, chs.length())
-	for i, ch := range chs.slice {
-		children[i] = ch
+	children := make([]*Node, 0, chs.length())
+	for _, ch := range chs.slice {
+		if ch != nil || !omitNilCh {
+			children = append(children, ch)
+		}
 	}
 	return children
 }

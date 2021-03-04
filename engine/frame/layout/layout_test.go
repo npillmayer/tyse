@@ -10,7 +10,6 @@ import (
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"golang.org/x/net/html"
@@ -68,6 +67,7 @@ func TestBoxGeneration(t *testing.T) {
 	}
 }
 
+/*
 func TestReorderingSimple(t *testing.T) {
 	//viewport := &dimen.Rect{TopL: dimen.Origin, BotR: dimen.DINA4}
 	gtrace.EngineTracer = gologadapter.New()
@@ -90,6 +90,7 @@ func TestReorderingSimple(t *testing.T) {
 		}
 	}
 }
+*/
 
 // ----------------------------------------------------------------------
 

@@ -10,7 +10,6 @@ import (
 
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
-	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
 
@@ -61,25 +60,25 @@ func boxes(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, 
 		return
 	}
 	box(c, w, dict, gparams)
-	gtrace.EngineTracer.Infof("container = %v", c)
+	gtrace.EngineTracer.Debugf("container = %v", c)
 	n := c.TreeNode()
 	if n.ChildCount() >= 0 {
-		children := n.Children()
-		nn := n.ChildCount()
-		gtrace.EngineTracer.Errorf("container has %d/%d children ..............", len(children), nn)
+		//children := n.Children(true)
+		//nn := n.ChildCount()
+		//gtrace.EngineTracer.Errorf("container has %d/%d children ..............", len(children), nn)
 
 		//for i, ch := range children {
 		for i := 0; i < n.ChildCount(); i++ {
 			ch, ok := n.Child(i)
 			if !ok {
-				gtrace.EngineTracer.Errorf("Child at #%d could not be retrieved", i)
+				gtrace.EngineTracer.Debugf("Child at #%d could not be retrieved", i)
 			} else {
 				if ch == nil {
-					gtrace.EngineTracer.Errorf("Child at #%d is nil", i)
+					gtrace.EngineTracer.Debugf("Child at #%d is nil", i)
 				} else {
-					gtrace.EngineTracer.Errorf("Child is %v", ch)
+					//gtrace.EngineTracer.Errorf("Child is %v", ch)
 					child := ch.Payload.(boxtree.Container)
-					gtrace.EngineTracer.Infof("  child[%d] = %v", i, child)
+					gtrace.EngineTracer.Debugf("  child[%d] = %v", i, child)
 					boxes(child, w, dict, gparams)
 					edge(c, child, w, dict, gparams)
 				}
@@ -176,16 +175,12 @@ func PrincipalLabel(pbox *boxtree.PrincipalBox) string {
 		return "<empty box>"
 	}
 	name := pbox.DOMNode().NodeName()
+	//fmt.Printf("LABEL for PBOX %v\n", name)
 	innerSym := pbox.DisplayMode().Inner().Symbol()
+	//fmt.Printf("inner display mode = %+v\n", pbox.DisplayMode().Inner())
 	//outerSym := pbox.outerMode.Symbol()
 	outerSym := pbox.DisplayMode().Outer().Symbol()
-	if pbox.Context() != nil {
-		if pbox.Context().Type() == boxtree.BlockFormattingContext {
-			outerSym = frame.BlockMode.Symbol()
-		} else {
-			outerSym = frame.InlineMode.Symbol()
-		}
-	}
+	//fmt.Println("display modes OK")
 	return fmt.Sprintf("%s %s %s", outerSym, innerSym, name)
 }
 
@@ -238,18 +233,32 @@ const nouseboxTmpl = `{{ if .C.IsAnonymous }}
 const edgeTmpl = `{{ .N1.Name }} -> {{ .N2.Name }} [weight=1] ;
 `
 
-func styledBoxParams(p *boxtree.PrincipalBox, name string) *pbox {
-	if p.Box.Styles == nil {
-		return nil
+func styledBoxParams(p *boxtree.PrincipalBox, name string) (b *pbox) {
+	isFixed := false
+	if p.CSSBox().HasFixedBorderBoxWidth(true) {
+		isFixed = true
 	}
-	fmt.Printf("principal box for %v does have styles\n", p.DOMNode().NodeName())
-	sty := p.Box.Styles
-	b := &pbox{
-		C:     p,
-		N:     p.DOMNode(),
-		Name:  name,
-		Color: fmt.Sprintf("color=\"%s\"", style.ColorString(sty.Border.LineColor)),
-		Fill:  fmt.Sprintf("fillcolor=\"%s\"", style.ColorString(sty.Colors.Background)),
+	if p.Box.Styles == nil && isFixed {
+		return nil // we'll create a standard box
+	}
+	//fmt.Printf("principal box for %v does have styles\n", p.DOMNode().NodeName())
+	if p.Box.Styles == nil {
+		b = &pbox{
+			C:     p,
+			N:     p.DOMNode(),
+			Name:  name,
+			Color: "color=black",
+			Fill:  "fillcolor=lightblue3",
+		}
+	} else {
+		sty := p.Box.Styles
+		b = &pbox{
+			C:     p,
+			N:     p.DOMNode(),
+			Name:  name,
+			Color: fmt.Sprintf("color=\"%s\"", style.ColorString(sty.Border.LineColor)),
+			Fill:  fmt.Sprintf("fillcolor=\"%s\"", style.ColorString(sty.Colors.Background)),
+		}
 	}
 	if p.CSSBox().HasFixedBorderBoxWidth(true) {
 		b.Border = ""

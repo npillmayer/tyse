@@ -180,7 +180,7 @@ func (w *W3CNode) ChildNodes() w3cdom.NodeList {
 	}
 	tn, ok := NodeAsTreeNode(w)
 	if ok {
-		children := tn.Children()
+		children := tn.Children(true)
 		childnodes := make([]*W3CNode, len(children))
 		for i, ch := range children {
 			childnodes[i] = &W3CNode{styledtree.Node(ch)}
@@ -198,7 +198,7 @@ func (w *W3CNode) Children() w3cdom.NodeList {
 	}
 	tn, ok := NodeAsTreeNode(w)
 	if ok {
-		children := tn.Children()
+		children := tn.Children(true)
 		childnodes := make([]*W3CNode, len(children))
 		j := 0
 		for _, ch := range children {

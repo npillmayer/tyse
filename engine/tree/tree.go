@@ -340,18 +340,20 @@ func descendentsWith(node *Node, isBuffered bool, udata userdata, push func(*Nod
 func revisitChildrenOf(node *Node, serial uint32, pushBuf func(*Node, interface{}, uint32)) {
 	chcnt := node.ChildCount()
 	for position := 0; position < chcnt; position++ {
-		ch, _ := node.Child(position)
-		pp := parentAndPosition{node, position}
-		pushBuf(ch, pp, node.calcChildSerial(serial, ch, position))
+		if ch, ok := node.Child(position); ok {
+			pp := parentAndPosition{node, position}
+			pushBuf(ch, pp, node.calcChildSerial(serial, ch, position))
+		}
 	}
 }
 
-// TODO
+// TODO this is too simplistic
 func (node *Node) calcChildSerial(myserial uint32, ch *Node, position int) uint32 {
 	r := myserial - 1
 	for i := node.ChildCount() - 1; i > position; i-- {
-		child, _ := node.Child(i)
-		r -= child.Rank
+		if child, ok := node.Child(i); ok {
+			r -= child.Rank
+		}
 	}
 	return r
 }

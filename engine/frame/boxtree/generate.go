@@ -49,6 +49,9 @@ func BuildBoxTree(domRoot *dom.W3CNode) (Container, error) {
 		err = ErrNoBoxTreeCreated
 	} else {
 		err = attributeBoxes(boxRoot.(*PrincipalBox))
+		if err == nil {
+			err = reorderBoxTree(boxRoot.(*PrincipalBox))
+		}
 	}
 	return boxRoot, err
 }
@@ -71,12 +74,12 @@ func prepareBoxCreator(dict *domToBoxAssoc) tree.Action {
 				return nil, err
 			}
 		}
-		return makeBoxNode(domnode, parent, chpos, dom2box)
+		return createAndAttachBoxNode(domnode, parent, chpos, dom2box)
 	}
 	return action
 }
 
-func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *domToBoxAssoc) (
+func createAndAttachBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *domToBoxAssoc) (
 	*tree.Node, error) {
 	//
 	T().Infof("making box for %s", domnode.NodeName())
@@ -87,35 +90,31 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 	}
 	T().Infof("remembering %d/%s", domnode.NodeType(), domnode.NodeName())
 	dom2box.Put(domnode, box) // associate the styled tree node to this box
-	if !domnode.IsDocument() {
-		if parentNode := domnode.ParentNode(); parentNode != nil {
-			parent := parentNode.(*dom.W3CNode)
-			parentbox, found := dom2box.Get(parent)
-			if found {
-				T().Debugf("adding new box %s node to parent %s\n", box, parentbox)
-				p := parentbox.(*PrincipalBox)
-				var err error
-				switch b := box.(type) {
-				case *PrincipalBox:
-					//b.ChildInx = uint32(chpos)
-					err = p.AddChild(b, chpos)
-				case *TextBox:
-					//b.ChildInx = uint32(chpos)
-					err = p.AddTextChild(b, chpos)
-				default:
-					T().Errorf("Unknown box type for %v", box)
-				}
-				if err != nil {
-					T().Errorf(err.Error())
-				}
-				_, ok := p.Child(0)
-				if !ok {
-					T().Errorf("Parent has no child!")
-				}
+	if domnode.IsDocument() { // document root cannot be attached to anything
+		return box.TreeNode(), nil
+	}
+	if parentNode := domnode.ParentNode(); parentNode != nil {
+		parent := parentNode.(*dom.W3CNode)
+		parentbox, found := dom2box.Get(parent)
+		if found {
+			T().Debugf("adding new box [%s] to parent [%s]\n", boxname(box), boxname(parentbox))
+			p := parentbox.(*PrincipalBox)
+			var err error
+			switch b := box.(type) {
+			case *PrincipalBox:
+				err = p.AddChild(b, chpos)
+			case *TextBox:
+				err = p.AddTextChild(b, chpos)
+			default:
+				T().Errorf("Unknown box type for %v", box)
+				err = errDOMNodeNotSuitable
+			}
+			if err != nil {
+				T().Errorf(err.Error())
 			}
 		}
 	}
-	//possiblyCreateMiniHierarchy(box)
+	possiblyCreateMiniHierarchy(box)
 	return box.TreeNode(), nil
 }
 
@@ -132,6 +131,8 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) Container {
 	// document or element node
 	mode := frame.DisplayModeForDOMNode(domnode)
 	if mode == frame.NoMode || mode == frame.DisplayNone {
+		T().Debugf("removing node for %v with display=none", domnode.NodeName())
+		//panic(fmt.Sprintf("NO MODE for %v", domnode.NodeName()))
 		return nil // do not produce box for illegal mode or for display = "none"
 	}
 	pbox := NewPrincipalBox(domnode, mode)
@@ -141,13 +142,16 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) Container {
 	return pbox
 }
 
-func possiblyCreateMiniHierarchy(pbox *PrincipalBox) {
+func possiblyCreateMiniHierarchy(c Container) {
+	if c.Type() != TypePrincipal {
+		return
+	}
 	//htmlnode := pbox.DOMNode().HTMLNode()
 	//propertyMap := styler.ComputedStyles()
-	switch pbox.DOMNode().NodeName() {
+	switch c.DOMNode().NodeName() {
 	case "li":
 		//markertype, _ := style.GetCascadedProperty(c.DOMNode, "list-style-type", toStyler)
-		markertype := pbox.DOMNode().ComputedStyles().GetPropertyValue("list-style-type")
+		markertype := c.DOMNode().ComputedStyles().GetPropertyValue("list-style-type")
 		if markertype != "none" {
 			//markerbox := newContainer(BlockMode, FlowMode)
 			// TODO: fill box with correct marker symbol
@@ -159,21 +163,8 @@ func possiblyCreateMiniHierarchy(pbox *PrincipalBox) {
 
 // ---------------------------------------------------------------------------
 
-// TODO initialize box with style properties affection box layout:
-//    - padding
-//    - border
-//    - margin
-//    - width
-//    - height
-//    - box-sizing
-//
-// This is probably a separate run after the box tree is complete
-//
-// TODO initialize whitespace flags for TextBoxes
-// TODO initialize styling information for principal boxes
-//
-// width := css.DimenOption(c.DOMNode().ComputedStyles().GetPropertyValue("width"))
-
+// attributeBoxes attributes principal boxes with sizing information and styles
+// from CSS properties.
 func attributeBoxes(boxRoot *PrincipalBox) error {
 	if boxRoot == nil {
 		return nil
@@ -220,7 +211,6 @@ func setSizingInformationForPrincipalBox(c Container, view *view, font string) {
 	style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
 	// Padding
 	pt := css.DimenOption(style("padding-top"))
-	T().Debugf("padding-top = %v", pt)
 	c.CSSBox().Padding[frame.Top] = scale(pt, view, frame.Top, font)
 	pr := css.DimenOption(style("padding-right"))
 	c.CSSBox().Padding[frame.Right] = scale(pr, view, frame.Right, font)
@@ -333,6 +323,7 @@ func viewFromBoxRoot(root Container) *view {
 }
 
 func scale(d css.DimenT, view *view, dir int, font string) css.DimenT {
+	//T().Debugf("scaling dimen %+v", d)
 	if d.IsRelative() {
 		if d.UnitString() == "rem" {
 			d = d.ScaleFromFont(view.font)
@@ -348,4 +339,19 @@ func scale(d css.DimenT, view *view, dir int, font string) css.DimenT {
 		// }
 	}
 	return d
+}
+
+func boxname(c Container) string {
+	if c == nil {
+		return "none"
+	}
+	switch c.Type() {
+	case TypePrincipal:
+		return c.DOMNode().NodeName()
+	case TypeAnonymous:
+		return "anonymous"
+	case TypeText:
+		return "#CData"
+	}
+	return "container"
 }

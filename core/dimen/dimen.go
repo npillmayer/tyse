@@ -55,6 +55,7 @@ const (
 	Zero Dimen = 0
 	SP   Dimen = 1       // scaled point = BP / 65536
 	BP   Dimen = 65536   // big point (PDF) = 1/72 inch
+	PX   Dimen = 65536   // "pixels"
 	PT   Dimen = 65291   // printers point 1/72.27 inch
 	MM   Dimen = 185771  // millimeters
 	CM   Dimen = 1857710 // centimeters

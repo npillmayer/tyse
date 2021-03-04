@@ -129,12 +129,16 @@ func ParseDisplay(display string) (DisplayMode, error) {
 		return NoMode, nil
 	}
 	switch display {
+	case "none":
+		return DisplayNone, nil
 	case "block":
-		return BlockMode, nil
+		return BlockMode | InnerBlockMode, nil
 	case "inline":
-		return InlineMode, nil
+		return InlineMode | InnerInlineMode, nil
 	case "list-item":
 		return ListItemMode | BlockMode, nil
+	case "block-inline":
+		return BlockMode | InnerInlineMode, nil
 	case "inline-block":
 		return InlineMode | InnerBlockMode, nil
 	case "table":

@@ -205,6 +205,7 @@ A new block formatting context is created by:
 
 */
 func CreateContextForContainer(c Container, mustRoot bool) Context {
+	T().Debugf("context for %+v", c.DOMNode().NodeName())
 	mode := frame.DisplayModeForDOMNode(c.DOMNode()).BlockOrInline()
 	// An inline box is one that is both inline-level and whose contents participate
 	// in its containing inline formatting context. A non-replaced element with a
@@ -233,8 +234,10 @@ func CreateContextForContainer(c Container, mustRoot bool) Context {
 		block = true
 	} // TODO and other rules
 	if c.TreeNode().ChildCount() > 0 {
+		T().Debugf("context: checking %d children", c.TreeNode().ChildCount())
 		var modes frame.DisplayMode
-		children := c.TreeNode().Children()
+		children := c.TreeNode().Children(true)
+		T().Debugf("context: children = %+v", children)
 		for _, ch := range children {
 			if childContainer, ok := ch.Payload.(Container); ok {
 				modes |= childContainer.DisplayMode().BlockOrInline()
@@ -246,6 +249,7 @@ func CreateContextForContainer(c Container, mustRoot bool) Context {
 			mode = frame.InlineMode
 		}
 	}
+	T().Debugf("context: mode = %v", mode)
 	if mode == frame.InlineMode {
 		return NewInlineContext(c, block || mustRoot)
 	}

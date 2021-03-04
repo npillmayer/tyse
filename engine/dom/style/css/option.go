@@ -76,7 +76,7 @@ func SomeDimen(x dimen.Dimen) DimenT {
 
 // Dimen creates an optional dimen without an initial value.
 func Dimen() DimenT {
-	return DimenT{d: 0, flags: dimenNone}
+	return DimenT{d: 0}
 }
 
 // Match is part of interface option.Type.
@@ -246,6 +246,7 @@ func DimenOption(p style.Property) DimenT {
 	}
 	d, err := ParseDimen(string(p))
 	if err != nil {
+		T().Errorf("dimension option from property '%s': %v", p, err)
 		return Dimen()
 	}
 	return d
@@ -261,15 +262,24 @@ var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[a-zA-Z]{2,4})?$`)
 //     -33rem
 //
 func ParseDimen(s string) (DimenT, error) {
+	//T().Debugf("PARSE DIMEN STRING = '%s'", s)
 	if s == "" || s == "none" {
 		return Dimen(), nil
+	}
+	switch s {
+	case "thin":
+		return SomeDimen(dimen.PX / 2), nil
+	case "medium":
+		return SomeDimen(dimen.PX), nil
+	case "thick":
+		return SomeDimen(dimen.PX * 2), nil
 	}
 	d := dimenPattern.FindStringSubmatch(s)
 	if len(d) < 2 {
 		return Dimen(), errors.New("format error parsing dimension")
 	}
 	scale := dimen.SP
-	dim := DimenT{}
+	dim := SomeDimen(0)
 	if len(d) > 2 {
 		switch d[2] {
 		case "pt", "PT":
@@ -287,6 +297,7 @@ func ParseDimen(s string) (DimenT, error) {
 		default:
 			u := strings.ToLower(d[2])
 			if unit, ok := relUnitStringMap[u]; ok {
+				dim = Dimen()
 				dim.flags = unit
 			} else {
 				return Dimen(), errors.New("format error parsing dimension")
@@ -332,12 +343,14 @@ type Position uint16
 
 // Enum values for type Position
 const (
-	PositionUnknown  Position = iota
-	PositionStatic            // CSS static (default)
-	PositionRelative          // CSS relative
-	PositionAbsolute          // CSS absolute
-	PositionFixed             // CSS fixed
-	PositionSticky            // CSS sticky, currently mapped to relative
+	PositionUnknown    Position = iota
+	PositionStatic              // CSS static (default)
+	PositionRelative            // CSS relative
+	PositionAbsolute            // CSS absolute
+	PositionFixed               // CSS fixed
+	PositionSticky              // CSS sticky, currently mapped to relative
+	PositionFloatLeft           // CSS float property
+	PositionFloatRight          // CSS float property
 )
 
 // PositionT is an option type for CSS positions.
@@ -358,7 +371,7 @@ func (o PositionT) Match(choices interface{}) (value interface{}, err error) {
 
 // Equals is part of interface option.Type.
 func (o PositionT) Equals(other interface{}) bool {
-	T().Debugf("Position EQUALS %v ? %v", o, other)
+	//T().Debugf("Position EQUALS %v ? %v", o, other)
 	switch p := other.(type) {
 	case Position:
 		return o.Unwrap() == p
@@ -391,11 +404,13 @@ func (o PositionT) String() string {
 }
 
 var positionMap map[Position]string = map[Position]string{
-	PositionStatic:   "static",
-	PositionRelative: "relative",
-	PositionAbsolute: "absolute",
-	PositionFixed:    "fixed",
-	PositionSticky:   "sticky",
+	PositionStatic:     "static",
+	PositionRelative:   "relative",
+	PositionAbsolute:   "absolute",
+	PositionFixed:      "fixed",
+	PositionSticky:     "sticky",
+	PositionFloatLeft:  "float",
+	PositionFloatRight: "float",
 }
 
 var positionStringMap map[string]Position = map[string]Position{
@@ -404,6 +419,7 @@ var positionStringMap map[string]Position = map[string]Position{
 	"absolute": PositionAbsolute,
 	"fixed":    PositionFixed,
 	"sticky":   PositionSticky,
+	"float":    PositionFloatLeft,
 }
 
 // ParsePosition parses a string and returns an option-type for positions.
@@ -424,7 +440,15 @@ func ParsePosition(s string) PositionT {
 //
 func PositionOption(styler style.Styler) PositionT {
 	pos := GetLocalProperty(styler.Styles(), "position")
+	float := GetLocalProperty(styler.Styles(), "float")
 	if pos == style.NullStyle {
+		if float != style.NullStyle {
+			if float == "left" {
+				return SomePosition(PositionFloatLeft)
+			} else if float == "right" {
+				return SomePosition(PositionFloatRight)
+			} // TODO bidi variants
+		}
 		return PositionT{}
 	}
 	p := ParsePosition(string(pos))

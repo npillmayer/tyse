@@ -145,7 +145,7 @@ func collectBoxText(c boxtree.Container, b *styled.TextBuilder, irs *infoIRS,
 		T().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())
 	}
 	if c.TreeNode().ChildCount() > 0 {
-		children := c.TreeNode().Children()
+		children := c.TreeNode().Children(true)
 		for _, ch := range children {
 			if childContainer, ok := ch.Payload.(boxtree.Container); ok {
 				collectBoxText(childContainer, b, irs, blocks)

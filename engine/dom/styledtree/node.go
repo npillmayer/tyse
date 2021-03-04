@@ -98,9 +98,6 @@ func (sn *StyNode) HTMLNode() *html.Node {
 // StylesCascade gets the upwards to the enclosing style set.
 func (sn *StyNode) StylesCascade() style.Styler {
 	enclosingStyles := Node(sn.Parent())
-	if enclosingStyles == nil {
-		T().Errorf("styled tree: enclosing style set is null! user-agent styles unset?")
-	}
 	return enclosingStyles.AsStyler()
 }
 

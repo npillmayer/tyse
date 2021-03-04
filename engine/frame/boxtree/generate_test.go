@@ -60,6 +60,9 @@ func buildDOM(t *testing.T, drawit bool) *dom.W3CNode {
 }
 
 func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
+	tl := gtrace.EngineTracer.GetTraceLevel()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
+	//
 	tmpfile, err := ioutil.TempFile(".", "dom.*.dot")
 	if err != nil {
 		log.Fatal(err)
@@ -76,6 +79,7 @@ func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
 		t.Fatal(err.Error())
 	}
 	fmt.Printf("done with dom.svg\n")
+	gtrace.EngineTracer.SetTraceLevel(tl)
 	return tmpfile
 }
 
@@ -94,6 +98,9 @@ func checkBoxTree(boxes boxtree.Container, err error, t *testing.T) {
 }
 
 func dottyBoxTree(root boxtree.Container, t *testing.T) *os.File {
+	tl := gtrace.EngineTracer.GetTraceLevel()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
+	//
 	tmpfile, err := ioutil.TempFile(".", "boxtree.*.dot")
 	if err != nil {
 		log.Fatal(err)
@@ -110,5 +117,6 @@ func dottyBoxTree(root boxtree.Container, t *testing.T) *os.File {
 		t.Error(err.Error())
 	}
 	fmt.Printf("done with boxtree.svg\n")
+	gtrace.EngineTracer.SetTraceLevel(tl)
 	return tmpfile
 }

@@ -89,8 +89,12 @@ func DisplayPropertyForHTMLNode(node *html.Node) Property {
 		return "none"
 	}
 	switch node.Data {
+	case "head":
+		return "none"
+	case "p":
+		return "block-inline"
 	case "html", "aside", "body", "div", "h1", "h2", "h3",
-		"h4", "h5", "h6", "it", "ol", "p", "section",
+		"h4", "h5", "h6", "it", "ol", "section",
 		"ul":
 		return "block"
 	case "i", "b", "span", "strong":
