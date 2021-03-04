@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/dom/style/cssom"
 	"github.com/npillmayer/tyse/engine/dom/style/cssom/douceuradapter"
 	"github.com/npillmayer/tyse/engine/dom/styledtree"
@@ -345,8 +346,13 @@ func (cstyles *computedStyles) GetPropertyValue(key string) style.Property {
 	if cstyles == nil {
 		return style.NullStyle
 	}
-	node := &cstyles.domnode.Node
-	return cstyles.propsMap.GetPropertyValue(key, node, styler)
+	p, err := css.GetProperty(cstyles.domnode.AsStyler(), key)
+	if err != nil {
+		T().Errorf("W3C node styles: %v", err)
+		node := &cstyles.domnode.Node
+		return cstyles.propsMap.GetPropertyValue(key, node, styler)
+	}
+	return p
 }
 
 // --- Attributes -----------------------------------------------------------------

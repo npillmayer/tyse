@@ -99,8 +99,6 @@ type PrincipalBox struct {
 func NewPrincipalBox(domnode *dom.W3CNode, mode frame.DisplayMode) *PrincipalBox {
 	pbox := &PrincipalBox{
 		domNode: domnode,
-		//outerMode: outerMode,
-		//innerMode: innerMode,
 	}
 	pbox.displayMode = mode
 	pbox.Box = &frame.StyledBox{}
@@ -419,8 +417,8 @@ func (anon *AnonymousBox) CSSBox() *frame.Box {
 // }
 
 // Type returns TypeText
-func (pbox *TextBox) Type() Type {
-	return TypePrincipal
+func (anon *AnonymousBox) Type() Type {
+	return TypeAnonymous
 }
 
 // func (anon *AnonymousBox) String() string {
@@ -486,8 +484,8 @@ func (tbox *TextBox) CSSBox() *frame.Box {
 }
 
 // Type returns TypeAnonymous
-func (pbox *AnonymousBox) Type() Type {
-	return TypeAnonymous
+func (tbox *TextBox) Type() Type {
+	return TypeText
 }
 
 // TreeNode returns the underlying tree node for a box.

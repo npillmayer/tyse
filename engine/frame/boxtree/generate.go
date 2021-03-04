@@ -1,4 +1,4 @@
-package layout
+package boxtree
 
 // This module should have knowledge about:
 // - which mini-hierarchy of boxes to create for each HTML element
@@ -11,18 +11,18 @@ import (
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
-	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
 
-var errDOMRootIsNull = errors.New("DOM root is null")
+var ErrDOMRootIsNull = errors.New("DOM root is null")
 var errDOMNodeNotSuitable = errors.New("DOM node is not suited for layout")
+var ErrNoBoxTreeCreated = errors.New("no box tree created")
 
 // BuildBoxTree creates a render box tree from a styled tree.
-func BuildBoxTree(domRoot *dom.W3CNode) (boxtree.Container, error) {
+func BuildBoxTree(domRoot *dom.W3CNode) (Container, error) {
 	if domRoot == nil {
-		return nil, errDOMRootIsNull
+		return nil, ErrDOMRootIsNull
 	}
 	domWalker := domRoot.Walk()
 	T().Debugf("Creating box tree")
@@ -44,17 +44,20 @@ func BuildBoxTree(domRoot *dom.W3CNode) (boxtree.Container, error) {
 	//T().Errorf("domRoot/2 = %s", dbgNodeString(domRoot))
 	boxRoot, ok := dom2box.Get(domRoot)
 	//T().Errorf("box for domRoot = %v", boxRoot)
-	if !ok {
+	if !ok || boxRoot.Type() != TypePrincipal {
 		T().Errorf("No box created for root style node")
+		err = ErrNoBoxTreeCreated
+	} else {
+		err = attributeBoxes(boxRoot.(*PrincipalBox))
 	}
-	return boxRoot, nil
+	return boxRoot, err
 }
 
 // prepareBocCreator is an action function for concurrent tree-traversal.
 func prepareBoxCreator(dict *domToBoxAssoc) tree.Action {
 	dom2box := dict
+	T().Infof("generate ACTION box creator ========================================")
 	action := func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
-		T().Infof("generate ACTION box creator")
 		domnode, err := dom.NodeFromTreeNode(node)
 		if err != nil {
 			T().Errorf("action 1: %s", err.Error())
@@ -90,13 +93,13 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 			parentbox, found := dom2box.Get(parent)
 			if found {
 				T().Debugf("adding new box %s node to parent %s\n", box, parentbox)
-				p := parentbox.(*boxtree.PrincipalBox)
+				p := parentbox.(*PrincipalBox)
 				var err error
 				switch b := box.(type) {
-				case *boxtree.PrincipalBox:
+				case *PrincipalBox:
 					//b.ChildInx = uint32(chpos)
 					err = p.AddChild(b, chpos)
-				case *boxtree.TextBox:
+				case *TextBox:
 					//b.ChildInx = uint32(chpos)
 					err = p.AddTextChild(b, chpos)
 				default:
@@ -119,9 +122,9 @@ func makeBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *
 // ----------------------------------------------------------------------
 
 // NewBoxForDOMNode creates an adequately initialized box for a given DOM node.
-func NewBoxForDOMNode(domnode *dom.W3CNode) boxtree.Container {
+func NewBoxForDOMNode(domnode *dom.W3CNode) Container {
 	if domnode.NodeType() == html.TextNode {
-		tbox := boxtree.NewTextBox(domnode)
+		tbox := NewTextBox(domnode)
 		// TODO find index within parent
 		// and set #ChildInx
 		return tbox
@@ -131,14 +134,14 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) boxtree.Container {
 	if mode == frame.NoMode || mode == frame.DisplayNone {
 		return nil // do not produce box for illegal mode or for display = "none"
 	}
-	pbox := boxtree.NewPrincipalBox(domnode, mode)
+	pbox := NewPrincipalBox(domnode, mode)
 	//pbox.PrepareAnonymousBoxes()
 	// TODO find index within parent
 	// and set #ChildInx
 	return pbox
 }
 
-func possiblyCreateMiniHierarchy(pbox *boxtree.PrincipalBox) {
+func possiblyCreateMiniHierarchy(pbox *PrincipalBox) {
 	//htmlnode := pbox.DOMNode().HTMLNode()
 	//propertyMap := styler.ComputedStyles()
 	switch pbox.DOMNode().NodeName() {
@@ -171,7 +174,7 @@ func possiblyCreateMiniHierarchy(pbox *boxtree.PrincipalBox) {
 //
 // width := css.DimenOption(c.DOMNode().ComputedStyles().GetPropertyValue("width"))
 
-func attributeBoxes(boxRoot *boxtree.PrincipalBox) error {
+func attributeBoxes(boxRoot *PrincipalBox) error {
 	if boxRoot == nil {
 		return nil
 	}
@@ -182,18 +185,17 @@ func attributeBoxes(boxRoot *boxtree.PrincipalBox) error {
 }
 
 // Tree action: attribute each box from CSS styles.
-func makeAttributesAction(root boxtree.Container) tree.Action {
-	T().Infof("generate ACTION attributer")
+func makeAttributesAction(root Container) tree.Action {
+	T().Infof("generate ACTION attributer ==============================================")
 	view := viewFromBoxRoot(root)
 	//return func attributeFromCSS(node *tree.Node, unused *tree.Node, chpos int) (match *tree.Node, err error) {
 	return func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
-		c := node.Payload.(boxtree.Container)
+		c := node.Payload.(Container)
 		if c == nil {
 			return nil, nil
 		}
-		parent := parentNode.Payload.(boxtree.Container)
 		style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
-		if c.Type() == boxtree.TypePrincipal {
+		if c.Type() == TypePrincipal {
 			T().Debugf("attributing container %+v", c.DOMNode().NodeName())
 			//
 			// TODO font handling
@@ -205,18 +207,20 @@ func makeAttributesAction(root boxtree.Container) tree.Action {
 			setVisualStylesForPrincipalBox(c)
 			//pos := css.PositionOption(c.DOMNode()) // later during re-ordering
 			//
-		} else if c.Type() == boxtree.TypeText {
+		} else if c.Type() == TypeText {
+			parent := parentNode.Payload.(Container)
 			setWhitespaceProperties(c, parent)
 		}
 		return node, nil
 	}
 }
 
-func setSizingInformationForPrincipalBox(c boxtree.Container, view *view, font string) {
+func setSizingInformationForPrincipalBox(c Container, view *view, font string) {
 	//
 	style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
 	// Padding
 	pt := css.DimenOption(style("padding-top"))
+	T().Debugf("padding-top = %v", pt)
 	c.CSSBox().Padding[frame.Top] = scale(pt, view, frame.Top, font)
 	pr := css.DimenOption(style("padding-right"))
 	c.CSSBox().Padding[frame.Right] = scale(pr, view, frame.Right, font)
@@ -254,11 +258,11 @@ func setSizingInformationForPrincipalBox(c boxtree.Container, view *view, font s
 	// TODO min-/max-w + h
 }
 
-func setVisualStylesForPrincipalBox(c boxtree.Container) {
-	if c == nil || c.Type() != boxtree.TypePrincipal {
+func setVisualStylesForPrincipalBox(c Container) {
+	if c == nil || c.Type() != TypePrincipal {
 		return // other container types cannot be styled
 	}
-	pbox := c.(*boxtree.PrincipalBox).Box                  // box with styles
+	pbox := c.(*PrincipalBox).Box                          // box with styles
 	style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
 	fgcolor := style("color").Color()
 	bgcolor := style("background-color").Color()
@@ -268,6 +272,15 @@ func setVisualStylesForPrincipalBox(c boxtree.Container) {
 	}
 	if bcolor != nil || fgcolor != nil || bgcolor != nil {
 		if pbox.Styles == nil {
+			// T().Debugf("bcolor = %v", bcolor)
+			// T().Debugf("fgcolor = %v", fgcolor)
+			// T().Debugf("bgcolor = %v", bgcolor)
+			// if bcolor == nil {
+			// 	panic("CREATING STYLES")
+			// }
+			// if bcolor == color.Black {
+			// 	panic("BLACK BORDER")
+			// }
 			pbox.Styles = &frame.Styling{}
 		}
 		pbox.Styles.Border.LineColor = bcolor
@@ -285,9 +298,9 @@ func setVisualStylesForPrincipalBox(c boxtree.Container) {
     pre-line      Preserve     Collapse            Wrap              Remove
     break-spaces  Preserve     Preserve            Wrap              Wrap
 */
-func setWhitespaceProperties(c, parent boxtree.Container) {
-	if c != nil && parent != nil && c.Type() == boxtree.TypeText {
-		t := c.(*boxtree.TextBox)
+func setWhitespaceProperties(c, parent Container) {
+	if c != nil && parent != nil && c.Type() == TypeText {
+		t := c.(*TextBox)
 		ws := parent.DOMNode().ComputedStyles().GetPropertyValue("white-space")
 		switch ws {
 		case "nowrap":
@@ -312,7 +325,7 @@ type view struct {
 	size dimen.Point
 }
 
-func viewFromBoxRoot(root boxtree.Container) *view {
+func viewFromBoxRoot(root Container) *view {
 	return &view{
 		font: "view font",
 		size: dimen.DINA4,

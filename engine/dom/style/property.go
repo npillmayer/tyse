@@ -199,11 +199,14 @@ func (pg *PropertyGroup) ForkOnProperty(key string, p Property, cascade bool) (*
 	return npg, true
 }
 
-// Cascade finds the ancesiting PropertyGroup containing the given property-key.
+// Cascade finds the ancesting PropertyGroup containing the given property-key.
 func (pg *PropertyGroup) Cascade(key string) *PropertyGroup {
 	it := pg
 	for it != nil && !it.IsSet(key) { // stopper is default partial
 		it = it.Parent
+	}
+	if it == nil {
+		panic(fmt.Sprintf("styling: no property group %s found with key '%s'", pg.name, key))
 	}
 	return it
 }
@@ -230,6 +233,8 @@ const (
 	PGDimension = "Dimension"
 	PGDisplay   = "Display"
 	PGRegion    = "Region"
+	PGColor     = "Color"
+	PGText      = "Text"
 	PGX         = "X"
 )
 
@@ -270,9 +275,17 @@ var groupNameFromPropertyKey = map[string]string{
 	"position":                   PGDisplay,
 	"flow-into":                  PGRegion,
 	"flow-from":                  PGRegion,
+	"color":                      PGColor,
+	"background-color":           PGColor,
+	"direction":                  PGText,
+	"white-space":                PGText,
+	"word-spacing":               PGText,
+	"letter-spacing":             PGText,
+	"word-break":                 PGText,
+	"word-wrap":                  PGText,
 }
 
-// isCascading returns wether the standard behaviour for a propery is to be
+// IsCascading returns wether the standard behaviour for a propery is to be
 // inherited or not, i.e., a call to retrieve its value will cascade.
 func IsCascading(key string) bool {
 	if strings.HasPrefix(key, "list-style") {
@@ -428,6 +441,8 @@ func (pmap *PropertyMap) GetPropertyValue(key string, node *tree.Node, styler In
 	// not found in local dicts => cascade, if allowed
 	if p == "inherit" || IsCascading(key) {
 		groupname := GroupNameFromPropertyKey(key)
+		T().P("key", key).Debugf("styling: cascading for key %s", key)
+		T().P("key", key).Debugf("styling: cascading with property group %s", groupname)
 		var group *PropertyGroup
 		//func (pg *PropertyGroup) Cascade(key string) *PropertyGroup {
 		for node != nil && group == nil {
@@ -485,171 +500,6 @@ func (pmap *PropertyMap) Add(key string, value Property) {
 		pmap.m[groupname] = group
 	}
 	group.Set(key, value)
-}
-
-// InitializeDefaultPropertyValues creates an internal data structure to
-// hold all the default values for CSS properties.
-// In real-world browsers these are the user-agent CSS values.
-func InitializeDefaultPropertyValues(additionalProps []KeyValue) *PropertyMap {
-	m := make(map[string]*PropertyGroup, 15)
-	root := NewPropertyGroup("Root")
-
-	x := NewPropertyGroup(PGX) // special group for extension properties
-	for _, kv := range additionalProps {
-		x.Set(kv.Key, kv.Value)
-	}
-	m[PGX] = x
-
-	margins := NewPropertyGroup(PGMargins)
-	margins.Set("margin-top", "0")
-	margins.Set("margin-left", "0")
-	margins.Set("margin-right", "0")
-	margins.Set("margin-bottom", "0")
-	margins.Parent = root
-	m[PGMargins] = margins
-
-	padding := NewPropertyGroup(PGPadding)
-	padding.Set("padding-top", "0")
-	padding.Set("padding-left", "0")
-	padding.Set("padding-right", "0")
-	padding.Set("padding-bottom", "0")
-	padding.Parent = root
-	m[PGPadding] = padding
-
-	border := NewPropertyGroup(PGBorder)
-	border.Set("border-top-color", "black")
-	border.Set("border-left-color", "black")
-	border.Set("border-right-color", "black")
-	border.Set("border-bottom-color", "black")
-	border.Set("border-top-width", "medium")
-	border.Set("border-left-width", "medium")
-	border.Set("border-right-width", "medium")
-	border.Set("border-bottom-width", "medium")
-	border.Set("border-top-style", "solid")
-	border.Set("border-left-style", "solid")
-	border.Set("border-right-style", "solid")
-	border.Set("border-bottom-style", "solid")
-	border.Set("border-top-left-radius", "0")
-	border.Set("border-top-right-radius", "0")
-	border.Set("border-bottom-left-radius", "0")
-	border.Set("border-bottom-right-radius", "0")
-	border.Parent = root
-	m[PGBorder] = border
-
-	dimension := NewPropertyGroup(PGDimension)
-	dimension.Set("width", "10%")
-	dimension.Set("width", "100pt")
-	dimension.Set("min-width", "0")
-	dimension.Set("min-height", "0")
-	dimension.Set("max-width", "10000pt")
-	dimension.Set("max-height", "10000pt")
-	dimension.Parent = root
-	m[PGDimension] = dimension
-
-	region := NewPropertyGroup(PGRegion)
-	region.Set("flow-from", "")
-	region.Set("flow-into", "")
-	m[PGRegion] = region
-
-	display := NewPropertyGroup(PGDisplay)
-	display.Set("display", "block")
-	display.Set("float", "none")
-	display.Set("visibility", "visible")
-	display.Set("position", "static")
-	m[PGDisplay] = display
-
-	/*
-	   type DisplayStyle struct {
-	   	Display    uint8 // https://www.tutorialrepublic.com/css-reference/css-display-property.php
-	   	Top        dimen.Dimen
-	   	Left       dimen.Dimen
-	   	Right      dimen.Dimen
-	   	Bottom     dimen.Dimen
-	   	ZIndex     int
-	   	Overflow   uint8
-	   	OverflowX  uint8
-	   	OverflowY  uint8
-	   	Clip       string // geometric shape
-	   }
-
-	   type ColorModel string
-
-	   type Color struct {
-	   	Color   color.Color
-	   	Model   ColorModel
-	   	Opacity uint8
-	   }
-
-	   type Background struct {
-	   	Color color.Color
-	   	//Position TODO
-	   	Image  image.Image
-	   	Origin dimen.Point
-	   	Size   dimen.Point
-	   	Clip   uint8
-	   }
-
-	   type Font struct {
-	   	Family     string
-	   	Style      string
-	   	Variant    uint16
-	   	Stretch    uint8
-	   	Size       dimen.Dimen
-	   	SizeAdjust dimen.Dimen
-	   }
-
-	   type TextProperties struct {
-	   	Direction          uint8
-	   	WordSpacing        uint8
-	   	LetterSpacing      uint8
-	   	VerticalAlignment  uint8
-	   	TextAlignment      uint8 // + TextJustify
-	   	TextAlignLast      uint8
-	   	TextIndentation    dimen.Dimen // first line
-	   	TabSize            dimen.Dimen
-	   	LineHeight         uint8
-	   	TextDecoration     uint8
-	   	TextTransformation uint8
-	   	WordWrap           uint8
-	   	WordBreak          uint8
-	   	Whitespace         uint8
-	   	TextOverflow       uint8
-	   }
-
-
-	   type GeneratedContent struct {
-	   	Content          string
-	   	Quotes           string
-	   	CounterReset     uint8
-	   	CounterIncrement uint8
-	   }
-
-	   type Print struct {
-	   	PageBreakAfter  uint8
-	   	PageBreakBefore uint8
-	   	PageBreakInside uint8
-	   }
-
-	   type Outline struct {
-	   	Color  color.Color
-	   	Offset dimen.Dimen
-	   	Style  uint8
-	   	Width  dimen.Dimen
-	   }
-
-	   //list-style-type:
-	   //	disc | circle | square | decimal | decimal-leading-zero | lower-roman |
-	   //  upper-roman | lower-greek | lower-latin | upper-latin | armenian |
-	   //  georgian | lower-alpha | upper-alpha | none | initial | inherit
-	   type List struct {
-	   	StyleImage    image.Image
-	   	StylePosition uint8 // inside, outside
-	   	StyleType     uint8
-	   }
-
-	*/
-
-	return &PropertyMap{m}
 }
 
 // --------------------------------------------------------------------------

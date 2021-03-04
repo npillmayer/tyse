@@ -1,4 +1,4 @@
-package layout
+package boxtree_test
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ func TestCSSAttributing(t *testing.T) {
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	domroot := buildDOM(t, false)
-	boxes, err := BuildBoxTree(domroot)
+	boxes, err := boxtree.BuildBoxTree(domroot)
 	checkBoxTree(boxes, err, t)
 	dottyBoxTree(boxes, t)
 }

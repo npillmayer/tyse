@@ -251,7 +251,7 @@ func DimenOption(p style.Property) DimenT {
 	return d
 }
 
-var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[A-Z]{2,4})?$`)
+var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[a-zA-Z]{2,4})?$`)
 
 // ParseDimen parses a string to return an optional dimension. Syntax is CSS Unit.
 // Valid dimensions are
@@ -261,6 +261,9 @@ var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[A-Z]{2,4})?$`)
 //     -33rem
 //
 func ParseDimen(s string) (DimenT, error) {
+	if s == "" || s == "none" {
+		return Dimen(), nil
+	}
 	d := dimenPattern.FindStringSubmatch(s)
 	if len(d) < 2 {
 		return Dimen(), errors.New("format error parsing dimension")

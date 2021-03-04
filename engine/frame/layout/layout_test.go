@@ -7,7 +7,6 @@ import (
 
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/framedebug"
-	"github.com/npillmayer/tyse/engine/frame/layout"
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
@@ -51,7 +50,7 @@ func TestBoxGeneration(t *testing.T) {
 	defer teardown()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelInfo)
 	domroot := buildDOM(t)
-	boxes, err := layout.BuildBoxTree(domroot)
+	boxes, err := boxtree.BuildBoxTree(domroot)
 	if err != nil {
 		t.Errorf(err.Error())
 	} else if boxes == nil {
@@ -74,7 +73,7 @@ func TestReorderingSimple(t *testing.T) {
 	gtrace.EngineTracer = gologadapter.New()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
 	domroot := buildDOM(t)
-	boxes, err := layout.BuildBoxTree(domroot)
+	boxes, err := boxtree.BuildBoxTree(domroot)
 	if err != nil {
 		t.Errorf(err.Error())
 	} else {
@@ -82,7 +81,7 @@ func TestReorderingSimple(t *testing.T) {
 		gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 		gtrace.EngineTracer.Debugf("=== Reordering Boxes =========================")
 		renderRoot := boxtree.TreeNodeAsPrincipalBox(boxes.TreeNode())
-		if err = layout.ReorderBoxTree(renderRoot); err != nil {
+		if err = boxtree.ReorderBoxTree(renderRoot); err != nil {
 			t.Errorf(err.Error())
 		} else if graphviz {
 			gvz, _ := ioutil.TempFile(".", "reorder-*.dot")

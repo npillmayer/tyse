@@ -48,11 +48,12 @@ func GetProperty(node style.Styler, key string) (style.Property, error) {
 	if style.IsCascading(key) {
 		return GetCascadedProperty(node, key)
 	}
-	T().Debugf("css get property: %s is not inherited", key)
+	//T().Debugf("css get property: %s is not inherited", key)
 	p := GetLocalProperty(node.Styles(), key)
 	if p == style.NullStyle {
-		p = style.GetDefaultProperty(node, key)
+		p = style.GetUserAgentDefaultProperty(node, key)
 	}
+	//T().Debugf("css get property: local property value = %+v", p)
 	return p, nil
 }
 

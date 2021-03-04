@@ -8,6 +8,7 @@ import (
 
 	"github.com/npillmayer/schuko/gtrace"
 
+	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
 	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
@@ -18,6 +19,7 @@ type graphParamsType struct {
 	Fontname    string
 	StyleGroups []string
 	BoxTmpl     *template.Template
+	PBoxTmpl    *template.Template
 	EdgeTmpl    *template.Template
 }
 
@@ -35,6 +37,12 @@ func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer) {
 			"istext":      isTextBox,
 			"label":       label,
 		}).Parse(boxTmpl)
+	gparams.PBoxTmpl, _ = template.New("pbox").Funcs(
+		template.FuncMap{
+			"shortstring": shortText,
+			"istext":      isTextBox,
+			"label":       label,
+		}).Parse(pboxTmpl)
 	gparams.EdgeTmpl = template.Must(template.New("boxedge").Parse(edgeTmpl))
 	err = header.Execute(w, gparams)
 	if err != nil {
@@ -87,16 +95,35 @@ func box(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, gp
 		name = fmt.Sprintf("node%05d", sz)
 		dict[c] = name
 	}
-	if err := gparams.BoxTmpl.Execute(w, &cbox{c, c.DOMNode(), name}); err != nil {
-		panic(err)
+	if p, ok := c.(*boxtree.PrincipalBox); ok {
+		if b := styledBoxParams(p, name); b != nil {
+			if err := gparams.PBoxTmpl.Execute(w, b); err != nil {
+				panic(err)
+			}
+		} else if err := gparams.BoxTmpl.Execute(w, &cbox{c, c.DOMNode(), name}); err != nil {
+			panic(err)
+		}
+	} else {
+		if err := gparams.BoxTmpl.Execute(w, &cbox{c, c.DOMNode(), name}); err != nil {
+			panic(err)
+		}
 	}
 }
 
-// Helper struct
+// Helper structs
 type cbox struct {
 	C    boxtree.Container
 	N    w3cdom.Node
 	Name string
+}
+
+type pbox struct {
+	C      *boxtree.PrincipalBox
+	N      w3cdom.Node
+	Name   string
+	Color  string
+	Fill   string
+	Border string
 }
 
 func shortText(box *cbox) string {
@@ -192,6 +219,10 @@ const boxTmpl = `{{ if istext .C }}
 {{ end }}
 `
 
+const pboxTmpl = `
+{{ .Name }}	[ label={{ label .C }} shape=box style=filled {{ .Fill }} {{ .Color }} {{ .Border }}] ;
+`
+
 const nouseboxTmpl = `{{ if .C.IsAnonymous }}
 {{ if .C.IsText }}
 {{ .Name }}	[ label={{ shortstring . }} shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
@@ -206,3 +237,24 @@ const nouseboxTmpl = `{{ if .C.IsAnonymous }}
 //const domEdgeTmpl = `{{ .N1.Name }} -> {{ .N2.Name }} [dir=none weight=1] ;
 const edgeTmpl = `{{ .N1.Name }} -> {{ .N2.Name }} [weight=1] ;
 `
+
+func styledBoxParams(p *boxtree.PrincipalBox, name string) *pbox {
+	if p.Box.Styles == nil {
+		return nil
+	}
+	fmt.Printf("principal box for %v does have styles\n", p.DOMNode().NodeName())
+	sty := p.Box.Styles
+	b := &pbox{
+		C:     p,
+		N:     p.DOMNode(),
+		Name:  name,
+		Color: fmt.Sprintf("color=\"%s\"", style.ColorString(sty.Border.LineColor)),
+		Fill:  fmt.Sprintf("fillcolor=\"%s\"", style.ColorString(sty.Colors.Background)),
+	}
+	if p.CSSBox().HasFixedBorderBoxWidth(true) {
+		b.Border = ""
+	} else {
+		b.Border = "peripheries=2"
+	}
+	return b
+}
