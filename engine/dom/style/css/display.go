@@ -1,10 +1,12 @@
-package frame
+package css
 
-import "bytes"
+import (
+	"bytes"
+	"fmt"
+)
 
 // DisplayMode is a type for CSS property "display".
 //
-// TODO move to package css
 type DisplayMode uint16
 
 // Flags for box context and display mode (outer and inner).
@@ -109,4 +111,31 @@ func (disp DisplayMode) Symbol() string {
 		return "–"
 	}
 	return "?"
+}
+
+// ParseDisplay returns mode flags from a display property string (outer and inner).
+func ParseDisplay(display string) (DisplayMode, error) {
+	// TODO
+	if display == "" {
+		return NoMode, nil
+	}
+	switch display {
+	case "none":
+		return DisplayNone, nil
+	case "block":
+		return BlockMode | InnerBlockMode, nil
+	case "inline":
+		return InlineMode | InnerInlineMode, nil
+	case "list-item":
+		return ListItemMode | BlockMode, nil
+	case "block-inline":
+		return BlockMode | InnerInlineMode, nil
+	case "inline-block":
+		return InlineMode | InnerBlockMode, nil
+	case "table":
+		return BlockMode | TableMode, nil
+	case "inline-table":
+		return InlineMode | TableMode, nil
+	}
+	return BlockMode, fmt.Errorf("Unknown display mode: %s", display)
 }

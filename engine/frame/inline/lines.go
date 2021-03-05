@@ -4,6 +4,7 @@ import (
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/khipu"
@@ -227,7 +228,7 @@ func collectAlignedBoxes(pbox *boxtree.PrincipalBox) ([]*frame.Box, []*frame.Box
 
 func Layout(c frame.Container) {
 	T().Debugf("Layout of sub-block")
-	if c.DisplayMode().Inner().Contains(frame.InlineMode) {
+	if c.DisplayMode().Inner().Contains(css.InlineMode) {
 		// call layout paragraph
 	} else {
 		// call layout block

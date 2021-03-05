@@ -1,6 +1,5 @@
 /*
-Package defines types for a CSS box tree.
-
+Package boxtree produces a box-tree from a styled tree (DOM).
 
 ______________________________________________________________________
 

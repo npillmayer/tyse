@@ -130,7 +130,7 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
 	}
 	// document or element node
 	mode := frame.DisplayModeForDOMNode(domnode)
-	if mode == frame.NoMode || mode == frame.DisplayNone {
+	if mode == css.NoMode || mode == css.DisplayNone {
 		T().Debugf("removing node for %v with display=none", domnode.NodeName())
 		//panic(fmt.Sprintf("NO MODE for %v", domnode.NodeName()))
 		return nil // do not produce box for illegal mode or for display = "none"

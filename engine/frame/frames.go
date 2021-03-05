@@ -6,6 +6,7 @@ import (
 
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"golang.org/x/net/html"
 )
 
@@ -57,12 +58,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 // DisplayModeForDOMNode returns outer and inner display mode for a given DOM node.
-func DisplayModeForDOMNode(domnode *dom.W3CNode) DisplayMode {
+func DisplayModeForDOMNode(domnode *dom.W3CNode) css.DisplayMode {
 	if domnode == nil || domnode.HTMLNode() == nil {
-		return NoMode
+		return css.NoMode
 	}
 	if domnode.NodeType() == html.TextNode {
-		return InlineMode
+		return css.InlineMode
 	}
 	display := domnode.ComputedStyles().GetPropertyValue("display")
 	//T().Infof("property display = %v", display)
@@ -71,10 +72,10 @@ func DisplayModeForDOMNode(domnode *dom.W3CNode) DisplayMode {
 		display = style.DisplayPropertyForHTMLNode(domnode.HTMLNode())
 	}
 	//outerMode, innerMode, err = ParseDisplay(display.String())
-	mode, err := ParseDisplay(display.String())
+	mode, err := css.ParseDisplay(display.String())
 	if err != nil {
 		T().Errorf("unrecognized display property: %s", display)
-		mode = BlockMode
+		mode = css.BlockMode
 	}
 	//T().Infof("display modes = %s", mode)
 	return mode
@@ -85,68 +86,41 @@ func DisplayModeForDOMNode(domnode *dom.W3CNode) DisplayMode {
 //
 // TODO possibly move this to package style (= part of browser defaults)
 // If, then return a string.
-func DefaultDisplayModeForHTMLNode(h *html.Node) (DisplayMode, DisplayMode) {
+func DefaultDisplayModeForHTMLNode(h *html.Node) (css.DisplayMode, css.DisplayMode) {
 	if h == nil {
-		return NoMode, NoMode
+		return css.NoMode, css.NoMode
 	}
 	switch h.Type {
 	case html.DocumentNode:
-		return BlockMode, BlockMode
+		return css.BlockMode, css.BlockMode
 	case html.TextNode:
-		return InlineMode, InlineMode
+		return css.InlineMode, css.InlineMode
 	case html.ElementNode:
 		switch h.Data {
 		case "table":
-			return BlockMode, TableMode
+			return css.BlockMode, css.TableMode
 		case "ul", "ol":
-			return BlockMode, ListItemMode
+			return css.BlockMode, css.ListItemMode
 		case "li":
-			return ListItemMode, BlockMode
+			return css.ListItemMode, css.BlockMode
 		case "html", "body", "div", "section", "article", "nav":
-			return BlockMode, BlockMode
+			return css.BlockMode, css.BlockMode
 		case "p":
-			return BlockMode, InlineMode
+			return css.BlockMode, css.InlineMode
 		case "span", "i", "b", "strong", "em":
-			return InlineMode, InlineMode
+			return css.InlineMode, css.InlineMode
 		case "h1", "h2", "h3", "h4", "h5", "h6":
-			return BlockMode, InlineMode
+			return css.BlockMode, css.InlineMode
 		default:
-			return BlockMode, BlockMode
+			return css.BlockMode, css.BlockMode
 		}
 	default:
 		T().Errorf("Have styled node for non-element ?!?")
 		T().Errorf(" type of node = %d", h.Type)
 		T().Errorf(" name of node = %s", h.Data)
 		T().Infof("unknown HTML element will stack children vertically")
-		return BlockMode, BlockMode
+		return css.BlockMode, css.BlockMode
 	}
-}
-
-// ParseDisplay returns mode flags from a display property string (outer and inner).
-func ParseDisplay(display string) (DisplayMode, error) {
-	// TODO
-	if display == "" {
-		return NoMode, nil
-	}
-	switch display {
-	case "none":
-		return DisplayNone, nil
-	case "block":
-		return BlockMode | InnerBlockMode, nil
-	case "inline":
-		return InlineMode | InnerInlineMode, nil
-	case "list-item":
-		return ListItemMode | BlockMode, nil
-	case "block-inline":
-		return BlockMode | InnerInlineMode, nil
-	case "inline-block":
-		return InlineMode | InnerBlockMode, nil
-	case "table":
-		return BlockMode | TableMode, nil
-	case "inline-table":
-		return InlineMode | TableMode, nil
-	}
-	return BlockMode, fmt.Errorf("Unknown display mode: %s", display)
 }
 
 // ---------------------------------------------------------------------------

@@ -72,7 +72,7 @@ func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthes
 		MaxW: view.Width,
 		view: view,
 	}
-	if !boxRoot.DisplayMode().Outer().Contains(frame.BlockMode) {
+	if !boxRoot.DisplayMode().Outer().Contains(css.BlockMode) {
 		syn.lastErr = errors.New("layout root expected to have display mode block")
 	} else if boxRoot.Context() == nil || !boxRoot.Context().IsFlowRoot() {
 		syn.lastErr = errors.New("layout root expected to be flow root")

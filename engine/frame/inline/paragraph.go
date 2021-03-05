@@ -144,7 +144,7 @@ func collectBoxText(c frame.Container, b *styled.TextBuilder, irs *infoIRS,
 		}
 		//text.Style(styleset, pos, pos+l.Weight())
 		b.Append(leaf, styleset)
-	} else if c.DisplayMode().BlockOrInline() == frame.BlockMode {
+	} else if c.DisplayMode().BlockOrInline() == css.BlockMode {
 		b.Append(&nonReplacableElementLeaf{c.DOMNode()}, frame.StyleSet{})
 	} else {
 		T().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())

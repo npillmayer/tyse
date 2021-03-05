@@ -2,6 +2,7 @@ package frame
 
 import (
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -13,7 +14,7 @@ type Container interface {
 	DOMNode() *dom.W3CNode
 	TreeNode() *tree.Node
 	CSSBox() *Box
-	DisplayMode() DisplayMode
+	DisplayMode() css.DisplayMode
 	Context() Context
 	PresetContained() bool
 	ChildIndex() int
@@ -28,9 +29,9 @@ const (
 // --- Base Box type ---------------------------------------------------------
 
 type ContainerBase struct {
-	tree.Node             // a container is a node within the layout tree
-	ChildInx  uint32      // this box represents child #childInx of the parent principal box
-	Display   DisplayMode // inner and outer display mode
+	tree.Node                 // a container is a node within the layout tree
+	ChildInx  uint32          // this box represents child #childInx of the parent principal box
+	Display   css.DisplayMode // inner and outer display mode
 }
 
 // TreeNode returns the underlying tree node for a box.
@@ -39,7 +40,7 @@ func (b *ContainerBase) TreeNode() *tree.Node {
 }
 
 // DisplayMode returns the computed display mode of this box.
-func (b *ContainerBase) DisplayMode() DisplayMode {
+func (b *ContainerBase) DisplayMode() css.DisplayMode {
 	return b.Display
 }
 

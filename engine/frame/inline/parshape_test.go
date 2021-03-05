@@ -56,7 +56,7 @@ func makeIsoBox(a, b, c, d dimen.Dimen) isoBox {
 }
 
 func makePara() (*boxtree.PrincipalBox, []*frame.Box, []*frame.Box) {
-	para := boxtree.NewPrincipalBox(nil, frame.BlockMode)
+	para := boxtree.NewPrincipalBox(nil, css.BlockMode)
 	para.Box = &frame.StyledBox{}
 	para.Box.W = css.SomeDimen(500)
 	para.Box.W = css.SomeDimen(800)

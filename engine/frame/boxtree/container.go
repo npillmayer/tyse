@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/tree"
 )
@@ -31,7 +32,7 @@ type PrincipalBox struct {
 }
 
 // NewPrincipalBox creates either a block-level container or an inline-level container
-func NewPrincipalBox(domnode *dom.W3CNode, mode frame.DisplayMode) *PrincipalBox {
+func NewPrincipalBox(domnode *dom.W3CNode, mode css.DisplayMode) *PrincipalBox {
 	pbox := &PrincipalBox{
 		domNode: domnode,
 	}
@@ -382,7 +383,7 @@ func (anon *AnonymousBox) Context() frame.Context {
 	return nil // TODO
 }
 
-func NewAnonymousBox(mode frame.DisplayMode) *AnonymousBox {
+func NewAnonymousBox(mode css.DisplayMode) *AnonymousBox {
 	anon := &AnonymousBox{}
 	anon.Display = mode
 	anon.Payload = anon // always points to itself: tree node -> box
