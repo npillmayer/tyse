@@ -1,4 +1,4 @@
-package boxtree
+package frame
 
 import (
 	"sync"

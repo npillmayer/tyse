@@ -17,13 +17,13 @@ import (
 
 // TypeLine and TypeParagraph are additional container types defined in this package.
 const (
-	TypeLine      boxtree.Type = boxtree.TypeAnonymous + 1
-	TypeParagraph boxtree.Type = TypeLine + 1
+	TypeLine      frame.ContainerType = 200
+	TypeParagraph frame.ContainerType = 201
 )
 
 // LineBox is a type for CSS inline text boxes.
 type LineBox struct {
-	boxtree.Base
+	frame.ContainerBase
 	//tree.Node
 	Box    *frame.Box
 	khipu  *khipu.Khipu
@@ -66,7 +66,7 @@ func (lbox *LineBox) CSSBox() *frame.Box {
 }
 
 // Type returns TypeLine
-func (pbox *LineBox) Type() boxtree.Type {
+func (pbox *LineBox) Type() frame.ContainerType {
 	return TypeLine
 }
 
@@ -90,15 +90,21 @@ func (pbox *LineBox) Type() boxtree.Type {
 // 	return 0, 0
 // }
 
-func (lbox *LineBox) Context() boxtree.Context {
+func (lbox *LineBox) Context() frame.Context {
 	return nil
 }
 
-func (lbox *LineBox) AppendToPrincipalBox(pbox *boxtree.PrincipalBox) {
-	boxtree.Inline(pbox.Context()).AddLineBox(lbox)
+func (lbox *LineBox) PresetContained() bool {
+	panic("TODO")
+	return false
 }
 
-var _ boxtree.Container = &LineBox{}
+func (lbox *LineBox) AppendToPrincipalBox(pbox *boxtree.PrincipalBox) {
+	//boxtree.Inline(pbox.Context()).AddLineBox(lbox)
+	panic("TODO ?")
+}
+
+var _ frame.Container = &LineBox{}
 
 // --- Breaking paragraphs into lines ----------------------------------------
 
@@ -146,20 +152,20 @@ func BreakParagraph(k *khipu.Khipu, pbox *boxtree.PrincipalBox,
 	return nil, nil
 }
 
-func FindParaWidthAndText(pbox *ParagraphBox, rootctx boxtree.Context) (
-	[]boxtree.Container, boxtree.Context, error) {
+func FindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
+	[]frame.Container, frame.Context, error) {
 	//
 	paraText, blocks, err := paragraphTextFromBox(pbox)
 	if err != nil {
 		T().Errorf(err.Error())
-		return []boxtree.Container{}, rootctx, err
+		return []frame.Container{}, rootctx, err
 	}
 	regs := parameters.NewTypesettingRegisters()
 	regs = adaptTypesettingRegisters(regs, pbox)
 	k, err := khipu.EncodeParagraph(paraText.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	if err != nil || k == nil {
 		T().Errorf("lines: khipu resulting from paragraph is nil")
-		return []boxtree.Container{}, rootctx, err
+		return []frame.Container{}, rootctx, err
 	}
 	pbox.para = paraText
 	pbox.khipu = k
@@ -219,7 +225,7 @@ func collectAlignedBoxes(pbox *boxtree.PrincipalBox) ([]*frame.Box, []*frame.Box
 	return []*frame.Box{}, []*frame.Box{}
 }
 
-func Layout(c boxtree.Container) {
+func Layout(c frame.Container) {
 	T().Debugf("Layout of sub-block")
 	if c.DisplayMode().Inner().Contains(frame.InlineMode) {
 		// call layout paragraph

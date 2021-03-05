@@ -10,6 +10,7 @@ import (
 
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
 
@@ -47,14 +48,14 @@ func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer) {
 	if err != nil {
 		panic(err)
 	}
-	dict := make(map[boxtree.Container]string, 4096)
+	dict := make(map[frame.Container]string, 4096)
 	boxes(boxroot, w, dict, &gparams)
 	w.Write([]byte("}\n"))
 }
 
 var cnt int
 
-func boxes(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, gparams *graphParamsType) {
+func boxes(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
 	cnt++
 	if cnt == 300 {
 		return
@@ -77,7 +78,7 @@ func boxes(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, 
 					gtrace.EngineTracer.Debugf("Child at #%d is nil", i)
 				} else {
 					//gtrace.EngineTracer.Errorf("Child is %v", ch)
-					child := ch.Payload.(boxtree.Container)
+					child := ch.Payload.(frame.Container)
 					gtrace.EngineTracer.Debugf("  child[%d] = %v", i, child)
 					boxes(child, w, dict, gparams)
 					edge(c, child, w, dict, gparams)
@@ -87,7 +88,7 @@ func boxes(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, 
 	}
 }
 
-func box(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, gparams *graphParamsType) {
+func box(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
 	name := dict[c]
 	if name == "" {
 		sz := len(dict) + 1
@@ -111,7 +112,7 @@ func box(c boxtree.Container, w io.Writer, dict map[boxtree.Container]string, gp
 
 // Helper structs
 type cbox struct {
-	C    boxtree.Container
+	C    frame.Container
 	N    w3cdom.Node
 	Name string
 }
@@ -146,7 +147,7 @@ type cedge struct {
 	N1, N2 cbox
 }
 
-func edge(c1 boxtree.Container, c2 boxtree.Container, w io.Writer, dict map[boxtree.Container]string,
+func edge(c1 frame.Container, c2 frame.Container, w io.Writer, dict map[frame.Container]string,
 	gparams *graphParamsType) {
 	//
 	//fmt.Printf("dict has %d entries\n", len(dict))
@@ -160,7 +161,7 @@ func edge(c1 boxtree.Container, c2 boxtree.Container, w io.Writer, dict map[boxt
 
 // ---------------------------------------------------------------------------
 
-func label(c boxtree.Container) string {
+func label(c frame.Container) string {
 	switch b := c.(type) {
 	case *boxtree.PrincipalBox:
 		return "\"" + PrincipalLabel(b) + "\""
@@ -185,7 +186,7 @@ func PrincipalLabel(pbox *boxtree.PrincipalBox) string {
 }
 
 //func String(anon *boxtree.AnonymousBox) string {
-func AnonLabel(c boxtree.Container) string {
+func AnonLabel(c frame.Container) string {
 	if c == nil {
 		return "<empty anon box>"
 	}
@@ -194,7 +195,7 @@ func AnonLabel(c boxtree.Container) string {
 	return fmt.Sprintf("%s %s", outerSym, innerSym)
 }
 
-func isTextBox(c boxtree.Container) bool {
+func isTextBox(c frame.Container) bool {
 	_, ok := c.(*boxtree.TextBox)
 	return ok
 }

@@ -20,7 +20,7 @@ var errDOMNodeNotSuitable = errors.New("DOM node is not suited for layout")
 var ErrNoBoxTreeCreated = errors.New("no box tree created")
 
 // BuildBoxTree creates a render box tree from a styled tree.
-func BuildBoxTree(domRoot *dom.W3CNode) (Container, error) {
+func BuildBoxTree(domRoot *dom.W3CNode) (frame.Container, error) {
 	if domRoot == nil {
 		return nil, ErrDOMRootIsNull
 	}
@@ -121,7 +121,7 @@ func createAndAttachBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int
 // ----------------------------------------------------------------------
 
 // NewBoxForDOMNode creates an adequately initialized box for a given DOM node.
-func NewBoxForDOMNode(domnode *dom.W3CNode) Container {
+func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
 	if domnode.NodeType() == html.TextNode {
 		tbox := NewTextBox(domnode)
 		// TODO find index within parent
@@ -142,7 +142,7 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) Container {
 	return pbox
 }
 
-func possiblyCreateMiniHierarchy(c Container) {
+func possiblyCreateMiniHierarchy(c frame.Container) {
 	if c.Type() != TypePrincipal {
 		return
 	}
@@ -176,12 +176,12 @@ func attributeBoxes(boxRoot *PrincipalBox) error {
 }
 
 // Tree action: attribute each box from CSS styles.
-func makeAttributesAction(root Container) tree.Action {
+func makeAttributesAction(root frame.Container) tree.Action {
 	T().Infof("generate ACTION attributer ==============================================")
 	view := viewFromBoxRoot(root)
 	//return func attributeFromCSS(node *tree.Node, unused *tree.Node, chpos int) (match *tree.Node, err error) {
 	return func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
-		c := node.Payload.(Container)
+		c := node.Payload.(frame.Container)
 		if c == nil {
 			return nil, nil
 		}
@@ -199,14 +199,14 @@ func makeAttributesAction(root Container) tree.Action {
 			//pos := css.PositionOption(c.DOMNode()) // later during re-ordering
 			//
 		} else if c.Type() == TypeText {
-			parent := parentNode.Payload.(Container)
+			parent := parentNode.Payload.(frame.Container)
 			setWhitespaceProperties(c, parent)
 		}
 		return node, nil
 	}
 }
 
-func setSizingInformationForPrincipalBox(c Container, view *view, font string) {
+func setSizingInformationForPrincipalBox(c frame.Container, view *view, font string) {
 	//
 	style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
 	// Padding
@@ -248,7 +248,7 @@ func setSizingInformationForPrincipalBox(c Container, view *view, font string) {
 	// TODO min-/max-w + h
 }
 
-func setVisualStylesForPrincipalBox(c Container) {
+func setVisualStylesForPrincipalBox(c frame.Container) {
 	if c == nil || c.Type() != TypePrincipal {
 		return // other container types cannot be styled
 	}
@@ -288,7 +288,7 @@ func setVisualStylesForPrincipalBox(c Container) {
     pre-line      Preserve     Collapse            Wrap              Remove
     break-spaces  Preserve     Preserve            Wrap              Wrap
 */
-func setWhitespaceProperties(c, parent Container) {
+func setWhitespaceProperties(c, parent frame.Container) {
 	if c != nil && parent != nil && c.Type() == TypeText {
 		t := c.(*TextBox)
 		ws := parent.DOMNode().ComputedStyles().GetPropertyValue("white-space")
@@ -315,7 +315,7 @@ type view struct {
 	size dimen.Point
 }
 
-func viewFromBoxRoot(root Container) *view {
+func viewFromBoxRoot(root frame.Container) *view {
 	return &view{
 		font: "view font",
 		size: dimen.DINA4,
@@ -341,7 +341,7 @@ func scale(d css.DimenT, view *view, dir int, font string) css.DimenT {
 	return d
 }
 
-func boxname(c Container) string {
+func boxname(c frame.Container) string {
 	if c == nil {
 		return "none"
 	}

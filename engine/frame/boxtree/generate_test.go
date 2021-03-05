@@ -14,6 +14,7 @@ import (
 	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/framedebug"
 	"golang.org/x/net/html"
@@ -83,7 +84,7 @@ func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
 	return tmpfile
 }
 
-func checkBoxTree(boxes boxtree.Container, err error, t *testing.T) {
+func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	} else if boxes == nil {
@@ -97,7 +98,7 @@ func checkBoxTree(boxes boxtree.Container, err error, t *testing.T) {
 	t.Logf("root node = %+v", boxes)
 }
 
-func dottyBoxTree(root boxtree.Container, t *testing.T) *os.File {
+func dottyBoxTree(root frame.Container, t *testing.T) *os.File {
 	tl := gtrace.EngineTracer.GetTraceLevel()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
 	//

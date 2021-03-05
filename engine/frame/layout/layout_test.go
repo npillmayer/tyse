@@ -1,180 +1,130 @@
-package layout_test
+package layout
 
 import (
+	"fmt"
 	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/tyse/engine/frame/boxtree"
-	"github.com/npillmayer/tyse/engine/frame/framedebug"
-
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
+	"github.com/npillmayer/tyse/engine/dom/domdbg"
+	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
+	"github.com/npillmayer/tyse/engine/frame/framedebug"
 	"golang.org/x/net/html"
 )
 
-var graphviz = true
+func TestLayout(t *testing.T) {
+	// teardown := testconfig.QuickConfig(t)
+	// defer teardown()
+	gtrace.EngineTracer = gologadapter.New()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer = gologadapter.New()
+	//gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	domroot := buildDOM(t, false)
+	boxes, err := boxtree.BuildBoxTree(domroot)
+	checkBoxTree(boxes, err, t)
+	v := View{Width: 8 * dimen.CM}
+	r := BoxTreeToLayoutTree(boxes.(*boxtree.PrincipalBox), &v)
+	t.Logf("resulting W = %s", r.W)
+	if r.lastErr != nil {
+		t.Errorf("resulting error is: %v", r.lastErr)
+	}
+	//dottyLayoutTree(boxes, t)
+}
 
-var Xmyhtml = `<div><b>bold</b><table></table><span>spanned</span></div>`
+// ---------------------------------------------------------------------------
 
-var myhtml = `
+var minihtml = `
 <html><head>
 <style>
-  body { border-color: red; }
+  p { border-color: red; }
 </style>
 </head><body>
-  <p>The quick brown fox jumps over the lazy</p><b>dog.</b>
-  <p id="world">Hello <b>World</b>!</p>
-  <p style="padding-left: 5px; position: fixed;">This is a test.</p>
+  <p>The quick brown fox jumps over the lazy dog.</p>
 </body>
 `
 
-func buildDOM(t *testing.T) *dom.W3CNode {
-	h, err := html.Parse(strings.NewReader(myhtml))
+func buildDOM(t *testing.T, drawit bool) *dom.W3CNode {
+	h, err := html.Parse(strings.NewReader(minihtml))
 	if err != nil {
 		t.Errorf("Cannot create test document")
 	}
 	dom := dom.FromHTMLParseTree(h, nil) // nil = no external stylesheet
 	if dom == nil {
-		t.Errorf("Could not build DOM from HTML")
+		t.Fatal("Could not build DOM from HTML")
+	} else if drawit {
+		dottyDOM(dom, t)
 	}
 	return dom
 }
 
-func TestBoxGeneration(t *testing.T) {
-	//gtrace.EngineTracer = gologadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
-	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelInfo)
-	domroot := buildDOM(t)
-	boxes, err := boxtree.BuildBoxTree(domroot)
+func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
+	tl := gtrace.EngineTracer.GetTraceLevel()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
+	//
+	tmpfile, err := ioutil.TempFile(".", "dom.*.dot")
 	if err != nil {
-		t.Errorf(err.Error())
+		log.Fatal(err)
+	}
+	//defer os.Remove(tmpfile.Name()) // clean up
+	fmt.Printf("writing DOM to %s\n", tmpfile.Name())
+	domdbg.ToGraphViz(doc, tmpfile, nil)
+	defer tmpfile.Close()
+	cmd := exec.Command("dot", "-Tsvg", "-odom.svg", tmpfile.Name())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Printf("writing SVG DOM image to dom.svg\n")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err.Error())
+	}
+	fmt.Printf("done with dom.svg\n")
+	gtrace.EngineTracer.SetTraceLevel(tl)
+	return tmpfile
+}
+
+func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
+	if err != nil {
+		t.Fatalf(err.Error())
 	} else if boxes == nil {
-		t.Errorf("Render tree root is null")
+		t.Fatalf("Render tree root is null")
 	} else {
 		t.Logf("root node is %s", boxes.DOMNode().NodeName())
 		if boxes.DOMNode().NodeName() != "#document" {
 			t.Errorf("name of root element expected to be '#document")
 		}
-		if graphviz {
-			gvz, _ := ioutil.TempFile(".", "layout-*.dot")
-			defer gvz.Close()
-			framedebug.ToGraphViz(boxes.(*boxtree.PrincipalBox), gvz)
-		}
 	}
+	t.Logf("root node = %+v", boxes)
 }
 
-/*
-func TestReorderingSimple(t *testing.T) {
-	//viewport := &dimen.Rect{TopL: dimen.Origin, BotR: dimen.DINA4}
-	gtrace.EngineTracer = gologadapter.New()
+func dottyLayoutTree(root frame.Container, t *testing.T) *os.File {
+	tl := gtrace.EngineTracer.GetTraceLevel()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
-	domroot := buildDOM(t)
-	boxes, err := boxtree.BuildBoxTree(domroot)
+	//
+	tmpfile, err := ioutil.TempFile(".", "layouttree.*.dot")
 	if err != nil {
-		t.Errorf(err.Error())
-	} else {
-		t.Logf("root node is %s", boxes.DOMNode().NodeName())
-		gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-		gtrace.EngineTracer.Debugf("=== Reordering Boxes =========================")
-		renderRoot := boxtree.TreeNodeAsPrincipalBox(boxes.TreeNode())
-		if err = boxtree.ReorderBoxTree(renderRoot); err != nil {
-			t.Errorf(err.Error())
-		} else if graphviz {
-			gvz, _ := ioutil.TempFile(".", "reorder-*.dot")
-			defer gvz.Close()
-			framedebug.ToGraphViz(boxes.(*boxtree.PrincipalBox), gvz)
-		}
+		log.Fatal(err)
 	}
-}
-*/
-
-// ----------------------------------------------------------------------
-
-/*
-func Test0(t *testing.T) {
-	tracing.EngineTracer = gologadapter.New()
-}
-
-func TestLayout1(t *testing.T) {
-	root := styledtree.NewNodeForHtmlNode(makeHtmlNode("body"))
-	p1 := styledtree.NewNodeForHtmlNode(makeHtmlNode("p"))
-	p2 := styledtree.NewNodeForHtmlNode(makeHtmlNode("p"))
-	p1.HtmlNode().AppendChild(makeCData("Hello World!"))
-	p2.HtmlNode().AppendChild(makeCData("More text."))
-	root.AddChild(p1)
-	root.AddChild(p2)
-	tree := buildLayoutTree(root)
-	PrintTree(tree, t)
-	if l := len(tree.content[0].content); l != 2 {
-		t.Errorf("<body> should have 2 content children, has %d", l)
+	//defer os.Remove(tmpfile.Name()) // clean up
+	fmt.Printf("writing BoxTree to %s\n", tmpfile.Name())
+	framedebug.ToGraphViz(root.(*boxtree.PrincipalBox), tmpfile)
+	defer tmpfile.Close()
+	cmd := exec.Command("dot", "-Tsvg", "-olayouttree.svg", tmpfile.Name())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Printf("writing SVG BoxTree image to layouttree.svg\n")
+	if err := cmd.Run(); err != nil {
+		t.Error(err.Error())
 	}
-	group := style.NewPropertyGroup("Display")
-	group.Set("display", "none")
-	pmap := style.NewPropertyMap()
-	pmap.AddAllFromGroup(group, true)
-	p2.SetComputedStyles(pmap)
-	t.Log("-----------------------")
-	d, _ := style.GetLocalProperty(p2, "display")
-	t.Logf("Now p2.display = %s\n", d)
-	t.Log("-----------------------")
-	tree = buildLayoutTree(root)
-	if l := len(tree.content[0].content); l != 1 {
-		t.Errorf("<body> should have 1 content child, has %d", l)
-	}
-	PrintTree(tree, t)
-	group.Set("display", "inline")
-	pmap.AddAllFromGroup(group, true)
-	t.Log("-----------------------")
-	d, _ = style.GetLocalProperty(p2, "display")
-	t.Logf("Now p2.display = %s\n", d)
-	t.Log("-----------------------")
-	tree = buildLayoutTree(root)
-	PrintTree(tree, t)
+	fmt.Printf("done with layouttree.svg\n")
+	gtrace.EngineTracer.SetTraceLevel(tl)
+	return tmpfile
 }
-*/
-
-// ----------------------------------------------------------------------
-
-/*
-func makeHTMLNode(e string) *html.Node {
-	n := &html.Node{}
-	n.Type = html.ElementNode
-	n.Data = e
-	return n
-}
-
-func makeCData(s string) *html.Node {
-	n := &html.Node{}
-	n.Type = html.TextNode
-	n.Data = s
-	return n
-}
-*/
-
-/*
-func PrintTree(c *Container, t *testing.T) {
-	indent := 0
-	printContainer(c, indent, t)
-}
-
-func printContainer(c *Container, w int, t *testing.T) {
-	t.Logf("%s%s{\n", indent(w), c)
-	for _, ch := range c.content {
-		printContainer(ch, w+1, t)
-	}
-	t.Logf("%s}", indent(w))
-}
-
-func indent(w int) string {
-	s := ""
-	for w > 0 {
-		s += "   "
-		w--
-	}
-	return s
-}
-*/

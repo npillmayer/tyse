@@ -19,17 +19,17 @@ import (
 )
 
 type ParagraphBox struct {
-	boxtree.Base
+	frame.ContainerBase
 	Box     *frame.StyledBox // styled box for a DOM node
 	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
-	context boxtree.Context  // principal boxes may establish a context
+	context frame.Context    // principal boxes may establish a context
 	para    *Paragraph       // text of the paragraph
 	khipu   *khipu.Khipu     // khipu knots make from paragraph text
 	//tree.Node                     // a paragraph box is a node within the layout tree
 	//displayMode frame.DisplayMode // outer display mode
 }
 
-var _ boxtree.Container = &ParagraphBox{}
+var _ frame.Container = &ParagraphBox{}
 
 // TreeNode returns the underlying tree node for a box.
 func (pbox *ParagraphBox) TreeNode() *tree.Node {
@@ -47,7 +47,7 @@ func (pbox *ParagraphBox) CSSBox() *frame.Box {
 }
 
 // Type returns TypeParagraph
-func (pbox *ParagraphBox) Type() boxtree.Type {
+func (pbox *ParagraphBox) Type() frame.ContainerType {
 	return TypeParagraph
 }
 
@@ -66,11 +66,16 @@ func (pbox *ParagraphBox) Type() boxtree.Type {
 // 	return false
 // }
 
-func (pbox *ParagraphBox) Context() boxtree.Context {
+func (pbox *ParagraphBox) Context() frame.Context {
 	if pbox.context == nil {
 		pbox.context = boxtree.CreateContextForContainer(pbox, false)
 	}
 	return pbox.context
+}
+
+func (pbox *ParagraphBox) PresetContained() bool {
+	panic("TODO")
+	return false
 }
 
 func (pbox *ParagraphBox) ChildIndices() (uint32, uint32) {
@@ -99,7 +104,7 @@ type infoIRS struct {
 // Returns a paragraphs's text, a list of block level containers which are
 // children of c, or possibly an error.
 //
-func paragraphTextFromBox(c boxtree.Container) (*Paragraph, []boxtree.Container, error) {
+func paragraphTextFromBox(c frame.Container) (*Paragraph, []frame.Container, error) {
 	para := &Paragraph{
 		irs: infoIRS{
 			irsElems: make(map[uint64]bidi.Direction),
@@ -114,18 +119,18 @@ func paragraphTextFromBox(c boxtree.Container) (*Paragraph, []boxtree.Container,
 	return para, blocks, err
 }
 
-func boxText(c boxtree.Container, irs *infoIRS) (*styled.Text, []boxtree.Container, error) {
+func boxText(c frame.Container, irs *infoIRS) (*styled.Text, []frame.Container, error) {
 	if c == nil {
-		return styled.TextFromString(""), []boxtree.Container{}, cords.ErrIllegalArguments
+		return styled.TextFromString(""), []frame.Container{}, cords.ErrIllegalArguments
 	}
 	b := styled.NewTextBuilder()
-	var blocks []boxtree.Container
+	var blocks []frame.Container
 	collectBoxText(c, b, irs, blocks)
 	return b.Text(), blocks, nil
 }
 
-func collectBoxText(c boxtree.Container, b *styled.TextBuilder, irs *infoIRS,
-	blocks []boxtree.Container) {
+func collectBoxText(c frame.Container, b *styled.TextBuilder, irs *infoIRS,
+	blocks []frame.Container) {
 	//
 	if c.DOMNode() != nil && c.DOMNode().NodeType() == html.TextNode {
 		leaf := createLeaf(c.DOMNode())
@@ -147,7 +152,7 @@ func collectBoxText(c boxtree.Container, b *styled.TextBuilder, irs *infoIRS,
 	if c.TreeNode().ChildCount() > 0 {
 		children := c.TreeNode().Children(true)
 		for _, ch := range children {
-			if childContainer, ok := ch.Payload.(boxtree.Container); ok {
+			if childContainer, ok := ch.Payload.(frame.Container); ok {
 				collectBoxText(childContainer, b, irs, blocks)
 			}
 		}

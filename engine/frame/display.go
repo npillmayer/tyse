@@ -14,7 +14,7 @@ const (
 	DisplayNone     DisplayMode = 0x0001 // CSS outer display = none
 	BlockMode       DisplayMode = 0x0002 // CSS block context (inner or outer)
 	InlineMode      DisplayMode = 0x0004 // CSS inline context
-	FlowRoot        DisplayMode = 0x0010 // CSS flow-root display property
+	FlowRootMode    DisplayMode = 0x0010 // CSS flow-root display property
 	ListItemMode    DisplayMode = 0x0020 // CSS list-item display
 	FlexMode        DisplayMode = 0x0040 // CSS inner display = flex
 	GridMode        DisplayMode = 0x0080 // CSS inner display = grid
@@ -24,7 +24,7 @@ const (
 )
 
 var allDisplayModes = []DisplayMode{
-	DisplayNone, BlockMode, InlineMode, ListItemMode, FlowRoot, FlexMode,
+	DisplayNone, BlockMode, InlineMode, ListItemMode, FlowRootMode, FlexMode,
 	GridMode, TableMode, InnerBlockMode, InnerInlineMode,
 }
 

@@ -42,8 +42,10 @@ var ErrNotAPercentageDimension error = errors.New("input dimension not a percent
      we need a clear understanding of input vs output.
 */
 type inheritedParams struct {
-	flowRoot *boxtree.FlowRoot
-	W        css.DimenT // enclosing width    fixed ?
+	flowRoot   *frame.FlowRoot
+	view       *View
+	W          css.DimenT // enclosing width    fixed ?
+	MinW, MaxW dimen.Dimen
 }
 
 type synthesizedParams struct {
@@ -52,21 +54,53 @@ type synthesizedParams struct {
 	lastErr error
 }
 
-// potentially recursive call to nested containers
-func CalcBlockWidth(c boxtree.Container, inherited inheritedParams) (syn synthesizedParams) {
+type View struct {
+	Width dimen.Dimen
+}
+
+func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthesizedParams) {
+	T().Debugf("============ Layout ===========================")
+	if view == nil {
+		if boxRoot != nil {
+			syn.lastErr = errors.New("illegal arguments")
+		}
+		return
+	}
+	params := inheritedParams{
+		W:    css.SomeDimen(view.Width),
+		MinW: 0,
+		MaxW: view.Width,
+		view: view,
+	}
+	if !boxRoot.DisplayMode().Outer().Contains(frame.BlockMode) {
+		syn.lastErr = errors.New("layout root expected to have display mode block")
+	} else if boxRoot.Context() == nil || !boxRoot.Context().IsFlowRoot() {
+		syn.lastErr = errors.New("layout root expected to be flow root")
+	} else {
+		params.flowRoot = boxRoot.Context().FlowRoot()
+		syn = CalcBlockWidths(boxRoot, params)
+	}
+	if syn.lastErr != nil {
+		T().Errorf("layout tree: %v", syn.lastErr)
+	}
+	return syn
+}
+
+// Potentially recursive call to nested containers
+func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesizedParams) {
 	// case c.Box.W is Font or View dependent: should have been done already => error
 	// case c.Box.W is Content dependent: call calc on nested block
 	// case c.Box.W is absolute: we're done
 	w, err := c.CSSBox().TotalWidth().Match(option.Of{
-		option.None:    nil, // defaults to `auto`
-		css.FontScaled: option.Fail(ErrUnfixedscaledUnit),
-		css.ViewScaled: option.Fail(ErrUnfixedscaledUnit),
-		css.FixedValue: c.CSSBox().TotalWidth().Unwrap(),
-		option.Some:    nil,
+		option.None:       nil, // defaults to `auto`
+		css.FontScaled:    option.Fail(ErrUnfixedscaledUnit),
+		css.ViewScaled:    option.Fail(ErrUnfixedscaledUnit),
+		css.FixedValue:    c.CSSBox().TotalWidth().Unwrap(),
+		css.ContentScaled: nil,
+		option.Some:       nil,
 	})
 	if err != nil {
-		syn.lastErr = err
-		return
+		return withError(syn, err)
 	}
 	if w != nil {
 		syn.W = w.(dimen.Dimen)
@@ -74,15 +108,35 @@ func CalcBlockWidth(c boxtree.Container, inherited inheritedParams) (syn synthes
 	}
 	// if c.ctx.isFlowRoot:
 	//      tell flow root to layout floats
+	//      wait for shelf-line condition
 	//      subtract floats' width from enclosing width
 	//
 	// Now we're ready to:
-	// SolveWidthTopDown(c boxtree.Container, enclosing dimen.Dimen) (*frame.Box, error)
-	//
+	syn = solveWidthTopDown(c, inherited) // TODO how to recurse down? => context ?
+	// recursion step
+	if syn.lastErr == nil {
+		// recurse down
+		if hasContained := c.PresetContained(); hasContained {
+			for _, sub := range c.Context().Contained() {
+				inherited.W = c.CSSBox().W
+				inherited.MaxW = c.CSSBox().W.Unwrap()
+				s := CalcBlockWidths(sub, inherited)
+				if s.lastErr != nil {
+					break
+				}
+			}
+		}
+	} else if syn.lastErr == ErrContentScaling {
+		syn = solveWidthForContent(c, inherited) // this will recurse all the way down
+	}
+	// now the subtree of c has its width fixed
+	if syn.lastErr == nil {
+		syn.lastErr = errors.New("SUCCESS") // TODO just for testing => remove
+	}
 	return
 }
 
-func LayoutBlockFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRoot) *frame.Box {
+func LayoutBlockFormattingContext(ctx frame.Context, flowRoot *frame.FlowRoot) *frame.Box {
 	// C = ctx.container
 	// C.w is already set
 	if ctx.IsFlowRoot() {
@@ -110,7 +164,7 @@ func LayoutBlockFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRoo
 	return nil
 }
 
-func LayoutInlineFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRoot) *frame.Box {
+func LayoutInlineFormattingContext(ctx frame.Context, flowRoot *frame.FlowRoot) *frame.Box {
 	// C = ctx.container
 	// C.w is already set
 	if ctx.IsFlowRoot() {
@@ -131,7 +185,7 @@ func LayoutInlineFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRo
 }
 
 // enclosing is width of containing block.
-// will stay inside c, not traversing of children containers.
+// will stay inside c, no traversing of children containers.
 // Instead will flag an appropriate error, which the caller will use to traverse
 // nested containers before calling Solve… again.
 //
@@ -139,10 +193,11 @@ func LayoutInlineFormattingContext(ctx boxtree.Context, flowRoot *boxtree.FlowRo
 //
 //     margin-left + width + margin-right = width of containing block
 //
-func SolveWidthTopDown(c boxtree.Container, enclosing dimen.Dimen) (*frame.Box, error) {
-	var box *frame.Box
+func solveWidthTopDown(c frame.Container, inherited inheritedParams) (syn synthesizedParams) {
 	// TODO fix relative width,margins => resolve against enclosing
-	width := c.CSSBox().BorderBoxWidth()
+	// => should already been done
+	width := c.CSSBox().ContentWidth()
+	T().Debugf("solving width top down, width now = %v", width)
 	calc, err := width.Match(option.Of{
 		option.None:       calcWidthAsRest, // default is `auto`
 		css.Auto:          calcWidthAsRest,
@@ -150,41 +205,60 @@ func SolveWidthTopDown(c boxtree.Container, enclosing dimen.Dimen) (*frame.Box, 
 		option.Some:       takeWidth,
 	})
 	if err != nil {
-		return c.CSSBox(), err
+		return withError(syn, err)
 	}
-	solve := calc.(calcFn)
-	w, _ := solve(c, width, css.SomeDimen(enclosing))
-	box = distributeMarginSpace(c, w.Unwrap(), enclosing)
-	return box, nil
+	solve := asCalcFn(calc)
+	w, _ := solve(c, width, inherited.W)
+	box := distributeMarginSpace(c, w.Unwrap(), inherited.W.Unwrap())
+	// TODO how to proceed with box?
+	// -> assign to CSS box of c
+	T().Debugf("solved W to %s", box.TotalWidth())
+	if !box.W.IsAbsolute() {
+		return withError(syn, "box width not determined after margin space distribution")
+	}
+	syn.W = box.TotalWidth().Unwrap()
+	return
 }
 
-func SolveWidthBottomUp(c boxtree.Container, enclosing dimen.Dimen) (*frame.Box, error) {
+func solveWidthForContent(c frame.Container, inherited inheritedParams) (syn synthesizedParams) {
+	panic("TODO")
+}
+
+func SolveWidthBottomUp(c frame.Container, enclosing dimen.Dimen) (*frame.Box, error) {
 	panic("TODO")
 }
 
 // --- Various dimen constraint solving strategies ---------------------------
 
-type calcFn func(c boxtree.Container, w, enclosing css.DimenT) (css.DimenT, error)
+type calcFn func(c frame.Container, w, enclosing css.DimenT) (css.DimenT, error)
 
-func takeWidth(c boxtree.Container, w, enclosing css.DimenT) (css.DimenT, error) {
-	return w, nil
+func asCalcFn(f interface{}) calcFn {
+	return f.(func(c frame.Container, w, enclosing css.DimenT) (css.DimenT, error))
+}
+
+func takeWidth(c frame.Container, w, enclosing css.DimenT) (css.DimenT, error) {
+	T().Debugf("calculating width: simply take is as is = %v", w)
+	return c.CSSBox().ContentWidth(), nil
 }
 
 // Spec: If 'width' is set to 'auto', any other 'auto' values become '0'
 // and 'width' follows from the resulting equality.
-func calcWidthAsRest(c boxtree.Container, w, enclosing css.DimenT) (css.DimenT, error) {
+func calcWidthAsRest(c frame.Container, w, enclosing css.DimenT) (css.DimenT, error) {
 	left := fixDimensionMust(c.CSSBox().Margins[frame.Left], c, enclosing)
 	c.CSSBox().Margins[frame.Left] = css.SomeDimen(left) // do not lose fixed value
 	right := fixDimensionMust(c.CSSBox().Margins[frame.Right], c, enclosing)
 	c.CSSBox().Margins[frame.Right] = css.SomeDimen(right) // do not lose fixed value
 	width := enclosing.Unwrap() - left - right
-	return css.SomeDimen(width), nil
+	r := css.SomeDimen(width)
+	T().Debugf("calculate width as rest (without decoration) to %s", r)
+	return r, nil
+	//return css.SomeDimen(width), nil
 }
 
 // ---------------------------------------------------------------------------
 
 // This must not be called for dimensions in unfixed relative units, except '%'.
-func fixDimensionMust(d css.DimenT, c boxtree.Container, enclosing css.DimenT) (fixedDimen dimen.Dimen) {
+func fixDimensionMust(d css.DimenT, c frame.Container, enclosing css.DimenT) (fixedDimen dimen.Dimen) {
 	var err error
 	var fixed interface{}
 	if d.IsRelative() {
@@ -208,7 +282,7 @@ func fixDimensionMust(d css.DimenT, c boxtree.Container, enclosing css.DimenT) (
 }
 
 // Forbidden to have side effects !
-func fixRelativeDimension(d css.DimenT, c boxtree.Container, w css.DimenT) (dimen.Dimen, error) {
+func fixRelativeDimension(d css.DimenT, c frame.Container, w css.DimenT) (dimen.Dimen, error) {
 	if d.IsAbsolute() {
 		return d.Unwrap(), nil
 	}
@@ -229,10 +303,9 @@ func fixRelativeDimension(d css.DimenT, c boxtree.Container, w css.DimenT) (dime
 }
 
 // w and enclosing should be fixed
-func distributeMarginSpace(c boxtree.Container, w, enclosing dimen.Dimen) *frame.Box {
-	box := &frame.Box{}
-	box.H = c.CSSBox().H
-	box.TopL = c.CSSBox().TopL
+func distributeMarginSpace(c frame.Container, w, enclosing dimen.Dimen) *frame.Box {
+	//box := &frame.Box{}
+	box := c.CSSBox() // make a copy of c's CSS box
 	remaining := enclosing - w
 	if remaining == 0 { // TODO fit into general case
 		box.FixBorderBoxWidth(w)
@@ -251,4 +324,24 @@ func distributeMarginSpace(c boxtree.Container, w, enclosing dimen.Dimen) *frame
 		box.FixBorderBoxWidth(w)
 	}
 	return box
+}
+
+func setWidthFromParent(c frame.Container, enclosing dimen.Dimen) bool {
+	dw := c.CSSBox().DecorationWidth(true)
+	if !dw.IsAbsolute() {
+		return false
+	}
+	return c.CSSBox().FixContentWidth(dw.Unwrap())
+}
+
+func withError(syn synthesizedParams, arg interface{}) synthesizedParams {
+	switch a := arg.(type) {
+	case string:
+		syn.lastErr = errors.New(a)
+	case error:
+		syn.lastErr = a
+	default:
+		syn.lastErr = errors.New("error")
+	}
+	return syn
 }

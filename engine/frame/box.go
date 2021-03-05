@@ -262,6 +262,28 @@ func (box *Box) OuterBox() Rect {
 	}
 }
 
+// DecorationWidth returns the cumulated width of padding, borders and margins,
+// if all of them have known values, and an unset dimension otherwise.
+func (box *Box) DecorationWidth(includeMargins bool) css.DimenT {
+	w := dimen.Zero
+	if includeMargins {
+		if !box.Margins[Left].IsAbsolute() || !box.Margins[Right].IsAbsolute() {
+			return css.Dimen()
+		}
+		w += box.Margins[Left].Unwrap()
+		w += box.Margins[Right].Unwrap()
+	}
+	if !box.Padding[Left].IsAbsolute() || !box.Padding[Right].IsAbsolute() ||
+		!box.BorderWidth[Left].IsAbsolute() || !box.BorderWidth[Right].IsAbsolute() {
+		return css.Dimen()
+	}
+	w += box.Padding[Left].Unwrap()
+	w += box.Padding[Right].Unwrap()
+	w += box.BorderWidth[Left].Unwrap()
+	w += box.BorderWidth[Right].Unwrap()
+	return css.SomeDimen(w)
+}
+
 // ---------------------------------------------------------------------------
 
 // CollapseMargins returns the greater margin between bottom margin of box1 and

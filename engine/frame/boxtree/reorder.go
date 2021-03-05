@@ -3,6 +3,7 @@ package boxtree
 import (
 	"github.com/npillmayer/tyse/core/option"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
+	"github.com/npillmayer/tyse/engine/frame"
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
@@ -50,8 +51,8 @@ func anchor(anchorCandidate *tree.Node, node *tree.Node) (match *tree.Node, err 
 	if node == nil || anchorCandidate == nil {
 		panic("one of node, anchor is nil")
 	}
-	positionedChild := node.Payload.(Container)
-	possibleAnchor := anchorCandidate.Payload.(Container)
+	positionedChild := node.Payload.(frame.Container)
+	possibleAnchor := anchorCandidate.Payload.(frame.Container)
 	if positionedChild.Type() != TypePrincipal || possibleAnchor.Type() != TypePrincipal {
 		return
 	}

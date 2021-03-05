@@ -1,69 +1,15 @@
-package boxtree
+package layout
 
 import (
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/frame"
-	"github.com/npillmayer/tyse/engine/tree"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 )
 
-type FormattingContextType uint8
-
-// Currently we know about four formatting context types.
 const (
-	NoContext FormattingContextType = iota
-	BlockFormattingContext
-	InlineFormattingContext
-	FlexFormattingContext
-	GridFormattingContext
+	TypeBlockFormattingContext  frame.FormattingContextType = 100
+	TypeInlineFormattingContext frame.FormattingContextType = 101
 )
-
-// Context establishes a CSS formatting context.
-//
-// “Boxes in the normal flow belong to a formatting context, which may be block or
-// inline, but not both simultaneously. Block-level boxes participate in a block
-// formatting context. Inline-level boxes participate in an inline formatting context.”
-//
-type Context interface {
-	Type() FormattingContextType
-	Container() Container // container which creates this formatting context
-	IsFlowRoot() bool     // this is a self-contained BFC
-	FlowRoot() *FlowRoot  // non-nil if this context is a flow root
-}
-
-type FlowRoot struct {
-	PositionedFloats   *FloatList
-	UnpositionedFloats *FloatList
-}
-
-type contextBase struct {
-	tree.Node
-	container Container
-	isRoot    bool
-	flowRoot  *FlowRoot
-}
-
-func (ctx contextBase) Container() Container {
-	return ctx.container
-}
-
-// func (ctx contextBase) Self() Context {
-// 	if ctx.container == nil || ctx.container.Context() == nil {
-// 		panic("CSS context: internal inconsistency")
-// 	}
-// 	return ctx.container.Context()
-// }
-
-func (ctx contextBase) TreeNode() *tree.Node {
-	return &ctx.Node
-}
-
-func (ctx contextBase) IsFlowRoot() bool {
-	return ctx.isRoot
-}
-
-func (ctx contextBase) FlowRoot() *FlowRoot {
-	return ctx.flowRoot
-}
 
 // --- Block Formatting Context ----------------------------------------------
 
@@ -84,45 +30,45 @@ func (ctx contextBase) FlowRoot() *FlowRoot {
 // and margins only collapse between elements in the same formatting context.
 //
 type BlockContext struct {
-	contextBase
+	frame.ContextBase
 }
 
-func NewBlockContext(c Container, isRoot bool) *BlockContext {
+func NewBlockContext(c frame.Container, isRoot bool) *BlockContext {
 	ctx := &BlockContext{}
-	ctx.isRoot = isRoot
-	ctx.container = c
+	ctx.IsRootCtx = isRoot
+	ctx.C = c
 	ctx.Payload = ctx
 	return ctx
 }
 
-func Block(ctx Context) *BlockContext {
+func Block(ctx frame.Context) *BlockContext {
 	if block, ok := ctx.(*BlockContext); ok {
 		return block
 	}
 	panic("context is not a block context")
 }
 
-func (ctx *BlockContext) Type() FormattingContextType {
-	return BlockFormattingContext
+func (ctx *BlockContext) Type() frame.FormattingContextType {
+	return TypeBlockFormattingContext
 }
 
-func (ctx *BlockContext) AddBox(c Container) {
+func (ctx *BlockContext) AddContained(c frame.Container) {
 	if c.DisplayMode() == frame.InlineMode {
-		anon := NewAnonymousBox(frame.InlineMode)
+		anon := boxtree.NewAnonymousBox(frame.InlineMode)
 		anon.AddChild(c.TreeNode())
 		return
 	}
 	if c.DOMNode().ComputedStyles().GetPropertyValue("float") == style.NullStyle {
 		T().P("context", "block").Errorf("float box cannot be added")
-		panic("illegal argument for InlineContext.AddBox(c)")
+		panic("illegal argument for BlockContext.AddBox(c)")
 	}
 	if c.DOMNode().ComputedStyles().GetPropertyValue("position") == "absolute" ||
 		c.DOMNode().ComputedStyles().GetPropertyValue("position") == "fixed" {
 		//
 		T().P("context", "block").Errorf("child container has absolute or fixed position")
-		panic("illegal argument for InlineContext.AddBox(c)")
+		panic("illegal argument for BlockContext.AddBox(c)")
 	}
-	if ctx.container.TreeNode().IndexOfChild(c.TreeNode()) >= 0 {
+	if ctx.C.TreeNode().IndexOfChild(c.TreeNode()) >= 0 {
 		T().P("context", "block").Errorf("child container cannot have 2 parents")
 		panic("container is child container; cannot have 2 parents")
 	}
@@ -132,29 +78,29 @@ func (ctx *BlockContext) AddBox(c Container) {
 // --- Inline Context --------------------------------------------------------
 
 type InlineContext struct {
-	contextBase
+	frame.ContextBase
 }
 
-func NewInlineContext(c Container, isRoot bool) *InlineContext {
+func NewInlineContext(c frame.Container, isRoot bool) *InlineContext {
 	ctx := &InlineContext{}
-	ctx.isRoot = isRoot
-	ctx.container = c
+	ctx.IsRootCtx = isRoot
+	ctx.C = c
 	ctx.Payload = ctx
 	return ctx
 }
 
-func Inline(ctx Context) *InlineContext {
+func Inline(ctx frame.Context) *InlineContext {
 	if inline, ok := ctx.(*InlineContext); ok {
 		return inline
 	}
 	panic("context is not an inline context")
 }
 
-func (ctx *InlineContext) Type() FormattingContextType {
-	return InlineFormattingContext
+func (ctx *InlineContext) Type() frame.FormattingContextType {
+	return TypeInlineFormattingContext
 }
 
-func (ctx *InlineContext) AddLineBox(c Container) {
+func (ctx *InlineContext) AddContained(c frame.Container) {
 	// May only add line boxes
 	// inline-block boxes will already be part of the khipu
 	//
@@ -172,11 +118,11 @@ func (ctx *InlineContext) AddLineBox(c Container) {
 		T().P("context", "inline").Errorf("child container has absolute or fixed position")
 		panic("illegal argument for InlineContext.AddLineBox(c)")
 	}
-	if ctx.container.TreeNode().IndexOfChild(c.TreeNode()) >= 0 {
+	if ctx.C.TreeNode().IndexOfChild(c.TreeNode()) >= 0 {
 		T().P("context", "inline").Errorf("child container cannot have 2 parents")
 		panic("container is child container; cannot have 2 parents")
 	}
-	anon := NewAnonymousBox(frame.InlineMode)
+	anon := boxtree.NewAnonymousBox(frame.InlineMode)
 	anon.AddChild(c.TreeNode())
 }
 
@@ -204,7 +150,7 @@ A new block formatting context is created by:
  *  column-span: all should always create a new formatting context, even when the column-span: all element isn't contained by a multicol container (Spec change, Chrome bug).
 
 */
-func CreateContextForContainer(c Container, mustRoot bool) Context {
+func CreateContextForContainer(c frame.Container, mustRoot bool) frame.Context {
 	T().Debugf("context for %+v", c.DOMNode().NodeName())
 	mode := frame.DisplayModeForDOMNode(c.DOMNode()).BlockOrInline()
 	// An inline box is one that is both inline-level and whose contents participate
@@ -239,7 +185,7 @@ func CreateContextForContainer(c Container, mustRoot bool) Context {
 		children := c.TreeNode().Children(true)
 		T().Debugf("context: children = %+v", children)
 		for _, ch := range children {
-			if childContainer, ok := ch.Payload.(Container); ok {
+			if childContainer, ok := ch.Payload.(frame.Container); ok {
 				modes |= childContainer.DisplayMode().BlockOrInline()
 			}
 		}

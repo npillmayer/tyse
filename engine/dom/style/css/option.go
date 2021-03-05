@@ -86,7 +86,7 @@ func (o DimenT) Match(choices interface{}) (value interface{}, err error) {
 
 // Equals is part of interface option.Type.
 func (o DimenT) Equals(other interface{}) bool {
-	T().Debugf("Dimen EQUALS %v ? %v", o, other)
+	//T().Debugf("Dimen EQUALS %v ? %v", o, other)
 	switch i := other.(type) {
 	case DimenT:
 		return o.d == i.d && o.flags == i.flags
