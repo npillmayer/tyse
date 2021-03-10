@@ -1,9 +1,10 @@
 package boxtree
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 
+	"github.com/npillmayer/tyse/core/option"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
@@ -106,26 +107,30 @@ func (pbox *PrincipalBox) Type() frame.ContainerType {
 // }
 
 func (pbox *PrincipalBox) Context() frame.Context {
-	if pbox.context == nil {
-		panic("principal box does not yet have a valid context")
-		//pbox.context = layout.CreateContextForContainer(pbox, false)
-		//
-		// if pbox.context == nil {
-		// 	parent := pbox.Node.Parent()
-		// 	for parent != nil {
-		// 		c, ok := parent.Payload.(Container)
-		// 		if !ok {
-		// 			break
-		// 		}
-		// 		ctx := c.Context()
-		// 		if ctx != nil {
-		// 			pbox.context = ctx
-		// 		}
-		// 		parent = parent.Parent()
-		// 	}
-		// }
-	}
+	// if pbox.context == nil {
+	// panic("principal box does not yet have a valid context")
+	//pbox.context = layout.CreateContextForContainer(pbox, false)
+	//
+	// if pbox.context == nil {
+	// 	parent := pbox.Node.Parent()
+	// 	for parent != nil {
+	// 		c, ok := parent.Payload.(Container)
+	// 		if !ok {
+	// 			break
+	// 		}
+	// 		ctx := c.Context()
+	// 		if ctx != nil {
+	// 			pbox.context = ctx
+	// 		}
+	// 		parent = parent.Parent()
+	// 	}
+	// }
+	// }
 	return pbox.context
+}
+
+func (pbox *PrincipalBox) SetContext(ctx frame.Context) {
+	pbox.context = ctx
 }
 
 // func (pbox *PrincipalBox) String() string {
@@ -298,8 +303,41 @@ func (pbox *PrincipalBox) AppendChild(child *PrincipalBox) {
 }
 
 func (pbox *PrincipalBox) PresetContained() bool {
-	panic("TODO")
-	return false
+	if pbox.Context() == nil {
+		T().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(pbox))
+		return false
+	}
+	children := pbox.TreeNode().Children(true)
+	T().Debugf("[%v] pre-sets %d sub container(s)", pbox.domNode.NodeName(), len(children))
+	hasAdded := false
+	for _, ch := range children {
+		switch b := ch.Payload.(type) {
+		case *PrincipalBox:
+			pos := css.PositionOption(b.DOMNode())
+			doAdd, err := pos.Match(option.Of{
+				option.None:            true,
+				css.PositionFloatLeft:  false,
+				css.PositionFloatRight: false,
+				css.PositionAbsolute:   false,
+				css.PositionFixed:      false,
+				option.Some:            true,
+			})
+			if err != nil {
+				T().Errorf("preset children container: %v", err)
+				return false
+			}
+			if doAdd.(bool) {
+				b.CSSBox().Max.W = pbox.CSSBox().W
+				pbox.Context().AddContained(b)
+				hasAdded = true
+			}
+		case *TextBox:
+			pbox.Context().AddContained(b)
+		case AnonymousBox:
+			T().Errorf("unexpected anonymous box child")
+		}
+	}
+	return hasAdded
 }
 
 // --- Anonymous Boxes -----------------------------------------------------------------
@@ -314,7 +352,8 @@ func (pbox *PrincipalBox) PresetContained() bool {
 // their principal boxes.
 type AnonymousBox struct {
 	frame.ContainerBase
-	Box *frame.Box // an anoymous box cannot be styled
+	Box     *frame.Box // an anoymous box cannot be styled
+	context frame.Context
 	//displayMode frame.DisplayMode // container lives in this mode (block or inline)
 	// ChildInxFrom uint32            // this box represents children starting at #ChildInxFrom of the principal box
 	// ChildInxTo   uint32            // this box represents children to #ChildInxTo
@@ -380,19 +419,57 @@ func (anon *AnonymousBox) Type() frame.ContainerType {
 // }
 
 func (anon *AnonymousBox) Context() frame.Context {
-	return nil // TODO
+	return anon.context
+}
+
+func (anon *AnonymousBox) SetContext(ctx frame.Context) {
+	anon.context = ctx
 }
 
 func NewAnonymousBox(mode css.DisplayMode) *AnonymousBox {
 	anon := &AnonymousBox{}
+	anon.Box = frame.InitEmptyBox(anon.CSSBox())
 	anon.Display = mode
 	anon.Payload = anon // always points to itself: tree node -> box
 	return anon
 }
 
 func (anon *AnonymousBox) PresetContained() bool {
-	panic("TODO")
-	return false
+	if anon.Context() == nil {
+		T().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(anon))
+		return false
+	}
+	children := anon.TreeNode().Children(true)
+	T().Debugf("[anon] pre-sets %d sub container(s)", len(children))
+	hasAdded := false
+	for _, ch := range children {
+		switch b := ch.Payload.(type) {
+		case *PrincipalBox:
+			pos := css.PositionOption(b.DOMNode())
+			doAdd, err := pos.Match(option.Of{
+				option.None:            true,
+				css.PositionFloatLeft:  false,
+				css.PositionFloatRight: false,
+				css.PositionAbsolute:   false,
+				css.PositionFixed:      false,
+				option.Some:            true,
+			})
+			if err != nil {
+				T().Errorf("preset children container: %v", err)
+				return false
+			}
+			if doAdd.(bool) {
+				b.CSSBox().Max.W = anon.CSSBox().W
+				anon.Context().AddContained(b)
+				hasAdded = true
+			}
+		case *TextBox:
+			anon.Context().AddContained(b)
+		case AnonymousBox:
+			T().Errorf("unexpected anonymous box child")
+		}
+	}
+	return hasAdded
 }
 
 // --- Text Boxes ----------------------------------------------------------------------
@@ -413,10 +490,9 @@ type TextBox struct {
 }
 
 func NewTextBox(domnode *dom.W3CNode) *TextBox {
-	tbox := &TextBox{
-		domNode: domnode,
-		//outerMode: FlowMode,
-	}
+	tbox := &TextBox{domNode: domnode}
+	tbox.Box = frame.InitEmptyBox(tbox.CSSBox())
+	tbox.Display = css.InlineMode | css.InnerInlineMode
 	tbox.Payload = tbox // always points to itself: tree node -> box
 	return tbox
 }
@@ -461,8 +537,11 @@ func (tbox *TextBox) Context() frame.Context {
 	return nil
 }
 
+func (tbox *TextBox) SetContext(frame.Context) {
+	// do nothing
+}
+
 func (tbox *TextBox) PresetContained() bool {
-	panic("TODO")
 	return false
 }
 
@@ -475,6 +554,34 @@ func (tbox *TextBox) PresetContained() bool {
 
 // ----------------------------------------------------------------------------------
 
+func ContainerName(c frame.Container) string {
+	if c.Type() == TypeText {
+		return shortText(c.(*TextBox))
+	}
+	if c.DOMNode() == nil {
+		return "anon-box"
+	}
+	return c.DOMNode().NodeName()
+}
+
+func shortText(tbox *TextBox) string {
+	txt := tbox.domNode.NodeValue()
+	//disp := box.C.DisplayMode()
+	//sym := disp.Symbol()
+	//s := fmt.Sprintf("\"%s\u2000\\\"", sym)
+	s := fmt.Sprintf("\"%s\u2000\\\"", "T")
+	if len(txt) > 10 {
+		s += txt[:10] + "…\\\"\""
+	} else {
+		s += txt + "\\\"\""
+	}
+	s = strings.Replace(s, "\n", `\\n`, -1)
+	s = strings.Replace(s, "\t", `\\t`, -1)
+	s = strings.Replace(s, " ", "\u2423", -1)
+	return s
+}
+
+/*
 type runlength []intv // a list of intervals
 type intv struct {    // run-length interval
 	from, len uint32
@@ -546,3 +653,4 @@ func (rl runlength) String() string {
 	b.WriteString(" )")
 	return b.String()
 }
+*/

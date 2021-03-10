@@ -26,11 +26,12 @@ const (
 type LineBox struct {
 	frame.ContainerBase
 	//tree.Node
-	Box    *frame.Box
-	khipu  *khipu.Khipu
-	indent dimen.Dimen // horizontal offset of the text within the line box
-	pos    int64       // start position within the khipu
-	length int64       // length of the segment for this line
+	Box     *frame.Box
+	khipu   *khipu.Khipu
+	indent  dimen.Dimen   // horizontal offset of the text within the line box
+	pos     int64         // start position within the khipu
+	length  int64         // length of the segment for this line
+	context frame.Context // formatting context
 	//ChildInx uint32      // this box represents a text node at #ChildInx of the principal box
 }
 
@@ -95,6 +96,10 @@ func (lbox *LineBox) Context() frame.Context {
 	return nil
 }
 
+func (lbox *LineBox) SetContext(ctx frame.Context) {
+	lbox.context = ctx
+}
+
 func (lbox *LineBox) PresetContained() bool {
 	panic("TODO")
 	return false
@@ -117,19 +122,19 @@ var _ frame.Container = &LineBox{}
 // If an error occurs during line-breaking, a pbox of nil is returned, together with the
 // error value.
 //
-func BreakParagraph(k *khipu.Khipu, pbox *boxtree.PrincipalBox,
-	regs *parameters.TypesettingRegisters) (*boxtree.PrincipalBox, error) {
+func BreakParagraph(para *Paragraph, box *frame.Box) ([]frame.Container, error) {
 	//
 	// TODO
 	// find all children with align=left or align=right and collect their boxes
 	// there should be an API for this in frame/layout.
 	//
-	leftAlign, rightAlign := collectAlignedBoxes(pbox)
-	parshape := OutlineParshape(pbox, leftAlign, rightAlign)
+	//leftAlign, rightAlign := collectFloatBoxes(pbox)
+	//parshape := OutlineParshape(pbox, leftAlign, rightAlign)
+	parshape := OutlineParshape(box, nil, nil)
 	if parshape == nil {
 		T().Errorf("could not create a parshape for principal box")
 	}
-	cursor := linebreak.NewFixedWidthCursor(khipu.NewCursor(k), 10*dimen.BP, 0)
+	cursor := linebreak.NewFixedWidthCursor(khipu.NewCursor(para.Khipu), 10*dimen.BP, 0)
 	breakpoints, err := firstfit.BreakParagraph(cursor, parshape, nil)
 	if err != nil {
 		return nil, err
@@ -140,20 +145,39 @@ func BreakParagraph(k *khipu.Khipu, pbox *boxtree.PrincipalBox,
 	// assemble the broken line segments into anonymous line boxes
 	T().Debugf("     |---------+---------+---------+---------+---------50--------|")
 	j := int64(0)
+	var lines []frame.Container
 	for i := 1; i < len(breakpoints); i++ {
 		pos := breakpoints[i].Position()
-		T().Debugf("%3d: %s", i, k.Text(j, pos))
+		T().Debugf("%3d: %s", i, para.Khipu.Text(j, pos))
 		l := pos - j
 		indent := dimen.Dimen(0) // TODO derive from parshape
-		linebox := NewLineBox(k, breakpoints[i].Position(), l, indent)
-		linebox.AppendToPrincipalBox(pbox)
+		linebox := NewLineBox(para.Khipu, breakpoints[i].Position(), l, indent)
+		lines = append(lines, linebox)
+		//linebox.AppendToPrincipalBox(pbox)
 		j = breakpoints[i].Position()
 	}
 	//
-	return nil, nil
+	return lines, nil
 }
 
-func FindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
+func TextOfParagraph(c frame.Container) (*Paragraph, []frame.Container, error) {
+	paraText, blocks, err := paragraphTextFromBox(c)
+	if err != nil {
+		T().Errorf(err.Error())
+		return nil, []frame.Container{}, err
+	}
+	paraText.Regs = parameters.NewTypesettingRegisters()
+	paraText.Regs = adaptTypesettingRegisters(paraText.Regs, c)
+	paraText.Khipu, err = khipu.EncodeParagraph(paraText.Paragraph, 0,
+		monospace.Shaper(11*dimen.PT, nil), nil, paraText.Regs)
+	if err != nil || paraText.Khipu == nil {
+		T().Errorf("lines: khipu resulting from paragraph is nil")
+		return nil, []frame.Container{}, err
+	}
+	return paraText, blocks, err
+}
+
+func XFindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
 	[]frame.Container, frame.Context, error) {
 	//
 	paraText, blocks, err := paragraphTextFromBox(pbox)
@@ -171,12 +195,12 @@ func FindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
 	pbox.para = paraText
 	pbox.khipu = k
 	//
-	if ctx := boxtree.CreateContextForContainer(pbox, false); ctx != nil {
-		// we have to respect floats from the root context
-		// ...
-		// then move on to the paragraphs context
-		rootctx = ctx
-	}
+	// if ctx := boxtree.CreateContextForContainer(pbox, false); ctx != nil {
+	// we have to respect floats from the root context
+	// ...
+	// then move on to the paragraphs context
+	// rootctx = ctx
+	// }
 	if !pbox.Box.W.IsAbsolute() {
 		panic("width of paragraph's box not known")
 	}
@@ -200,7 +224,7 @@ func FindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
 	*/
 }
 
-func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, pbox *ParagraphBox) *parameters.TypesettingRegisters {
+func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, c frame.Container) *parameters.TypesettingRegisters {
 	return regs
 }
 
@@ -220,7 +244,7 @@ func addLineHeights(pbox *boxtree.PrincipalBox) dimen.Dimen {
 	return height
 }
 
-func collectAlignedBoxes(pbox *boxtree.PrincipalBox) ([]*frame.Box, []*frame.Box) {
+func collectFloatBoxes(pbox *boxtree.PrincipalBox) ([]*frame.Box, []*frame.Box) {
 	// TODO
 	// Float handling has to be re-thought completely
 	return []*frame.Box{}, []*frame.Box{}

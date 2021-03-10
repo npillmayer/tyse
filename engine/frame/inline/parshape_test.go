@@ -3,9 +3,7 @@ package inline
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/npillmayer/tyse/engine/frame"
@@ -35,6 +33,7 @@ func TestBoxIntersection(t *testing.T) {
 	}
 }
 
+/*
 func TestParaPolygon(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
@@ -45,6 +44,7 @@ func TestParaPolygon(t *testing.T) {
 	_ = OutlineParshape(para, leftAlign, rightAlign)
 	t.Fail()
 }
+*/
 
 // --- Helpers ----------------------------------------------------------
 

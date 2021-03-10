@@ -1,9 +1,6 @@
 package boxtree
 
-import (
-	"testing"
-)
-
+/*
 func TestIntervals(t *testing.T) {
 	// teardown := gotestingadapter.RedirectTracing(t)
 	// defer teardown()
@@ -36,6 +33,7 @@ func TestIntervalTranslation(t *testing.T) {
 		}
 	}
 }
+*/
 
 // func TestDisplayMode(t *testing.T) {
 // 	// teardown := gotestingadapter.RedirectTracing(t)

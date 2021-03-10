@@ -80,17 +80,17 @@ func TestBreakParagraph(t *testing.T) {
 	para, _ := InnerParagraphText(p)
 	t.Logf("inner text of DOM = '%s'", para.Raw().String())
 	regs := parameters.NewTypesettingRegisters()
-	k, _ := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
+	_, _ = khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	//t.Logf("khipu = %v", k)
 	pbox := boxtree.NewPrincipalBox(p, css.BlockMode)
 	pbox.Box.W = css.SomeDimen(60 * 10 * dimen.BP)
 	pbox.Box.H = css.SomeDimen(10 * dimen.CM)
-	var err error
+	//var err error
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-	pbox, err = BreakParagraph(k, pbox, regs)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	// pbox, err = BreakParagraph(k, pbox, regs)
+	// if err != nil {
+	// 	t.Fatal(err.Error())
+	// }
 	//
 	t.Fail()
 }
@@ -108,16 +108,16 @@ func TestInlineBoxes(t *testing.T) {
 	para, _ := InnerParagraphText(p)
 	t.Logf("inner text of DOM = '%s'", para.Raw().String())
 	regs := parameters.NewTypesettingRegisters()
-	k, _ := khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
+	_, _ = khipu.EncodeParagraph(para.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	//t.Logf("khipu = %v", k)
 	pbox.Box.W = css.SomeDimen(60 * 10 * dimen.BP)
 	pbox.Box.H = css.SomeDimen(10 * dimen.CM)
-	var err error
+	//var err error
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-	pbox, err = BreakParagraph(k, pbox, regs)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	// pbox, err = BreakParagraph(k, pbox, regs)
+	// if err != nil {
+	// 	t.Fatal(err.Error())
+	// }
 	//
 	t.Fail()
 }

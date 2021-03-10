@@ -74,7 +74,10 @@ func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthes
 	}
 	if !boxRoot.DisplayMode().Outer().Contains(css.BlockMode) {
 		syn.lastErr = errors.New("layout root expected to have display mode block")
-	} else if boxRoot.Context() == nil || !boxRoot.Context().IsFlowRoot() {
+	}
+	boxRoot.SetContext(NewContextFor(boxRoot))
+	// This should be deferred to CalcBlockWidths, even for #document ?!
+	if !boxRoot.Context().IsFlowRoot() {
 		syn.lastErr = errors.New("layout root expected to be flow root")
 	} else {
 		params.flowRoot = boxRoot.Context().FlowRoot()
@@ -83,11 +86,13 @@ func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthes
 	if syn.lastErr != nil {
 		T().Errorf("layout tree: %v", syn.lastErr)
 	}
+	// now recursivly call boxRoot.Context().Layout(params/flowRoot)
 	return syn
 }
 
 // Potentially recursive call to nested containers
 func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesizedParams) {
+	T().Debugf("calculating block width of [%s]", boxtree.ContainerName(c))
 	// case c.Box.W is Font or View dependent: should have been done already => error
 	// case c.Box.W is Content dependent: call calc on nested block
 	// case c.Box.W is absolute: we're done
@@ -112,26 +117,44 @@ func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesi
 	//      subtract floats' width from enclosing width
 	//
 	// Now we're ready to:
-	syn = solveWidthTopDown(c, inherited) // TODO how to recurse down? => context ?
+	syn = solveWidthTopDown(c, inherited)
 	// recursion step
 	if syn.lastErr == nil {
+		c.SetContext(NewContextFor(c))
 		// recurse down
 		if hasContained := c.PresetContained(); hasContained {
+			T().Debugf("calculating width for %d children of [%s]", len(c.Context().Contained()),
+				boxtree.ContainerName(c))
 			for _, sub := range c.Context().Contained() {
+				if sub.Type() == boxtree.TypeText {
+					continue
+				}
 				inherited.W = c.CSSBox().W
 				inherited.MaxW = c.CSSBox().W.Unwrap()
+				T().Debugf("width of sub-container [%s]", boxtree.ContainerName(sub))
 				s := CalcBlockWidths(sub, inherited)
 				if s.lastErr != nil {
-					break
+					syn.lastErr = s.lastErr
+					return
 				}
 			}
 		}
+		// now c should have its width determined
+		// and the non-text sub-containers of c should have their dimensions fixed
+		T().Debugf("calling [%s].Layout()", boxtree.ContainerName(c))
+		syn.lastErr = c.Context().Layout(inherited.flowRoot)
 	} else if syn.lastErr == ErrContentScaling {
+		T().Debugf("[%v] width cannot be solved top-down, have to calc content-based",
+			c.DOMNode().NodeName())
 		syn = solveWidthForContent(c, inherited) // this will recurse all the way down
 	}
-	// now the subtree of c has its width fixed
-	if syn.lastErr == nil {
-		syn.lastErr = errors.New("SUCCESS") // TODO just for testing => remove
+	if syn.lastErr != nil {
+		T().Debugf("calc block width: last error = %v", syn.lastErr)
+	}
+	if _, h := c.Context().Measure(); !h.IsNone() {
+		syn.H = h.Unwrap()
+	} else {
+		return withError(syn, "height of context not determined")
 	}
 	return
 }
@@ -197,7 +220,6 @@ func solveWidthTopDown(c frame.Container, inherited inheritedParams) (syn synthe
 	// TODO fix relative width,margins => resolve against enclosing
 	// => should already been done
 	width := c.CSSBox().ContentWidth()
-	T().Debugf("solving width top down, width now = %v", width)
 	calc, err := width.Match(option.Of{
 		option.None:       calcWidthAsRest, // default is `auto`
 		css.Auto:          calcWidthAsRest,
@@ -207,12 +229,13 @@ func solveWidthTopDown(c frame.Container, inherited inheritedParams) (syn synthe
 	if err != nil {
 		return withError(syn, err)
 	}
+	T().Debugf("solving width of [%v] top down, width now = %v", boxtree.ContainerName(c), width)
 	solve := asCalcFn(calc)
 	w, _ := solve(c, width, inherited.W)
 	box := distributeMarginSpace(c, w.Unwrap(), inherited.W.Unwrap())
 	// TODO how to proceed with box?
 	// -> assign to CSS box of c
-	T().Debugf("solved W to %s", box.TotalWidth())
+	T().Debugf("solved width of [%v] to %s", boxtree.ContainerName(c), box.TotalWidth())
 	if !box.W.IsAbsolute() {
 		return withError(syn, "box width not determined after margin space distribution")
 	}

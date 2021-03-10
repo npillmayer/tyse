@@ -139,6 +139,11 @@ func (o DimenT) IsRelative() bool {
 	return o.flags&relativeMask > 0
 }
 
+// IsPercent returns true if o represents a percentage dimension (`%`).
+func (o DimenT) IsPercent() bool {
+	return o.flags&dimenPRCNT > 0
+}
+
 // IsAbsolute returns true if o represents a valid absolute dimension.
 func (o DimenT) IsAbsolute() bool {
 	return o.flags == dimenAbsolute
@@ -198,8 +203,15 @@ func (o DimenT) String() string {
 	case dimenInherit:
 		return "inherit"
 	}
+	switch o.flags & contentMask {
+	case DimenContentFit:
+		return "fit-content"
+	}
 	if o.IsRelative() {
 		if unit, ok := relUnitMap[o.flags&relativeMask]; ok {
+			if unit == "%" {
+				unit = "pcnt"
+			}
 			return fmt.Sprintf("%d%s", o.d, unit)
 		}
 	}
@@ -227,7 +239,7 @@ var relUnitStringMap map[string]uint32 = map[string]uint32{
 	"vh":   dimenVH,
 	"vmin": dimenVMIN,
 	"vmax": dimenVMAX,
-	"%":    dimenPRCNT,
+	`%`:    dimenPRCNT,
 }
 
 // DimenOption returns an optional dimension type from a property string.
@@ -243,6 +255,8 @@ func DimenOption(p style.Property) DimenT {
 		return DimenT{flags: dimenInitial}
 	case "inherit":
 		return DimenT{flags: dimenInherit}
+	case "fit-content":
+		return DimenT{flags: DimenContentFit}
 	}
 	d, err := ParseDimen(string(p))
 	if err != nil {

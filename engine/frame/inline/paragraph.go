@@ -6,6 +6,7 @@ import (
 
 	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/styled"
+	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
@@ -67,10 +68,14 @@ func (pbox *ParagraphBox) Type() frame.ContainerType {
 // }
 
 func (pbox *ParagraphBox) Context() frame.Context {
-	if pbox.context == nil {
-		pbox.context = boxtree.CreateContextForContainer(pbox, false)
-	}
+	// if pbox.context == nil {
+	// 	pbox.context = boxtree.CreateContextForContainer(pbox, false)
+	// }
 	return pbox.context
+}
+
+func (pbox *ParagraphBox) SetContext(ctx frame.Context) {
+	pbox.context = ctx
 }
 
 func (pbox *ParagraphBox) PresetContained() bool {
@@ -86,8 +91,10 @@ func (pbox *ParagraphBox) ChildIndices() (uint32, uint32) {
 
 // Paragraph represents a styled paragraph of text, from a W3C DOM.
 type Paragraph struct {
-	*styled.Paragraph         // a Paragraph is a styled text
-	irs               infoIRS // info about Bidi Isolating Run Sequences
+	*styled.Paragraph              // a Paragraph is a styled text
+	irs               infoIRS      // info about Bidi Isolating Run Sequences
+	Khipu             *khipu.Khipu // knot-encoding of the paragraph's text
+	Regs              *parameters.TypesettingRegisters
 }
 
 type infoIRS struct {
@@ -112,24 +119,26 @@ func paragraphTextFromBox(c frame.Container) (*Paragraph, []frame.Container, err
 		},
 	}
 	var innerText *styled.Text // TODO set boxText()
-	innerText, blocks, err := boxText(c, &para.irs)
+	innerText, blocks, err := containedText(c, &para.irs)
+	//T().Debugf("para from container: inner text = '%s'", innerText.Raw())
 	eBidiDir, _ := findEmbeddingBidiDirection(c.DOMNode())
 	para.Paragraph, err = styled.ParagraphFromText(innerText, 0, innerText.Raw().Len(), eBidiDir,
 		para.bidiMarkup())
 	return para, blocks, err
 }
 
-func boxText(c frame.Container, irs *infoIRS) (*styled.Text, []frame.Container, error) {
+func containedText(c frame.Container, irs *infoIRS) (*styled.Text, []frame.Container, error) {
 	if c == nil {
 		return styled.TextFromString(""), []frame.Container{}, cords.ErrIllegalArguments
 	}
 	b := styled.NewTextBuilder()
 	var blocks []frame.Container
-	collectBoxText(c, b, irs, blocks)
+	T().Debugf("collecting contained text of [%s]", boxtree.ContainerName(c))
+	collectContainedText(c, c, b, irs, blocks)
 	return b.Text(), blocks, nil
 }
 
-func collectBoxText(c frame.Container, b *styled.TextBuilder, irs *infoIRS,
+func collectContainedText(root, c frame.Container, b *styled.TextBuilder, irs *infoIRS,
 	blocks []frame.Container) {
 	//
 	if c.DOMNode() != nil && c.DOMNode().NodeType() == html.TextNode {
@@ -144,30 +153,34 @@ func collectBoxText(c frame.Container, b *styled.TextBuilder, irs *infoIRS,
 		}
 		//text.Style(styleset, pos, pos+l.Weight())
 		b.Append(leaf, styleset)
-	} else if c.DisplayMode().BlockOrInline() == css.BlockMode {
+	} else if c != root && c.DisplayMode().Outer() == css.BlockMode {
 		b.Append(&nonReplacableElementLeaf{c.DOMNode()}, frame.StyleSet{})
 	} else {
-		T().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())
-	}
-	if c.TreeNode().ChildCount() > 0 {
-		children := c.TreeNode().Children(true)
-		for _, ch := range children {
-			if childContainer, ok := ch.Payload.(frame.Container); ok {
-				collectBoxText(childContainer, b, irs, blocks)
-			}
+		//T().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())
+		children := c.Context().Contained()
+		for _, childContainer := range children {
+			collectContainedText(root, childContainer, b, irs, blocks)
 		}
 	}
+	// if c.TreeNode().ChildCount() > 0 {
+	// 	children := c.TreeNode().Children(true)
+	// 	for _, ch := range children {
+	// 		if childContainer, ok := ch.Payload.(frame.Container); ok {
+	// 			collectContainedText(root, childContainer, b, irs, blocks)
+	// 		}
+	// 	}
+	// }
 }
 
-func createLeaf(n w3cdom.Node) *pLeaf {
+func createLeaf(n *dom.W3CNode) *pLeaf {
 	parent := n.ParentNode()
 	for parent != nil && parent.NodeType() != html.ElementNode {
 		parent = parent.ParentNode()
 	}
-	//T().Debugf("parent of text node = %v", parent)
 	value := n.NodeValue()
+	//T().Debugf("parent of text node = %v, text = '%s'", parent, value)
 	leaf := &pLeaf{
-		element: parent,
+		element: parent.(*dom.W3CNode),
 		length:  uint64(len(value)),
 		content: value,
 	}
@@ -176,10 +189,12 @@ func createLeaf(n w3cdom.Node) *pLeaf {
 
 // --- Paragraph from W3C Node -----------------------------------------------
 
+// Previous version
+
 // InnerParagraphText creates a Paragraph instance holding the text content
 // of a W3C DOM node as a styled text.
 // node should be a paragraph-level HTML node, but this is not enforced.
-func InnerParagraphText(node w3cdom.Node) (*Paragraph, error) {
+func InnerParagraphText(node *dom.W3CNode) (*Paragraph, error) {
 	para := &Paragraph{
 		irs: infoIRS{
 			irsElems: make(map[uint64]bidi.Direction),
@@ -267,7 +282,7 @@ func (r Run) Len() uint64 {
 // The fragment organization of the resulting cord(s) will reflect the hierarchy of
 // the element node's descendents.
 //
-func innerText(n w3cdom.Node, irs *infoIRS) (*styled.Text, error) {
+func innerText(n *dom.W3CNode, irs *infoIRS) (*styled.Text, error) {
 	if n == nil {
 		return styled.TextFromString(""), cords.ErrIllegalArguments
 	}
@@ -276,7 +291,7 @@ func innerText(n w3cdom.Node, irs *infoIRS) (*styled.Text, error) {
 	return b.Text(), nil
 }
 
-func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
+func collectText(n *dom.W3CNode, b *styled.TextBuilder, irs *infoIRS) {
 	if n.NodeType() == html.ElementNode {
 		if n.ComputedStyles().GetPropertyValue("display") == "block" {
 			b.Append(&nonReplacableElementLeaf{n}, frame.StyleSet{})
@@ -314,7 +329,7 @@ func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
 	}
 	if n.HasChildNodes() {
 		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-			collectText(c, b, irs)
+			collectText(c.(*dom.W3CNode), b, irs)
 		}
 	}
 }
@@ -333,7 +348,10 @@ func collectText(n w3cdom.Node, b *styled.TextBuilder, irs *infoIRS) {
 // Bidi directions in HTML may either be set with an attribute `dir` (highest
 // priority) or with CSS property `direction`. We treat L2R as the default,
 // only switching it for explicit setting of R2L.
-func findEmbeddingBidiDirection(pnode w3cdom.Node) (eBidiDir bidi.Direction, explicit bool) {
+func findEmbeddingBidiDirection(pnode *dom.W3CNode) (eBidiDir bidi.Direction, explicit bool) {
+	if pnode == nil {
+		return
+	}
 	attrset := false
 	if pnode.HasAttributes() {
 		dirattr := pnode.Attributes().GetNamedItem("dir")
@@ -344,6 +362,7 @@ func findEmbeddingBidiDirection(pnode w3cdom.Node) (eBidiDir bidi.Direction, exp
 	}
 	if !attrset {
 		var textDir style.Property
+		_ = pnode.ComputedStyles().Styles()
 		textDir = css.GetLocalProperty(pnode.ComputedStyles().Styles(), "direction")
 		if textDir == "rtl" {
 			eBidiDir = bidi.RightToLeft
@@ -378,7 +397,7 @@ func (para *Paragraph) bidiMarkup() bidi.OutOfLineBidiMarkup {
 // pLeaf is the leaf type for cords from a paragraph of text.
 // Not intended for client usage.
 type pLeaf struct {
-	element w3cdom.Node
+	element *dom.W3CNode
 	length  uint64
 	content string
 }
@@ -400,12 +419,12 @@ func (l pLeaf) String() string {
 func (l pLeaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
 	left := &pLeaf{
 		element: l.element,
-		length:  l.length,
+		length:  i,
 		content: l.content[:i],
 	}
 	right := &pLeaf{
 		element: l.element,
-		length:  l.length,
+		length:  l.length - i,
 		content: l.content[i:],
 	}
 	return left, right

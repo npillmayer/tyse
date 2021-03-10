@@ -14,9 +14,10 @@ type Container interface {
 	DOMNode() *dom.W3CNode
 	TreeNode() *tree.Node
 	CSSBox() *Box
-	DisplayMode() css.DisplayMode
-	Context() Context
-	PresetContained() bool
+	DisplayMode() css.DisplayMode // CSS display property
+	Context() Context             // return the containers formatting context
+	SetContext(Context)           // context will be injected
+	PresetContained() bool        // pre-set contraints for children containers
 	ChildIndex() int
 }
 

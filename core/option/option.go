@@ -23,14 +23,14 @@ const (
 // if an error occurs.
 type Maybe map[MaybeOption]interface{}
 
-// Of is a type used for matching of optional types.
+// Of is a type used for matching of option-types.
 // It will first try to match concrete values, and in case of no match will
 // then try a Maybe match.
 type Of map[interface{}]interface{}
 
 //type expr func(interface{}) func(interface{}, MaybeOption) interface{}
 
-// Type is a type for optional values.
+// Type is a type for option values.
 type Type interface {
 	Match(choices interface{}) (interface{}, error)
 	Equals(other interface{}) bool

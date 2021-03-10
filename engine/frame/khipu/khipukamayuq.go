@@ -97,6 +97,7 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper glyphing.Sh
 	env.pipeline = PrepareTypesettingPipeline(text, env.pipeline)
 	var result *Khipu = NewKhipu()
 	T().Debugf("------------ start of para -----------")
+	//T().Debugf("para text = '%s'", para.Raw().String())
 	para.EachStyleRun(func(content string, sty styled.Style, pos, length uint64) error {
 		item := styledItem{
 			offset: para.Offset,

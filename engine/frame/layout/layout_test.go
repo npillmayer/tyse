@@ -27,7 +27,7 @@ func TestLayout(t *testing.T) {
 	gtrace.EngineTracer = gologadapter.New()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	gtrace.CoreTracer = gologadapter.New()
-	//gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
 	//
 	domroot := buildDOM(t, false)
 	boxes, err := boxtree.BuildBoxTree(domroot)

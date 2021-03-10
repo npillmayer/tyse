@@ -5,25 +5,23 @@ import (
 
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/frame"
-	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
 )
 
-func OutlineParshape(pbox *boxtree.PrincipalBox, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
-	if pbox.Box == nil || !pbox.CSSBox().HasFixedBorderBoxWidth(false) {
+func OutlineParshape(box *frame.Box, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
+	if box == nil || !box.HasFixedBorderBoxWidth(false) {
 		T().Errorf("outline parshape cannot be calculated for unfixed box")
 		panic("TODO")
 	}
-	boundingBox := pbox.Box.Box
-	T().Infof("parshape: bounding box = %v", boundingBox.Rect)
-	polygon := paragraphPolygon(&boundingBox, leftAlign, rightAlign)
+	T().Infof("parshape: bounding box = %v", box.Rect)
+	polygon := paragraphPolygon(box, leftAlign, rightAlign)
 	T().Debugf("polygon = %v", polygon)
 	if polygon == nil {
 		return nil
 	}
 	return polygonParshape{
 		lineskip: 12 * dimen.PT,
-		width:    pbox.Box.Box.ContentWidth().Unwrap(),
+		width:    box.ContentWidth().Unwrap(),
 		polygon:  polygon,
 	}
 }
