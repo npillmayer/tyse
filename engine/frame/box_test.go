@@ -111,9 +111,71 @@ func TestSetWidth(t *testing.T) {
 	box.Padding[Right] = css.DimenOption("10%")
 	box.SetWidth(css.SomeDimen(100 * dimen.PT))
 	assert.False(t, box.HasFixedBorderBoxWidth(false))
-	box.FixPrecentages(200 * dimen.PT)
+	box.FixPercentages(200 * dimen.PT)
 	assert.True(t, box.HasFixedBorderBoxWidth(false))
 	assert.True(t, box.HasFixedBorderBoxWidth(true))
 	assert.Equal(t, 20*dimen.PT, box.Padding[Left].Unwrap())
 	assert.Equal(t, css.SomeDimen(140*dimen.PT), box.TotalWidth())
+}
+
+func TestMargins(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	box := InitEmptyBox(&Box{})
+	box.Padding[Left] = css.SomeDimen(10 * dimen.PT)
+	box.SetWidth(css.SomeDimen(100 * dimen.PT))
+	assert.Equal(t, 110*dimen.PT, box.TotalWidth().Unwrap())
+	box.Margins[Left] = css.DimenOption("auto")
+	box.Margins[Right] = css.DimenOption("auto")
+	ok := distributeHorizontalMarginSpace(box, 200*dimen.PT)
+	assert.True(t, ok)
+	assert.Equal(t, 45*dimen.PT, box.Margins[Left].Unwrap())
+	assert.Equal(t, 45*dimen.PT, box.Margins[Right].Unwrap())
+	box.Margins[Left] = css.DimenOption("auto")
+	box.Margins[Right] = css.SomeDimen(10 * dimen.PT)
+	ok = distributeHorizontalMarginSpace(box, 200*dimen.PT)
+	assert.True(t, ok)
+	assert.Equal(t, 80*dimen.PT, box.Margins[Left].Unwrap())
+}
+
+func TestConstraints1(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	box := InitEmptyBox(&Box{})
+	box.Padding[Left] = css.SomeDimen(10 * dimen.PT)
+	box.SetWidth(css.SomeDimen(90 * dimen.PT))
+	box.Margins[Left] = css.DimenOption("auto")
+	box.Margins[Right] = css.DimenOption("auto")
+	//
+	ok, err := FixDimensionsFromEnclosingWidth(box, 200*dimen.PT)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.True(t, ok)
+	assert.Equal(t, 50*dimen.PT, box.Margins[Left].Unwrap())
+	assert.Equal(t, 50*dimen.PT, box.Margins[Right].Unwrap())
+}
+
+func TestConstraints2(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	box := InitEmptyBox(&Box{})
+	box.Padding[Left] = css.SomeDimen(10 * dimen.PT)
+	box.Padding[Right] = css.SomeDimen(10 * dimen.PT)
+	box.Margins[Left] = css.DimenOption("auto")
+	box.Margins[Right] = css.DimenOption("auto")
+	//
+	ok, err := FixDimensionsFromEnclosingWidth(box, 200*dimen.PT)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.True(t, ok)
+	assert.True(t, box.HasFixedBorderBoxWidth(false))
+	assert.Equal(t, 190*dimen.PT, box.W.Unwrap())
 }

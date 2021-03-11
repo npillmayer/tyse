@@ -33,6 +33,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
+	"image/color"
+
 	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/font"
@@ -64,6 +66,48 @@ func (set StyleSet) Equals(other styled.Style) bool {
 var _ styled.Style = StyleSet{}
 
 // ---------------------------------------------------------------------------
+
+// Box styling: We follow the CSS paradigm for boxes. Boxes are stylable
+// objects which have dimensions, spacing, borders and colors.
+//
+// Some boxes may just implement a subset of the styling parameters. Most
+// notably this holds for glyphs: Glyphs may have styled their content only.
+// No border or additional spacing is possible with glyphs.
+
+// ColorStyle is a type for styling with color.
+type ColorStyle struct {
+	Foreground color.Color
+	Background color.Color // may be (semi-)transparent
+}
+
+// TextStyle is a type for styling text.
+type TextStyle struct {
+	Typecase *font.TypeCase
+}
+
+// BorderStyle is a type for simple borders.
+type BorderStyle struct {
+	LineColor    color.Color
+	LineStyle    int8
+	CornerRadius dimen.Dimen
+}
+
+// LineStyle is a type for border line styles.
+type LineStyle int8
+
+// We support these line styles only
+const (
+	LSSolid  LineStyle = 0
+	LSDashed LineStyle = 1
+	LSDotted LineStyle = 2
+)
+
+// Styling rolls all styling options into one type.
+type Styling struct {
+	TextStyle TextStyle
+	Colors    ColorStyle
+	Border    BorderStyle
+}
 
 /*
 We take the following CSS properties as relevant for line boxes / span

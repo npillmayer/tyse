@@ -84,6 +84,28 @@ func (o DimenT) Match(choices interface{}) (value interface{}, err error) {
 	return option.Match(o, choices)
 }
 
+var errResultInvalidDimension error = errors.New("match-result is invalid dimension")
+
+// MatchToDimen performs a match and returnes the match-result as a dimen.Dimen.
+// If the match-result is not a legal dimension, dimen.Zero will be returned,
+// together with an error.
+func (o DimenT) MatchToDimen(choices interface{}) (value dimen.Dimen, err error) {
+	v, err := option.Match(o, choices)
+	if err != nil {
+		return dimen.Zero, err
+	} else if v == nil {
+		return dimen.Zero, errResultInvalidDimension
+	}
+	switch d := v.(type) {
+	case dimen.Dimen:
+		value = d
+	default:
+		value = dimen.Zero
+		err = errResultInvalidDimension
+	}
+	return
+}
+
 // Equals is part of interface option.Type.
 func (o DimenT) Equals(other interface{}) bool {
 	//T().Debugf("Dimen EQUALS %v ? %v", o, other)

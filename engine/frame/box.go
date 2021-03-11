@@ -36,11 +36,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
+	"errors"
 	"fmt"
-	"image/color"
 
 	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/core/option"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
 )
@@ -76,48 +75,6 @@ const (
 	Left
 )
 
-// Box styling: We follow the CSS paradigm for boxes. Boxes are stylable
-// objects which have dimensions, spacing, borders and colors.
-//
-// Some boxes may just implement a subset of the styling parameters. Most
-// notably this holds for glyphs: Glyphs may have styled their content only.
-// No border or additional spacing is possible with glyphs.
-
-// ColorStyle is a type for styling with color.
-type ColorStyle struct {
-	Foreground color.Color
-	Background color.Color // may be (semi-)transparent
-}
-
-// TextStyle is a type for styling text.
-type TextStyle struct {
-	Typecase *font.TypeCase
-}
-
-// BorderStyle is a type for simple borders.
-type BorderStyle struct {
-	LineColor    color.Color
-	LineStyle    int8
-	CornerRadius dimen.Dimen
-}
-
-// LineStyle is a type for border line styles.
-type LineStyle int8
-
-// We support these line styles only
-const (
-	LSSolid  LineStyle = 0
-	LSDashed LineStyle = 1
-	LSDotted LineStyle = 2
-)
-
-// Styling rolls all styling options into one type.
-type Styling struct {
-	TextStyle TextStyle
-	Colors    ColorStyle
-	Border    BorderStyle
-}
-
 // StyledBox is a type for a fully stylable box.
 type StyledBox struct {
 	Box
@@ -126,14 +83,19 @@ type StyledBox struct {
 
 // --- Handling of box dimensions --------------------------------------------
 
+// DebugString returns a textual representation of a box's dimensions.
+// Intended for debugging.
 func (box *Box) DebugString() string {
 	s := fmt.Sprintf("box{\n   w=%v  (bbox-sz=%v)\n", box.W, box.BorderBoxSizing)
-	s += fmt.Sprintf("   p.top=%v, p.right=%v, p.b=%v, p.l=%v\n",
+	s += fmt.Sprintf("   p.top=%v, p.right=%v, p.bottom=%v, p.left=%v\n",
 		box.Padding[Top], box.Padding[Right],
 		box.Padding[Bottom], box.Padding[Left])
-	s += fmt.Sprintf("   b.top=%v, b.right=%v, b.b=%v, b.l=%v\n",
+	s += fmt.Sprintf("   b.top=%v, b.right=%v, b.bottom=%v, b.left=%v\n",
 		box.BorderWidth[Top], box.BorderWidth[Right],
 		box.BorderWidth[Bottom], box.BorderWidth[Left])
+	s += fmt.Sprintf("   m.top=%v, m.right=%v, m.bottom=%v, m.left=%v\n",
+		box.Margins[Top], box.Margins[Right],
+		box.Margins[Bottom], box.Margins[Left])
 	s += "}"
 	return s
 }
@@ -382,7 +344,7 @@ func (box *Box) DecorationWidth(includeMargins bool) css.DimenT {
 	// return css.SomeDimen(w)
 }
 
-func (box *Box) FixPrecentages(enclosingWidth dimen.Dimen) bool {
+func (box *Box) FixPercentages(enclosingWidth dimen.Dimen) bool {
 	fixed := true
 	for dir := Top; dir <= Left; dir++ {
 		if box.Padding[dir].IsPercent() {
@@ -629,4 +591,201 @@ func (box *Box) fixPaddingAndBorderWidthFromBorderBox(w dimen.Dimen) css.DimenT 
 	unit := total / pcnt
 	return css.SomeDimen(dimen.Dimen(unit * 100))
 	//return box.FixPaddingAndBorderWidth(dimen.Dimen(unit * 100))
+}
+
+// ---------------------------------------------------------------------------
+
+// ErrUnfixedScaledUnit is returned if a dimension calculation encounters a
+// dimension-specification which is dependent on view-size or font-size.
+//
+var ErrUnfixedScaledUnit error = errors.New("font/view dependent dimension is unfixed")
+
+// ErrContentScaling is returned if a dimension calculation encounters a
+// dimension-specification which is dependent on the box's content.
+var ErrContentScaling error = errors.New("box scales with content")
+
+// ErrUnderspecified is returned if a dimension calculation cannot be completed
+// because the input values are underspecified.
+var ErrUnderspecified error = errors.New("box width dimensions are underspecified")
+
+// FixDimensionsFromEnclosingWidth calculates missing/auto dimensions from the
+// width of the enclosing box.
+//
+// This will distribute space according to the equation (ref. CSS spec):
+//
+//     margin-left + border-width-left + padding-left + width +
+//       padding-right + border-width-right + margin-right = width of containing block
+//
+// Returns a flag denoting whether there was enough information to specify each width
+// dimension.
+//
+func FixDimensionsFromEnclosingWidth(box *Box, enclosingWidth dimen.Dimen) (bool, error) {
+	T().Debugf("fix contraint dimensions, enclosing = %v", enclosingWidth)
+	fixIllegalDimensionSpecifications(box)
+	box.FixPercentages(enclosingWidth)
+	if err := checkForUnresolvedDependentDimensions(box); err != nil {
+		return false, err
+	}
+	calc, err := box.W.Match(option.Of{
+		option.None: calcWidthAsRest, // defaults to `auto`
+		css.Auto:    calcWidthAsRest,
+		option.Some: takeWidth,
+	})
+	if err != nil {
+		return false, err
+	}
+	solve := asCalcFn(calc)
+	w, err := solve(box, enclosingWidth)
+	if err != nil {
+		return false, err
+	} else if !w.IsAbsolute() {
+		return false, ErrUnderspecified
+	}
+	box.W = w
+	T().Debugf("after calcfn: box is %s", box.DebugString())
+	// if !box.Padding[dir].IsAbsolute() || !box.BorderWidth[dir].IsAbsolute() ||
+	// 	!box.BorderWidth[dir].IsAbsolute() {
+	// 	fixed = false
+	// }
+	return true, nil
+}
+
+type calcFn func(box *Box, enclosing dimen.Dimen) (css.DimenT, error)
+
+func asCalcFn(f interface{}) calcFn {
+	return f.(func(box *Box, enclosing dimen.Dimen) (css.DimenT, error))
+}
+
+func takeWidth(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
+	T().Debugf("calculating width: simply take is as is = %v", box.W)
+	fixed := distributeHorizontalMarginSpace(box, enclosing)
+	if !fixed {
+		return box.W, ErrUnderspecified
+	}
+	return box.W, nil
+}
+
+// Spec: If 'width' is set to 'auto', any other 'auto' values become '0'
+// and 'width' follows from the resulting equality.
+func calcWidthAsRest(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
+	T().Debugf("calculate width as rest for box %s", box.DebugString())
+	left, err := box.Margins[Left].MatchToDimen(option.Of{
+		option.None: dimen.Zero,
+		css.Auto:    dimen.Zero,
+		option.Some: box.Margins[Left].Unwrap(),
+	})
+	if err != nil {
+		return css.Dimen(), err
+	}
+	box.Margins[Left] = css.SomeDimen(left)
+	right, err := box.Margins[Right].MatchToDimen(option.Of{
+		option.None: dimen.Zero,
+		css.Auto:    dimen.Zero,
+		option.Some: box.Margins[Left].Unwrap(),
+	})
+	if err != nil {
+		return css.Dimen(), err
+	}
+	box.Margins[Right] = css.SomeDimen(right)
+	width := enclosing - left - right
+	T().Debugf("w = %v", width)
+	if !box.BorderBoxSizing {
+		var d css.DimenT
+		if d = innerDecorationWidth(box); d.IsNone() {
+			return d, ErrUnderspecified // this cannot happen
+		}
+		width -= d.Unwrap()
+	}
+	r := css.SomeDimen(width)
+	T().Debugf("calculate width as rest to w = %v", r)
+	return r, nil
+	//return css.SomeDimen(width), nil
+}
+
+// distributeHorizontalMarginSpace distributes space into left and right margins
+// after the border-box has been fixed.
+func distributeHorizontalMarginSpace(box *Box, enclosing dimen.Dimen) bool {
+	if !box.HasFixedBorderBoxWidth(false) {
+		return false
+	}
+	w := box.BorderBoxWidth().Unwrap()
+	remaining := enclosing - w
+	left, right := box.Margins[Left], box.Margins[Right]
+	l, err := left.Match(option.Of{
+		css.Auto: option.Safe(right.Match(option.Of{
+			css.Auto:    remaining / 2,
+			option.Some: remaining - right.Unwrap(),
+		})),
+	})
+	if err != nil {
+		T().Errorf("distribute h-margins: %s", err.Error())
+		return false
+	}
+	r := remaining - l.(dimen.Dimen)
+	box.Margins[Left] = css.SomeDimen(l.(dimen.Dimen))
+	box.Margins[Right] = css.SomeDimen(r)
+	return true
+}
+
+// checkForUnresolvedDependentDimensions will return an error for box dimensions
+// which are dependent on view-size, font-size or content.
+func checkForUnresolvedDependentDimensions(box *Box) error {
+	for dir := Top; dir <= Left; dir++ {
+		if _, err := box.Padding[dir].Match(option.Of{
+			option.None:       nil, // defaults to `auto`
+			css.FontScaled:    option.Fail(ErrUnfixedScaledUnit),
+			css.ViewScaled:    option.Fail(ErrUnfixedScaledUnit),
+			css.ContentScaled: option.Fail(ErrContentScaling),
+			option.Some:       nil,
+		}); err != nil {
+			return err
+		}
+		if _, err := box.BorderWidth[dir].Match(option.Of{
+			option.None:       nil, // defaults to `auto`
+			css.FontScaled:    option.Fail(ErrUnfixedScaledUnit),
+			css.ViewScaled:    option.Fail(ErrUnfixedScaledUnit),
+			css.ContentScaled: option.Fail(ErrContentScaling),
+			option.Some:       nil,
+		}); err != nil {
+			return err
+		}
+		if _, err := box.Margins[dir].Match(option.Of{
+			option.None:       nil, // defaults to `auto`
+			css.FontScaled:    option.Fail(ErrUnfixedScaledUnit),
+			css.ViewScaled:    option.Fail(ErrUnfixedScaledUnit),
+			css.ContentScaled: option.Fail(ErrContentScaling),
+			option.Some:       nil,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Property   Default    Valid values           Purpose
+// ---------+----------+----------------------+-----------------------------------
+// padding    Varies     length or percentage 	Controls the size of the padding.
+//                                              Negative values are not allowed.
+//                                              Percentages refer to width of the
+//                                              containing block.
+//
+// Similar for border width.
+//
+func fixIllegalDimensionSpecifications(box *Box) {
+	for dir := Top; dir <= Left; dir++ {
+		padd := box.Padding[dir]
+		if padd.Equals(css.Auto) || (padd.IsAbsolute() && padd.Unwrap() < 0) {
+			padd = css.SomeDimen(0)
+		}
+		if !padd.IsAbsolute() {
+			padd = css.SomeDimen(0)
+		}
+		bord := box.BorderWidth[dir]
+		if bord.Equals(css.Auto) || (bord.IsAbsolute() && bord.Unwrap() < 0) {
+			bord = css.SomeDimen(0)
+		}
+		if !bord.IsAbsolute() {
+			bord = css.SomeDimen(0)
+		}
+	}
 }
