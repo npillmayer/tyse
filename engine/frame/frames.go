@@ -86,6 +86,7 @@ func DisplayModeForDOMNode(domnode *dom.W3CNode) css.DisplayMode {
 //
 // TODO possibly move this to package style (= part of browser defaults)
 // If, then return a string.
+/*
 func DefaultDisplayModeForHTMLNode(h *html.Node) (css.DisplayMode, css.DisplayMode) {
 	if h == nil {
 		return css.NoMode, css.NoMode
@@ -122,6 +123,7 @@ func DefaultDisplayModeForHTMLNode(h *html.Node) (css.DisplayMode, css.DisplayMo
 		return css.BlockMode, css.BlockMode
 	}
 }
+*/
 
 // ---------------------------------------------------------------------------
 

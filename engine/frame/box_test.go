@@ -177,5 +177,5 @@ func TestConstraints2(t *testing.T) {
 	}
 	assert.True(t, ok)
 	assert.True(t, box.HasFixedBorderBoxWidth(false))
-	assert.Equal(t, 190*dimen.PT, box.W.Unwrap())
+	assert.Equal(t, 180*dimen.PT, box.W.Unwrap())
 }

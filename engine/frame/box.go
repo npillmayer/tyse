@@ -593,7 +593,7 @@ func (box *Box) fixPaddingAndBorderWidthFromBorderBox(w dimen.Dimen) css.DimenT 
 	//return box.FixPaddingAndBorderWidth(dimen.Dimen(unit * 100))
 }
 
-// ---------------------------------------------------------------------------
+// --- API for constraint width solving --------------------------------------
 
 // ErrUnfixedScaledUnit is returned if a dimension calculation encounters a
 // dimension-specification which is dependent on view-size or font-size.
