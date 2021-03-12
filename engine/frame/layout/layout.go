@@ -23,11 +23,12 @@ import (
   approach step-by-step.
 */
 
-var ErrUnfixedscaledUnit error = errors.New("font/view dependent dimension must be fixed")
+var ErrHeightNotFixed error = errors.New("height of context not determined")
 var ErrEnclosingWidthNotFixed error = errors.New("enclosing width not fixed")
 var ErrNotAPercentageDimension error = errors.New("input dimension not a percentage dimension")
 
-//var ErrContentScaling error = errors.New("box scales with content")
+// var ErrUnfixedscaledUnit error = errors.New("font/view dependent dimension must be fixed")
+// var ErrContentScaling error = errors.New("box scales with content")
 
 /*
   For top-down measurements, enclosing containers are responsible for calculation
@@ -141,6 +142,7 @@ func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesi
 				if sub.Type() == boxtree.TypeText {
 					continue
 				}
+				T().Debugf("--------------------------------------------------")
 				T().Debugf("width of sub-container [%s]", boxtree.ContainerName(sub))
 				s := CalcBlockWidths(sub, inherited)
 				if s.lastErr != nil {
@@ -161,10 +163,10 @@ func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesi
 	if syn.lastErr != nil {
 		T().Debugf("calc block width: last error = %v", syn.lastErr)
 	}
-	if _, h := c.Context().Measure(); !h.IsNone() {
-		syn.H = h.Unwrap()
+	if size, _, _ := c.Context().Measure(); !size.H.IsNone() {
+		syn.H = size.H.Unwrap()
 	} else {
-		return withError(syn, "height of context not determined")
+		return withError(syn, ErrHeightNotFixed)
 	}
 	return
 }

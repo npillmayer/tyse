@@ -219,14 +219,30 @@ func setSizingInformationForPrincipalBox(c frame.Container, view *view, font str
 	pl := css.DimenOption(style("padding-left"))
 	c.CSSBox().Padding[frame.Left] = scale(pl, view, frame.Left, font)
 	// Borders
-	bt := css.DimenOption(style("border-top-width"))
-	c.CSSBox().BorderWidth[frame.Top] = scale(bt, view, frame.Top, font)
-	br := css.DimenOption(style("border-right-width"))
-	c.CSSBox().BorderWidth[frame.Right] = scale(br, view, frame.Right, font)
-	bb := css.DimenOption(style("border-bottom-width"))
-	c.CSSBox().BorderWidth[frame.Bottom] = scale(bb, view, frame.Bottom, font)
-	bl := css.DimenOption(style("border-left-width"))
-	c.CSSBox().BorderWidth[frame.Left] = scale(bl, view, frame.Left, font)
+	if style("border-top-style") != "" { // TODO should be "none"
+		bt := css.DimenOption(style("border-top-width"))
+		c.CSSBox().BorderWidth[frame.Top] = scale(bt, view, frame.Top, font)
+	} else {
+		c.CSSBox().BorderWidth[frame.Top] = css.SomeDimen(0)
+	}
+	if style("border-right-style") != "" { // TODO should be "none"
+		br := css.DimenOption(style("border-right-width"))
+		c.CSSBox().BorderWidth[frame.Right] = scale(br, view, frame.Right, font)
+	} else {
+		c.CSSBox().BorderWidth[frame.Right] = css.SomeDimen(0)
+	}
+	if style("border-bottom-style") != "" { // TODO should be "none"
+		bb := css.DimenOption(style("border-bottom-width"))
+		c.CSSBox().BorderWidth[frame.Bottom] = scale(bb, view, frame.Bottom, font)
+	} else {
+		c.CSSBox().BorderWidth[frame.Bottom] = css.SomeDimen(0)
+	}
+	if style("border-left-style") != "" { // TODO should be "none"
+		bl := css.DimenOption(style("border-left-width"))
+		c.CSSBox().BorderWidth[frame.Left] = scale(bl, view, frame.Left, font)
+	} else {
+		c.CSSBox().BorderWidth[frame.Left] = css.SomeDimen(0)
+	}
 	// Margins
 	mt := css.DimenOption(style("margin-top"))
 	c.CSSBox().Margins[frame.Top] = scale(mt, view, frame.Top, font)

@@ -83,16 +83,27 @@ func (ctx *BlockContext) AddContained(c frame.Container) {
 }
 
 func (ctx *BlockContext) Layout(flowRoot *frame.FlowRoot) error {
-	panic("TODO Layout of block")
+	H := dimen.Zero
+	for _, c := range ctx.Contained() {
+		T().Debugf("[%s] positions box [%s]", boxtree.ContainerName(ctx.Container()),
+			boxtree.ContainerName(c))
+		c.CSSBox().TopL.Y = H
+		if !c.CSSBox().H.IsAbsolute() {
+			return ErrHeightNotFixed
+		}
+		H += c.CSSBox().H.Unwrap()
+	}
+	ctx.Container().CSSBox().H = css.SomeDimen(H)
+	return nil
 }
 
-func (ctx *BlockContext) Measure() (css.DimenT, css.DimenT) {
+func (ctx *BlockContext) Measure() (frame.Size, css.DimenT, css.DimenT) {
 	wmax, h, margin := dimen.Zero, dimen.Zero, dimen.Zero
 	children := ctx.Contained()
 	for i, ch := range children {
 		chw, chh := ch.CSSBox().TotalWidth(), ch.CSSBox().TotalHeight()
 		if !chw.IsAbsolute() || !chh.IsAbsolute() {
-			return css.Dimen(), css.Dimen()
+			return frame.Size{}, css.Dimen(), css.Dimen()
 		}
 		if w := ch.CSSBox().W.Unwrap(); w > wmax {
 			wmax = w
@@ -109,7 +120,8 @@ func (ctx *BlockContext) Measure() (css.DimenT, css.DimenT) {
 			h -= margin
 		}
 	}
-	return css.SomeDimen(wmax), css.SomeDimen(h)
+	//return css.SomeDimen(wmax), css.SomeDimen(h)
+	return ctx.Container().CSSBox().Size, css.SomeDimen(0), css.SomeDimen(0)
 }
 
 var _ frame.Context = &BlockContext{}
@@ -164,8 +176,35 @@ func (ctx *InlineContext) AddContained(c frame.Container) {
 }
 
 func (ctx *InlineContext) addLines(lines ...frame.Container) {
-	if len(lines) > 0 {
-		ctx.lines = append(ctx.lines, lines...)
+	boxcnt := len(ctx.Contained())
+	//size, _, mBot := ctx.Measure()
+	size := ctx.Container().CSSBox().Size
+	h, margin := dimen.Zero, dimen.Zero
+	if !size.H.IsNone() {
+		h = size.H.Unwrap()
+		if lastbox := lastbox(ctx); lastbox != nil {
+			margin = lastbox.Margins[frame.Bottom].Unwrap()
+		}
+	}
+	for i, line := range lines {
+		lh := line.CSSBox().TotalHeight()
+		if !lh.IsAbsolute() {
+			panic("line box must have fixed height")
+		}
+		h += lh.Unwrap()
+		if boxcnt == 0 && !ctx.IsFlowRoot() {
+			h -= line.CSSBox().Margins[frame.Top].Unwrap()
+		} else if boxcnt > 0 {
+			minMargin := dimen.Min(margin, line.CSSBox().Margins[frame.Top].Unwrap())
+			h -= minMargin
+		}
+		line.CSSBox().TopL.Y = h
+		ctx.lines = append(ctx.lines, line)
+		margin = line.CSSBox().Margins[frame.Bottom].Unwrap()
+		if i == len(ctx.lines) && !ctx.IsFlowRoot() {
+			h -= margin
+		}
+		boxcnt++
 	}
 }
 
@@ -182,36 +221,36 @@ func (ctx *InlineContext) Layout(flowRoot *frame.FlowRoot) error {
 		return err
 	}
 	T().Debugf("paragraph broken into %d lines", len(lines))
-	ctx.addLines(lines...)
+	if len(lines) > 0 {
+		last := lines[len(lines)-1]
+		ctx.Container().CSSBox().H = css.SomeDimen(last.CSSBox().TopL.Y + last.CSSBox().H.Unwrap())
+		ctx.addLines(lines...)
+	}
 	return nil
 }
 
-func (ctx *InlineContext) Measure() (css.DimenT, css.DimenT) {
-	h, margin := dimen.Zero, dimen.Zero
-	for i, line := range ctx.lines {
-		if line == nil {
-			panic("line is nil")
-		} else if line.CSSBox() == nil {
-			panic("CSS box of line is nil")
-		}
-		lh := line.CSSBox().TotalHeight()
-		if !lh.IsAbsolute() {
-			return css.Dimen(), css.Dimen()
-		}
-		//h += line.CSSBox().H.Unwrap()
-		h += lh.Unwrap()
-		if i == 0 && !ctx.IsFlowRoot() {
-			h -= line.CSSBox().Margins[frame.Top].Unwrap()
-		} else if i > 0 {
-			minMargin := dimen.Min(margin, line.CSSBox().Margins[frame.Top].Unwrap())
-			h -= minMargin
-		}
-		margin = line.CSSBox().Margins[frame.Bottom].Unwrap()
-		if i == len(ctx.lines) && !ctx.IsFlowRoot() {
-			h -= margin
-		}
-	}
-	return ctx.Container().CSSBox().TotalWidth(), css.SomeDimen(h)
+func (ctx *InlineContext) Measure() (frame.Size, css.DimenT, css.DimenT) {
+	// h, margin := dimen.Zero, dimen.Zero
+	// for i, line := range ctx.lines {
+	// 	lh := line.CSSBox().TotalHeight()
+	// 	if !lh.IsAbsolute() {
+	// 		return frame.Size{}, css.Dimen(), css.Dimen()
+	// 	}
+	// 	//h += line.CSSBox().H.Unwrap()
+	// 	h += lh.Unwrap()
+	// 	if i == 0 && !ctx.IsFlowRoot() {
+	// 		h -= line.CSSBox().Margins[frame.Top].Unwrap()
+	// 	} else if i > 0 {
+	// 		minMargin := dimen.Min(margin, line.CSSBox().Margins[frame.Top].Unwrap())
+	// 		h -= minMargin
+	// 	}
+	// 	margin = line.CSSBox().Margins[frame.Bottom].Unwrap()
+	// 	if i == len(ctx.lines) && !ctx.IsFlowRoot() {
+	// 		h -= margin
+	// 	}
+	// }
+	//
+	return ctx.Container().CSSBox().OuterBox().Size, css.SomeDimen(0), css.SomeDimen(0)
 }
 
 // ---------------------------------------------------------------------------
@@ -294,4 +333,12 @@ func NewContextFor(c frame.Container) frame.Context {
 		return NewBlockContext(c, isroot)
 	}
 	return nil
+}
+
+func lastbox(ctx frame.Context) *frame.Box {
+	children := ctx.Contained()
+	if len(children) == 0 {
+		return nil
+	}
+	return children[len(children)-1].CSSBox()
 }

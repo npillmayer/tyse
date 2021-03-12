@@ -37,12 +37,13 @@ type LineBox struct {
 
 func NewLineBox(k *khipu.Khipu, start, length int64, indent dimen.Dimen) *LineBox {
 	lbox := &LineBox{
-		Box:    &frame.Box{},
+		Box:    frame.InitEmptyBox(&frame.Box{}),
 		khipu:  k,
 		pos:    start,
 		length: length,
 		indent: indent,
 	}
+	lbox.Box.H = css.SomeDimen(12 * dimen.PT)
 	lbox.Payload = lbox
 	return lbox
 }
@@ -153,6 +154,7 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]frame.Container, error) 
 		l := pos - j
 		indent := dimen.Dimen(0) // TODO derive from parshape
 		linebox := NewLineBox(para.Khipu, breakpoints[i].Position(), l, indent)
+		linebox.Box.W = box.W
 		lines = append(lines, linebox)
 		//linebox.AppendToPrincipalBox(pbox)
 		j = breakpoints[i].Position()

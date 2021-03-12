@@ -46,8 +46,9 @@ import (
 
 type Rect struct {
 	TopL dimen.Point
-	W    css.DimenT
-	H    css.DimenT
+	Size
+	// W css.DimenT
+	// H css.DimenT
 }
 
 type Size struct {
@@ -86,7 +87,7 @@ type StyledBox struct {
 // DebugString returns a textual representation of a box's dimensions.
 // Intended for debugging.
 func (box *Box) DebugString() string {
-	s := fmt.Sprintf("box{\n   w=%v  (bbox-sz=%v)\n", box.W, box.BorderBoxSizing)
+	s := fmt.Sprintf("box{\n   w=%v, h=%v  (bbox-sz=%v)\n", box.W, box.H, box.BorderBoxSizing)
 	s += fmt.Sprintf("   p.top=%v, p.right=%v, p.bottom=%v, p.left=%v\n",
 		box.Padding[Top], box.Padding[Right],
 		box.Padding[Bottom], box.Padding[Left])
@@ -196,7 +197,7 @@ func (box *Box) HasFixedBorderBoxWidth(includeMargins bool) bool {
 // left and right border have fixed (known) values.
 // If includeMargins is true, left and right margins are checked as well.
 func (box *Box) HasFixedBorderBoxHeight(includeMargins bool) bool {
-	T().Debugf("fixed border box height ? => %v", box)
+	//T().Debugf("fixed border box height ? => %s", box.DebugString())
 	if includeMargins {
 		if !box.Margins[Top].IsAbsolute() || !box.Margins[Bottom].IsAbsolute() {
 			return false
@@ -311,11 +312,10 @@ func (box *Box) TotalHeight() css.DimenT {
 }
 
 func (box *Box) OuterBox() Rect {
-	return Rect{
-		TopL: box.TopL,
-		W:    box.TotalWidth(),
-		H:    box.TotalHeight(),
-	}
+	r := Rect{TopL: box.TopL}
+	r.W = box.TotalWidth()
+	r.H = box.TotalHeight()
+	return r
 }
 
 // DecorationWidth returns the cumulated width of padding, borders and margins
@@ -643,7 +643,7 @@ func FixDimensionsFromEnclosingWidth(box *Box, enclosingWidth dimen.Dimen) (bool
 		return false, ErrUnderspecified
 	}
 	box.W = w
-	T().Debugf("after calcfn: box is %s", box.DebugString())
+	T().Debugf("dimensions calculated from enclosing width: %s", box.DebugString())
 	// if !box.Padding[dir].IsAbsolute() || !box.BorderWidth[dir].IsAbsolute() ||
 	// 	!box.BorderWidth[dir].IsAbsolute() {
 	// 	fixed = false
@@ -669,7 +669,7 @@ func takeWidth(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
 // Spec: If 'width' is set to 'auto', any other 'auto' values become '0'
 // and 'width' follows from the resulting equality.
 func calcWidthAsRest(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
-	T().Debugf("calculate width as rest for box %s", box.DebugString())
+	//T().Debugf("calculate width as rest for box %s", box.DebugString())
 	left, err := box.Margins[Left].MatchToDimen(option.Of{
 		option.None: dimen.Zero,
 		css.Auto:    dimen.Zero,

@@ -19,13 +19,13 @@ const (
 //
 type Context interface {
 	Type() FormattingContextType
-	Container() Container              // container which creates this formatting context
-	Contained() []Container            // contained children
-	AddContained(Container)            // add a child to contain
-	Layout(*FlowRoot) error            // layout sub-container
-	Measure() (css.DimenT, css.DimenT) // return dimensions of context bounding box
-	IsFlowRoot() bool                  // this is a self-contained BFC
-	FlowRoot() *FlowRoot               // non-nil if this context is a flow root
+	Container() Container                    // container which creates this formatting context
+	Contained() []Container                  // contained children
+	AddContained(Container)                  // add a child to contain
+	Layout(*FlowRoot) error                  // layout sub-container
+	Measure() (Size, css.DimenT, css.DimenT) // return dimensions of context bounding box
+	IsFlowRoot() bool                        // this is a self-contained BFC
+	FlowRoot() *FlowRoot                     // non-nil if this context is a flow root
 }
 
 type FlowRoot struct {
