@@ -37,6 +37,7 @@ type LineBox struct {
 
 func NewLineBox(k *khipu.Khipu, start, length int64, indent dimen.Dimen) *LineBox {
 	lbox := &LineBox{
+		Box:    &frame.Box{},
 		khipu:  k,
 		pos:    start,
 		length: length,
@@ -139,7 +140,7 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]frame.Container, error) 
 	if err != nil {
 		return nil, err
 	}
-	T().Debugf("text broken up into %d lines", len(breakpoints))
+	T().Debugf("text broken up with %d breaks: %v", len(breakpoints), breakpoints)
 	//
 	// TODO
 	// assemble the broken line segments into anonymous line boxes

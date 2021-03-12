@@ -190,6 +190,7 @@ func createLeaf(n *dom.W3CNode) *pLeaf {
 // --- Paragraph from W3C Node -----------------------------------------------
 
 // Previous version
+/*
 
 // InnerParagraphText creates a Paragraph instance holding the text content
 // of a W3C DOM node as a styled text.
@@ -256,6 +257,7 @@ func InnerParagraphText(node *dom.W3CNode) (*Paragraph, error) {
 // 	}
 // 	return sty.(Set), i, nil
 // }
+*/
 
 // Run is a simple container type to hold a run of text with equal style.
 /*
@@ -271,6 +273,7 @@ func (r Run) Len() uint64 {
 }
 */
 
+/*
 // innerText creates a text cord for the textual content of an HTML element and all
 // its descendents. It resembles the text produced by
 //
@@ -300,20 +303,18 @@ func collectText(n *dom.W3CNode, b *styled.TextBuilder, irs *infoIRS) {
 		}
 	} else if n.NodeType() == html.TextNode {
 		leaf := createLeaf(n)
-		/*
-			//T().Debugf("text = %s", n.NodeValue())
-			parent := n.ParentNode()
-			for parent != nil && parent.NodeType() != html.ElementNode {
-				parent = parent.ParentNode()
-			}
-			//T().Debugf("parent of text node = %v", parent)
-			value := n.NodeValue()
-			leaf := &pLeaf{
-				element: parent,
-				length:  uint64(len(value)),
-				content: value,
-			}
-		*/
+			// //T().Debugf("text = %s", n.NodeValue())
+			// parent := n.ParentNode()
+			// for parent != nil && parent.NodeType() != html.ElementNode {
+			// 	parent = parent.ParentNode()
+			// }
+			// //T().Debugf("parent of text node = %v", parent)
+			// value := n.NodeValue()
+			// leaf := &pLeaf{
+			// 	element: parent,
+			// 	length:  uint64(len(value)),
+			// 	content: value,
+			// }
 		//
 		parent := leaf.element
 		styles := parent.ComputedStyles().Styles()
@@ -333,6 +334,7 @@ func collectText(n *dom.W3CNode, b *styled.TextBuilder, irs *infoIRS) {
 		}
 	}
 }
+*/
 
 // https://www.w3schools.com/cssref/pr_text_white-space.asp
 //

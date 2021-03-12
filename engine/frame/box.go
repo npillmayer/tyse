@@ -196,6 +196,7 @@ func (box *Box) HasFixedBorderBoxWidth(includeMargins bool) bool {
 // left and right border have fixed (known) values.
 // If includeMargins is true, left and right margins are checked as well.
 func (box *Box) HasFixedBorderBoxHeight(includeMargins bool) bool {
+	T().Debugf("fixed border box height ? => %v", box)
 	if includeMargins {
 		if !box.Margins[Top].IsAbsolute() || !box.Margins[Bottom].IsAbsolute() {
 			return false

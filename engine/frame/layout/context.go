@@ -189,6 +189,11 @@ func (ctx *InlineContext) Layout(flowRoot *frame.FlowRoot) error {
 func (ctx *InlineContext) Measure() (css.DimenT, css.DimenT) {
 	h, margin := dimen.Zero, dimen.Zero
 	for i, line := range ctx.lines {
+		if line == nil {
+			panic("line is nil")
+		} else if line.CSSBox() == nil {
+			panic("CSS box of line is nil")
+		}
 		lh := line.CSSBox().TotalHeight()
 		if !lh.IsAbsolute() {
 			return css.Dimen(), css.Dimen()

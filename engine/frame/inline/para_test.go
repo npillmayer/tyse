@@ -15,6 +15,8 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
+	"github.com/npillmayer/tyse/engine/frame"
+	"github.com/npillmayer/tyse/engine/frame/boxtree"
 	"golang.org/x/net/html"
 )
 
@@ -34,17 +36,23 @@ func TestParaCreate(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	domroot := buildTestDOM(testhtml, t)
-	text, err := InnerParagraphText(domroot)
+	boxes, err := boxtree.BuildBoxTree(domroot)
+	checkBoxTree(boxes, err, t)
+	found, pbox := findParaContainer(boxes, t)
+	if !found || pbox == nil {
+		t.Fatal("no paragraph found in input text")
+	}
+	para, _, err := paragraphTextFromBox(pbox)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if text.Raw().IsVoid() {
+	if para.Raw().IsVoid() {
 		t.Errorf("inner text of para is void, should not be")
 	}
-	t.Logf("inner text = (%s)", text.Raw().String())
+	t.Logf("inner text = (%s)", para.Raw().String())
 	//t.Logf("levels = %v", para.levels)
 	//
 	//f := cordsdotty(cords.Cord(para.Text.Styles()), t)
@@ -101,4 +109,36 @@ func cordsdotty(text cords.Cord, t *testing.T) *os.File {
 		t.Error(err.Error())
 	}
 	return tmpfile
+}
+
+func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if boxes == nil {
+		t.Fatalf("Render tree root is null")
+	} else {
+		t.Logf("root node is %s", boxes.DOMNode().NodeName())
+		if boxes.DOMNode().NodeName() != "#document" {
+			t.Errorf("name of root element expected to be '#document")
+		}
+	}
+	t.Logf("root node = %+v", boxes)
+}
+
+func findParaContainer(boxes frame.Container, t *testing.T) (bool, frame.Container) {
+	switch boxes.Type() {
+	case boxtree.TypePrincipal:
+		if boxes.DOMNode().NodeName() == "p" {
+			return true, boxes
+		}
+	}
+	ch := boxes.TreeNode().Children(true)
+	for _, c := range ch {
+		subc := c.Payload.(frame.Container)
+		found, p := findParaContainer(subc, t)
+		if found {
+			return true, p
+		}
+	}
+	return false, nil
 }

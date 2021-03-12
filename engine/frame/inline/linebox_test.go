@@ -4,18 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/core/parameters"
 	"github.com/npillmayer/tyse/engine/dom"
-	"github.com/npillmayer/tyse/engine/dom/style/css"
-	"github.com/npillmayer/tyse/engine/frame/boxtree"
-	"github.com/npillmayer/tyse/engine/frame/khipu"
-	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak"
-	"github.com/npillmayer/tyse/engine/frame/khipu/linebreak/firstfit"
-	"github.com/npillmayer/tyse/engine/glyphing/monospace"
 	"golang.org/x/net/html"
 )
 
@@ -36,6 +25,7 @@ vor den Augen.
 	</html> 
 `
 
+/*
 func TestBox1(t *testing.T) {
 	root := buildDOM(kafkaHTML, t)
 	p := findPara(root, t)
@@ -69,7 +59,9 @@ func TestBox1(t *testing.T) {
 	}
 	t.Fail()
 }
+*/
 
+/*
 func TestBreakParagraph(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
@@ -94,7 +86,9 @@ func TestBreakParagraph(t *testing.T) {
 	//
 	t.Fail()
 }
+*/
 
+/*
 func TestInlineBoxes(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
@@ -121,6 +115,7 @@ func TestInlineBoxes(t *testing.T) {
 	//
 	t.Fail()
 }
+*/
 
 // --- Helpers ---------------------------------------------------------------
 
