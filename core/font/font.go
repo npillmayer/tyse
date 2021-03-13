@@ -15,7 +15,7 @@ a certain script and language. The name is reminiscend on the wooden
 boxes of typesetters in the aera of metal type.
 An example is "Helvetica regular 11pt, Latin, en_US".
 
-Please not that Go (Golang) does use the terms "font" and "face"
+Please note that Go (Golang) does use the terms "font" and "face"
 differently–actually more or less in an opposite manner.
 
 TODO: font collections (*.ttc), e.g., /System/Library/Fonts/Helvetica.ttc
@@ -37,7 +37,7 @@ https://docs.microsoft.com/en-us/typography/opentype/
 
 BSD License
 
-Copyright (c) 2017-20, Norbert Pillmayer
+Copyright (c) 2017-21, Norbert Pillmayer
 
 All rights reserved.
 
@@ -70,15 +70,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 package font
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
+	"strings"
+	"sync"
 
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/tracing"
 	"golang.org/x/image/font"
+	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
 )
+
+// T traces to a global core-tracer.
+func T() tracing.Trace {
+	return gtrace.CoreTracer
+}
 
 type ScalableFont struct {
 	Fontname string
@@ -103,28 +112,25 @@ func NullTypeCase() *TypeCase {
 }
 
 func LoadOpenTypeFont(fontfile string) (*ScalableFont, error) {
-	ff := &ScalableFont{}
-	ff.Fontname = filepath.Base(fontfile)
-	ff.Filepath = fontfile
 	bytez, err := ioutil.ReadFile(fontfile)
-	ff.Binary = bytez
 	if err != nil {
-		panic(fmt.Sprintf("cannot read font file: %s", fontfile))
-	} else {
-		reader := bytes.NewReader(ff.Binary)
-		ff.SFNT, err = sfnt.ParseReaderAt(reader)
-		if err != nil {
-			ff.SFNT = nil
-			panic(fmt.Sprintf("cannot parse font file: %s", fontfile))
-		} else {
-			ff.Fontname, _ = ff.SFNT.Name(nil, sfnt.NameIDFull)
-		}
+		return nil, err
 	}
-	return ff, err
+	return ParseOpenTypeFont(bytez)
+}
+
+func ParseOpenTypeFont(fbytes []byte) (f *ScalableFont, err error) {
+	f = &ScalableFont{Binary: fbytes}
+	f.SFNT, err = sfnt.Parse(f.Binary)
+	if err != nil {
+		return nil, err
+	}
+	f.Fontname, _ = f.SFNT.Name(nil, sfnt.NameIDFull)
+	return
 }
 
 // TODO: check if language fits to script
-// TODO: check if font suports script
+// TODO: check if font supports script
 func (sf *ScalableFont) PrepareCase(fontsize float64) (*TypeCase, error) {
 	typecase := &TypeCase{}
 	typecase.scalableFontParent = sf
@@ -150,4 +156,133 @@ func (tc *TypeCase) ScalableFontParent() *ScalableFont {
 
 func (tc *TypeCase) PtSize() float64 {
 	return tc.size
+}
+
+// --- Fallback font ---------------------------------------------------------
+
+// FallbackFont returns a font to be used if everything else failes. It is
+// always present. Currently we use Go Sans.
+func FallbackFont() *ScalableFont {
+	fallbackFontLoading.Do(func() {
+		fallbackFont = loadFallbackFont()
+	})
+	return fallbackFont
+}
+
+var fallbackFontLoading sync.Once
+
+// fallbackFont is a font that is used if everything else failes.
+// Currently we use Go Sans.
+var fallbackFont *ScalableFont
+
+func loadFallbackFont() *ScalableFont {
+	var err error
+	gofont := &ScalableFont{
+		Fontname: "Go Sans",
+		Filepath: "internal",
+		Binary:   goregular.TTF,
+	}
+	gofont.SFNT, err = sfnt.Parse(gofont.Binary)
+	if err != nil {
+		panic("cannot load default font") // this cannot happen
+	}
+	return gofont
+}
+
+// --- Font Registry ---------------------------------------------------------
+
+type Registry struct {
+	sync.Mutex
+	fonts     map[string]*ScalableFont
+	typecases map[string]*TypeCase
+}
+
+var globalFontRegistry *Registry
+
+var globalRegistryCreation sync.Once
+
+func GlobalRegistry() *Registry {
+	globalRegistryCreation.Do(func() {
+		globalFontRegistry = NewRegistry()
+	})
+	return globalFontRegistry
+}
+
+func NewRegistry() *Registry {
+	fr := &Registry{
+		fonts:     make(map[string]*ScalableFont),
+		typecases: make(map[string]*TypeCase),
+	}
+	return fr
+}
+
+func (fr *Registry) StoreFont(f *ScalableFont) {
+	if f == nil {
+		T().Errorf("registry cannot store null font")
+		return
+	}
+	fr.Lock()
+	defer fr.Unlock()
+	fname := NormalizeFontname(f.Fontname)
+	T().Debugf("registry stores font %s as %s", f.Fontname, fname)
+	fr.fonts[fname] = f
+}
+
+func (fr *Registry) TypeCase(name string, size float64) (*TypeCase, error) {
+	T().Debugf("registry searches for font %s at %.2f", name, size)
+	fname := NormalizeFontname(name)
+	tname := NormalizeTypeCaseName(name, size)
+	fr.Lock()
+	defer fr.Unlock()
+	if t, ok := fr.typecases[tname]; ok {
+		T().Debugf("registry found font %s", tname)
+		return t, nil
+	}
+	if f, ok := fr.fonts[fname]; ok {
+		t, err := f.PrepareCase(size)
+		T().Infof("font registry has font %s, caches at %.2f", fname, size)
+		t.scalableFontParent = f
+		fr.typecases[tname] = t
+		return t, err
+	}
+	T().Infof("registry does not contain font %s", name)
+	err := errors.New("font " + name + " not found in registry")
+	fname = NormalizeTypeCaseName("fallback", size)
+	tname = NormalizeTypeCaseName("fallback", size)
+	if t, ok := fr.typecases[fname]; ok {
+		return t, err
+	}
+	f := FallbackFont()
+	t, _ := f.PrepareCase(size)
+	T().Infof("font registry caches fallback font %s at %.2f", fname, size)
+	fr.fonts[fname] = f
+	fr.typecases[tname] = t
+	return t, err
+}
+
+func (fr *Registry) DebugList() {
+	T().Debugf("--- registered fonts ---")
+	for k, v := range fr.fonts {
+		T().Debugf("font [%s] = %v", k, v.Fontname)
+	}
+	for k, v := range fr.typecases {
+		T().Debugf("typecase [%s] = %v", k, v.scalableFontParent.Fontname)
+	}
+	T().Debugf("------------------------")
+}
+
+func NormalizeFontname(fname string) string {
+	fname = strings.TrimSpace(fname)
+	fname = strings.ReplaceAll(fname, " ", "_")
+	if dot := strings.LastIndex(fname, "."); dot > 0 {
+		fname = fname[:dot]
+	}
+	fname = strings.ToLower(fname)
+	return fname
+}
+
+func NormalizeTypeCaseName(fname string, size float64) string {
+	fname = NormalizeFontname(fname)
+	fname = fmt.Sprintf("%s-%.2f", fname, size)
+	return fname
 }
