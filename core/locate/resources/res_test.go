@@ -2,6 +2,7 @@ package resources
 
 import (
 	"testing"
+	"time"
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
@@ -31,6 +32,7 @@ func TestLoadFont(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	loader := ResolveTypeCase("GentiumPlus-R.ttf", 11.0)
+	time.Sleep(500)
 	typecase, err := loader.TypeCase()
 	if err != nil {
 		t.Error(err)
