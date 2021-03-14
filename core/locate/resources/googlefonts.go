@@ -19,6 +19,7 @@ import (
 	xfont "golang.org/x/image/font"
 )
 
+// GoogleFontInfo describes a font entry in the Google Font Service.
 type GoogleFontInfo struct {
 	Family   string            `json:"family"`
 	Version  string            `json:"version"`
@@ -36,7 +37,7 @@ var googleFontsDirectory googleFontsList
 var googleFontsLoadError error
 var googleFontsAPI string = `https://www.googleapis.com/webfonts/v1/webfonts?`
 
-func SetupGoogleFontsDirectory() error {
+func setupGoogleFontsDirectory() error {
 	loadGoogleFontsDir.Do(func() {
 		apikey := gconf.GetString("google-api-key")
 		if apikey == "" {
@@ -79,9 +80,11 @@ func SetupGoogleFontsDirectory() error {
 	return googleFontsLoadError
 }
 
+// FindGoogleFont scans the Google Font Service for fonts matching pattern, and
+// having a given style and weight.
 func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]GoogleFontInfo, error) {
 	var fi []GoogleFontInfo
-	if err := SetupGoogleFontsDirectory(); err != nil {
+	if err := setupGoogleFontsDirectory(); err != nil {
 		return fi, err
 	}
 	r, err := regexp.Compile(pattern)
@@ -111,6 +114,8 @@ func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]G
 
 // ---------------------------------------------------------------------------
 
+// CacheGoogleFont loads a font described by fi with a given variant.
+// The loaded is cached in the user's cache directory.
 func CacheGoogleFont(fi GoogleFontInfo, variant string) (filepath string, err error) {
 	var fileurl string
 	for _, v := range fi.Variants {
@@ -146,7 +151,7 @@ func CacheGoogleFont(fi GoogleFontInfo, variant string) (filepath string, err er
 func ListGoogleFonts(pattern string) {
 	level := T().GetTraceLevel()
 	T().SetTraceLevel(tracing.LevelInfo)
-	if err := SetupGoogleFontsDirectory(); err != nil {
+	if err := setupGoogleFontsDirectory(); err != nil {
 		T().Errorf(err.(core.AppError).UserMessage())
 	} else {
 		listGoogleFonts(googleFontsDirectory, pattern)

@@ -81,7 +81,7 @@ func TestGoogleAPI(t *testing.T) {
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	err := SetupGoogleFontsDirectory()
+	err := setupGoogleFontsDirectory()
 	if err != nil {
 		core.UserError(err)
 		t.Fatal(err)
