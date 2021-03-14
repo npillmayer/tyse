@@ -73,6 +73,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -225,15 +226,18 @@ func (fr *Registry) StoreFont(f *ScalableFont) {
 	}
 	fr.Lock()
 	defer fr.Unlock()
-	fname := NormalizeFontname(f.Fontname)
+	style, weight := GuessStyleAndWeight(f.Fontname)
+	fname := NormalizeFontname(f.Fontname, style, weight)
 	T().Debugf("registry stores font %s as %s", f.Fontname, fname)
 	fr.fonts[fname] = f
 }
 
-func (fr *Registry) TypeCase(name string, size float64) (*TypeCase, error) {
+func (fr *Registry) TypeCase(name string, style xfont.Style, weight xfont.Weight,
+	size float64) (*TypeCase, error) {
+	//
 	T().Debugf("registry searches for font %s at %.2f", name, size)
-	fname := NormalizeFontname(name)
-	tname := NormalizeTypeCaseName(name, size)
+	fname := NormalizeFontname(name, style, weight)
+	tname := AppendSize(fname, size)
 	fr.Lock()
 	defer fr.Unlock()
 	if t, ok := fr.typecases[tname]; ok {
@@ -249,8 +253,8 @@ func (fr *Registry) TypeCase(name string, size float64) (*TypeCase, error) {
 	}
 	T().Infof("registry does not contain font %s", name)
 	err := errors.New("font " + name + " not found in registry")
-	fname = NormalizeTypeCaseName("fallback", size)
-	tname = NormalizeTypeCaseName("fallback", size)
+	fname = "fallback"
+	tname = AppendSize("fallback", size)
 	if t, ok := fr.typecases[fname]; ok {
 		return t, err
 	}
@@ -273,20 +277,78 @@ func (fr *Registry) DebugList() {
 	T().Debugf("------------------------")
 }
 
-func NormalizeFontname(fname string) string {
+func NormalizeFontname(fname string, style xfont.Style, weight xfont.Weight) string {
 	fname = strings.TrimSpace(fname)
 	fname = strings.ReplaceAll(fname, " ", "_")
 	if dot := strings.LastIndex(fname, "."); dot > 0 {
 		fname = fname[:dot]
 	}
 	fname = strings.ToLower(fname)
+	switch style {
+	case xfont.StyleItalic, xfont.StyleOblique:
+		fname += "-italic"
+	}
+	switch weight {
+	case xfont.WeightLight, xfont.WeightExtraLight:
+		fname += "-light"
+	case xfont.WeightBold, xfont.WeightExtraBold, xfont.WeightSemiBold:
+		fname += "-bold"
+	}
 	return fname
 }
 
-func NormalizeTypeCaseName(fname string, size float64) string {
-	fname = NormalizeFontname(fname)
+func AppendSize(fname string, size float64) string {
 	fname = fmt.Sprintf("%s-%.2f", fname, size)
 	return fname
+}
+
+// GuessStyleAndWeight trys to guess a font's style and weight from the
+// font's file name.
+func GuessStyleAndWeight(fontfilename string) (xfont.Style, xfont.Weight) {
+	fontfilename = path.Base(fontfilename)
+	ext := path.Ext(fontfilename)
+	fontfilename = strings.ToLower(fontfilename[:len(fontfilename)-len(ext)])
+	s := strings.Split(fontfilename, "-")
+	if len(s) > 1 {
+		switch s[len(s)-1] {
+		case "light", "xlight":
+			return xfont.StyleNormal, xfont.WeightLight
+		case "normal", "medium", "regular", "r":
+			return xfont.StyleNormal, xfont.WeightNormal
+		case "bold", "b":
+			return xfont.StyleNormal, xfont.WeightBold
+		case "xbold", "black":
+			return xfont.StyleNormal, xfont.WeightExtraBold
+		}
+	}
+	style, weight := xfont.StyleNormal, xfont.WeightNormal
+	if strings.Contains(fontfilename, "italic") {
+		style = xfont.StyleItalic
+	}
+	if strings.Contains(fontfilename, "light") {
+		weight = xfont.WeightLight
+	}
+	if strings.Contains(fontfilename, "bold") {
+		weight = xfont.WeightBold
+	}
+	return style, weight
+}
+
+// Matches returns true if a font's filename contains pattern and indicators
+// for a given style and weight.
+func Matches(fontfilename, pattern string, style xfont.Style, weight xfont.Weight) bool {
+	basename := path.Base(fontfilename)
+	basename = basename[:len(basename)-len(path.Ext(basename))]
+	basename = strings.ToLower(basename)
+	T().Debugf("basename of font = %s", basename)
+	if !strings.Contains(basename, strings.ToLower(pattern)) {
+		return false
+	}
+	s, w := GuessStyleAndWeight(basename)
+	if s == style && w == weight {
+		return true
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------

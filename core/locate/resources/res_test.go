@@ -2,7 +2,6 @@ package resources
 
 import (
 	"testing"
-	"time"
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
@@ -34,7 +33,7 @@ func TestLoadPackagedFont(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	loader := ResolveTypeCase("GentiumPlus", xfont.StyleNormal, xfont.WeightNormal, 11.0)
-	time.Sleep(500)
+	//time.Sleep(500)
 	typecase, err := loader.TypeCase()
 	if err != nil {
 		t.Error(err)
@@ -44,8 +43,8 @@ func TestLoadPackagedFont(t *testing.T) {
 	}
 	t.Logf("pt-size of typecase = %f", typecase.PtSize())
 	t.Logf("name of typecase = %s", typecase.ScalableFontParent().Fontname)
-	if typecase.ScalableFontParent().Fontname != "GentiumPlus" {
-		t.Errorf("expected font to be named GentiumPlus, isn't")
+	if typecase.ScalableFontParent().Fontname != "GentiumPlus-R.ttf" {
+		t.Errorf("expected font to be named GentiumPlus-R, isn't")
 	}
 }
 
@@ -67,5 +66,4 @@ func TestResolveGoogleFont(t *testing.T) {
 	t.Logf("pt-size of typecase = %f", typecase.PtSize())
 	t.Logf("name of typecase = %s", typecase.ScalableFontParent().Fontname)
 	font.GlobalRegistry().DebugList()
-	t.Fail()
 }

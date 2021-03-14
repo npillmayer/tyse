@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"io/fs"
 	"io/ioutil"
+	"path"
 	"strings"
 
 	"github.com/flopp/go-findfont"
@@ -131,11 +132,12 @@ func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 }
 
 // ResolveTypeCase resolves a font type case with a given size.
-func ResolveTypeCase(name string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
+func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
 	ch := make(chan fontPlusErr)
 	go func(ch chan<- fontPlusErr) {
 		result := fontPlusErr{}
-		if t, err := font.GlobalRegistry().TypeCase(name, size); err == nil {
+		name := font.NormalizeFontname(pattern, style, weight)
+		if t, err := font.GlobalRegistry().TypeCase(pattern, style, weight, size); err == nil {
 			result.font = t
 			ch <- result
 			close(ch)
@@ -145,8 +147,8 @@ func ResolveTypeCase(name string, style xfont.Style, weight xfont.Weight, size f
 		var f *font.ScalableFont
 		var fname string
 		for _, f := range fonts {
-			//T().Debugf("font file %s", f.Name())
-			if font.NormalizeFontname(f.Name()) == font.NormalizeFontname(name) {
+			T().Debugf("font file %s", f.Name())
+			if font.Matches(f.Name(), pattern, style, weight) {
 				fname = f.Name()
 				break
 			}
@@ -164,21 +166,22 @@ func ResolveTypeCase(name string, style xfont.Style, weight xfont.Weight, size f
 			}
 		}
 		if f == nil {
-			fpath, err := findfont.Find(name) // try to find as system font
+			fpath, err := findfont.Find(pattern) // try to find as system font
 			if err == nil && fpath != "" {
-				T().Debugf("%s is a system font", name)
+				T().Debugf("%s is a system font: %s", pattern, fpath)
 				f, result.err = font.LoadOpenTypeFont(fpath)
 			}
 		}
 		if f == nil {
 			var fiList []GoogleFontInfo
-			if fiList, result.err = FindGoogleFont(name, style, weight); result.err == nil {
+			if fiList, result.err = FindGoogleFont(pattern, style, weight); result.err == nil {
 				fi := fiList[0] // TODO select correct variant
 				// TODO check in cache directory
 				T().Errorf("not yet implemented: search for font %s in cache directory", fi.Family)
 				var fpath string
 				if fpath, result.err = CacheGoogleFont(fi, fi.Variants[0]); result.err == nil {
 					f, result.err = font.LoadOpenTypeFont(fpath)
+					name = path.Base(fpath)
 				}
 			}
 		}
@@ -186,7 +189,7 @@ func ResolveTypeCase(name string, style xfont.Style, weight xfont.Weight, size f
 		if f != nil {
 			f.Fontname = name
 			font.GlobalRegistry().StoreFont(f)
-			result.font, result.err = font.GlobalRegistry().TypeCase(name, size)
+			result.font, result.err = font.GlobalRegistry().TypeCase(name, style, weight, size)
 			//font.GlobalRegistry().DebugList()
 			//T().Debugf("name = %v", result.font.ScalableFontParent().Fontname)
 		}
