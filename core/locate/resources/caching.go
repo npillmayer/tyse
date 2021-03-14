@@ -46,7 +46,7 @@ func CacheDirPath(subfolders ...string) (string, error) {
 	}
 	subs := path.Join(subfolders...)
 	cachedir = path.Join(cachedir, gconf.GetString("app-key"), subs)
-	T().Infof("caching in %s", cachedir)
+	T().Debugf("caching in %s", cachedir)
 	_, err = os.Stat(cachedir)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(cachedir, 0755)

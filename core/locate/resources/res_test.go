@@ -7,6 +7,8 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/tyse/core/font"
+	xfont "golang.org/x/image/font"
 )
 
 func TestLoadImage(t *testing.T) {
@@ -26,12 +28,12 @@ func TestLoadImage(t *testing.T) {
 	t.Logf("width of image = %d", w)
 }
 
-func TestLoadFont(t *testing.T) {
+func TestLoadPackagedFont(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	loader := ResolveTypeCase("GentiumPlus-R.ttf", 11.0)
+	loader := ResolveTypeCase("GentiumPlus", xfont.StyleNormal, xfont.WeightNormal, 11.0)
 	time.Sleep(500)
 	typecase, err := loader.TypeCase()
 	if err != nil {
@@ -42,4 +44,28 @@ func TestLoadFont(t *testing.T) {
 	}
 	t.Logf("pt-size of typecase = %f", typecase.PtSize())
 	t.Logf("name of typecase = %s", typecase.ScalableFontParent().Fontname)
+	if typecase.ScalableFontParent().Fontname != "GentiumPlus" {
+		t.Errorf("expected font to be named GentiumPlus, isn't")
+	}
+}
+
+func TestResolveGoogleFont(t *testing.T) {
+	teardown := testconfig.QuickConfig(t, map[string]string{
+		"app-key": "tyse-test",
+	})
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	loader := ResolveTypeCase("Antic", xfont.StyleNormal, xfont.WeightNormal, 11.0)
+	typecase, err := loader.TypeCase()
+	if err != nil {
+		t.Error(err)
+	}
+	if typecase == nil {
+		t.Fatalf("typecase is nil, should not be")
+	}
+	t.Logf("pt-size of typecase = %f", typecase.PtSize())
+	t.Logf("name of typecase = %s", typecase.ScalableFontParent().Fontname)
+	font.GlobalRegistry().DebugList()
+	t.Fail()
 }

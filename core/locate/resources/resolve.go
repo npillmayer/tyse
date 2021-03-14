@@ -13,6 +13,7 @@ import (
 	"github.com/flopp/go-findfont"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
+	xfont "golang.org/x/image/font"
 )
 
 type resourceType int
@@ -129,7 +130,8 @@ func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 	return loader.await(context.Background())
 }
 
-func ResolveTypeCase(name string, size float64) TypeCasePromise {
+// ResolveTypeCase resolves a font type case with a given size.
+func ResolveTypeCase(name string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
 	ch := make(chan fontPlusErr)
 	go func(ch chan<- fontPlusErr) {
 		result := fontPlusErr{}
@@ -143,7 +145,7 @@ func ResolveTypeCase(name string, size float64) TypeCasePromise {
 		var f *font.ScalableFont
 		var fname string
 		for _, f := range fonts {
-			T().Debugf("font file %s", f.Name())
+			//T().Debugf("font file %s", f.Name())
 			if font.NormalizeFontname(f.Name()) == font.NormalizeFontname(name) {
 				fname = f.Name()
 				break
@@ -169,7 +171,16 @@ func ResolveTypeCase(name string, size float64) TypeCasePromise {
 			}
 		}
 		if f == nil {
-			// TODO load font from network
+			var fiList []GoogleFontInfo
+			if fiList, result.err = FindGoogleFont(name, style, weight); result.err == nil {
+				fi := fiList[0] // TODO select correct variant
+				// TODO check in cache directory
+				T().Errorf("not yet implemented: search for font %s in cache directory", fi.Family)
+				var fpath string
+				if fpath, result.err = CacheGoogleFont(fi, fi.Variants[0]); result.err == nil {
+					f, result.err = font.LoadOpenTypeFont(fpath)
+				}
+			}
 		}
 		//font.GlobalRegistry().DebugList()
 		if f != nil {
