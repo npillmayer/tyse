@@ -135,9 +135,13 @@ func CacheGoogleFont(fi GoogleFontInfo, variant string) (filepath string, err er
 	name := fi.Family + "-" + variant + ext
 	filepath = path.Join(cachedir, name)
 	T().Infof("caching font %s as %s", fi.Family, filepath)
-	err = DownloadCachedFile(filepath, fileurl)
-	if err != nil {
-		return "", err
+	if _, err := os.Stat(filepath); err == nil {
+		T().Infof("font already cached: %s", filepath)
+	} else {
+		err = DownloadCachedFile(filepath, fileurl)
+		if err != nil {
+			return "", err
+		}
 	}
 	return filepath, nil
 }

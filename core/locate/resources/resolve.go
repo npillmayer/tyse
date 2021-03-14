@@ -176,8 +176,6 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 			var fiList []GoogleFontInfo
 			if fiList, result.err = FindGoogleFont(pattern, style, weight); result.err == nil {
 				fi := fiList[0] // TODO select correct variant
-				// TODO check in cache directory
-				T().Errorf("not yet implemented: search for font %s in cache directory", fi.Family)
 				var fpath string
 				if fpath, result.err = CacheGoogleFont(fi, fi.Variants[0]); result.err == nil {
 					f, result.err = font.LoadOpenTypeFont(fpath)
