@@ -3,14 +3,16 @@ package core
 import (
 	"errors"
 	"fmt"
+	"os"
 )
 
 // General error codes
 const (
-	NOERROR   int = iota
-	EMISSING      // resource does not exist
-	EINVALID      // validation failed
-	EINTERNAL     // internal error
+	NOERROR     int = 0
+	EMISSING    int = 122 // resource does not exist
+	EINVALID    int = 123 // validation failed
+	ECONNECTION int = 124 // remote resource not connected
+	EINTERNAL   int = 125 // internal error
 )
 
 func errorText(ecode int) string {
@@ -21,6 +23,8 @@ func errorText(ecode int) string {
 		return "not found"
 	case EINVALID:
 		return "invalid"
+	case ECONNECTION:
+		return "transmission-error"
 	case EINTERNAL:
 		return "internal error"
 	}
@@ -48,13 +52,15 @@ func (e coreError) Error() string {
 	return fmt.Sprintf("[%d] %v", e.code, e.error)
 }
 
-func (e coreError) StatusCode() int {
+func (e coreError) ErrorCode() int {
 	return e.code
 }
 
 func (e coreError) UserMessage() string {
 	return e.msg
 }
+
+var _ AppError = coreError{}
 
 // ErrorWithCode adds an error code to err's error chain.
 // Unlike pkg/errors, ErrorWithCode will wrap nil error.
@@ -109,4 +115,12 @@ func Error(code int, format string, v ...interface{}) error {
 		code,
 		fmt.Sprintf(format, v...),
 	}
+}
+
+func UserError(err error) {
+	if e, ok := err.(AppError); ok {
+		fmt.Fprintf(os.Stderr, "[%d] %s\n", e.ErrorCode(), e.UserMessage())
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 }
