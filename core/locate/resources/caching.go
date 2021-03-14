@@ -1,12 +1,14 @@
 package resources
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"os"
 	"path"
 
 	"github.com/npillmayer/schuko/gconf"
+	"github.com/npillmayer/tyse/core"
 )
 
 // DownloadFile will download a url to a local file (usually located in the
@@ -35,7 +37,8 @@ func DownloadCachedFile(filepath string, url string) error {
 func CacheDirPath(subfolders ...string) (string, error) {
 	T().Debugf("config[%s] = %s", "app-key", gconf.GetString("app-key"))
 	if gconf.GetString("app-key") == "" {
-		T().Errorf("application key is not set")
+		return "", core.WrapError(errors.New("application key is not set"), core.EMISSING,
+			"application key is not configured; need to set it for cache access")
 	}
 	cachedir, err := os.UserCacheDir()
 	if err != nil {

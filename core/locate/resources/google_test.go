@@ -2,6 +2,7 @@ package resources
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core"
+	xfont "golang.org/x/image/font"
 )
 
 const exampleRespFragm string = `
@@ -75,9 +77,53 @@ func TestGoogleRespDecode(t *testing.T) {
 }
 
 func TestGoogleAPI(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
 	err := SetupGoogleFontsDirectory()
 	if err != nil {
 		core.UserError(err)
+		t.Fatal(err)
+	}
+}
+
+func TestGoogleFindFont(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	fi, err := FindGoogleFont("Inconsolata", xfont.StyleNormal, xfont.WeightNormal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range fi {
+		t.Logf("family = %s, variants = %+v", f.Family, f.Variants)
+	}
+	fi, err = FindGoogleFont("Inconsolata", xfont.StyleItalic, xfont.WeightNormal)
+	if err == nil {
+		t.Error("expected search for Inconsolata Italic to fail, did not")
+	}
+}
+
+func TestGoogleCacheFont(t *testing.T) {
+	teardown := testconfig.QuickConfig(t, map[string]string{
+		"app-key": "tyse-test",
+	})
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	fi, err := FindGoogleFont("Inconsolata", xfont.StyleNormal, xfont.WeightNormal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := CacheGoogleFont(fi[0], "regular")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("path = %s", path)
+	_, err = os.Stat(path)
+	if err != nil {
 		t.Fatal(err)
 	}
 }

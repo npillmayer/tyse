@@ -73,12 +73,14 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"golang.org/x/image/font"
+	xfont "golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
@@ -285,4 +287,56 @@ func NormalizeTypeCaseName(fname string, size float64) string {
 	fname = NormalizeFontname(fname)
 	fname = fmt.Sprintf("%s-%.2f", fname, size)
 	return fname
+}
+
+// ---------------------------------------------------------------------------
+
+func MatchStyle(variantName string, style xfont.Style) bool {
+	switch style {
+	case xfont.StyleNormal:
+		switch variantName {
+		case "regular", "100", "200", "300", "400", "500":
+			return true
+		}
+		return false
+	case xfont.StyleItalic, xfont.StyleOblique:
+		switch variantName {
+		case "italic", "100italic", "200italic", "300italic", "400italic", "500italic":
+			return true
+		}
+		return false
+	}
+	return false
+}
+
+func MatchWeight(variantName string, weight xfont.Weight) bool {
+	/* from https://pkg.go.dev/golang.org/x/image/font
+	WeightThin       Weight = -3 // CSS font-weight value 100.
+	WeightExtraLight Weight = -2 // CSS font-weight value 200.
+	WeightLight      Weight = -1 // CSS font-weight value 300.
+	WeightNormal     Weight = +0 // CSS font-weight value 400.
+	WeightMedium     Weight = +1 // CSS font-weight value 500.
+	WeightSemiBold   Weight = +2 // CSS font-weight value 600.
+	WeightBold       Weight = +3 // CSS font-weight value 700.
+	WeightExtraBold  Weight = +4 // CSS font-weight value 800.
+	WeightBlack      Weight = +5 // CSS font-weight value 900.
+	*/
+	if strconv.Itoa(int(weight)+4*100) == variantName {
+		return true
+	}
+	switch variantName {
+	case "regular", "100", "200", "300", "400", "500":
+		switch weight {
+		case xfont.WeightThin, xfont.WeightExtraLight, xfont.WeightLight, xfont.WeightNormal, xfont.WeightMedium:
+			return true
+		}
+		return false
+	case "bold", "extrabold", "600", "700", "800", "900":
+		switch weight {
+		case xfont.WeightSemiBold, xfont.WeightBold, xfont.WeightExtraBold, xfont.WeightBlack:
+			return true
+		}
+		return false
+	}
+	return false
 }

@@ -3,15 +3,20 @@ package resources
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/npillmayer/schuko/gconf"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core"
+	"github.com/npillmayer/tyse/core/font"
+	xfont "golang.org/x/image/font"
 )
 
 type GoogleFontInfo struct {
@@ -35,7 +40,7 @@ func SetupGoogleFontsDirectory() error {
 	loadGoogleFontsDir.Do(func() {
 		apikey := gconf.GetString("google-api-key")
 		if apikey == "" {
-			apikey = os.Getenv("GOOGLE_API_KE")
+			apikey = os.Getenv("GOOGLE_API_KEY")
 		}
 		if apikey == "" {
 			err := errors.New("Google API key not set")
@@ -72,6 +77,64 @@ func SetupGoogleFontsDirectory() error {
 		}
 	})
 	return googleFontsLoadError
+}
+
+func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]GoogleFontInfo, error) {
+	var fi []GoogleFontInfo
+	if err := SetupGoogleFontsDirectory(); err != nil {
+		return fi, err
+	}
+	r, err := regexp.Compile(pattern)
+	if err != nil {
+		return fi, core.WrapError(err, core.EINVALID,
+			"cannot match Google font: invalid pattern: %v", err)
+	}
+	for _, finfo := range googleFontsDirectory.Items {
+		if r.MatchString(finfo.Family) {
+			match := false
+			T().Debugf("Google font matches pattern: %s", finfo.Family)
+			for _, v := range finfo.Variants {
+				match = font.MatchStyle(v, style) && font.MatchWeight(v, weight)
+				if match {
+					fi = append(fi, finfo)
+					break
+				}
+			}
+		}
+	}
+	if len(fi) == 0 {
+		return fi, errors.New("no Google font matches pattern")
+	}
+	//T().Debugf("found %v", fi[0])
+	return fi, nil
+}
+
+// ---------------------------------------------------------------------------
+
+func CacheGoogleFont(fi GoogleFontInfo, variant string) (filepath string, err error) {
+	var fileurl string
+	for _, v := range fi.Variants {
+		if v == variant {
+			fileurl = fi.Files[v]
+		}
+	}
+	if fileurl == "" {
+		return "", fmt.Errorf("no variant equals %s, cannot cache %s", variant, fi.Family)
+	}
+	letter := strings.ToUpper(fi.Family[:1])
+	cachedir, err := CacheDirPath("fonts", letter)
+	if err != nil {
+		return "", err
+	}
+	ext := path.Ext(fileurl)
+	name := fi.Family + "-" + variant + ext
+	filepath = path.Join(cachedir, name)
+	T().Debugf("caching font %s as %s", fi.Family, filepath)
+	err = DownloadCachedFile(filepath, fileurl)
+	if err != nil {
+		return "", err
+	}
+	return filepath, nil
 }
 
 // ---------------------------------------------------------------------------
