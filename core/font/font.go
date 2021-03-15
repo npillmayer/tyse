@@ -69,6 +69,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -372,6 +373,7 @@ func Matches(fontfilename, pattern string, style xfont.Style, weight xfont.Weigh
 type Descriptor struct {
 	Family   string
 	Variants []string
+	Path     string
 }
 
 // MatchConfidence is a type for expressing the confidence level of font matching.
@@ -391,12 +393,21 @@ const (
 func ClosestMatch(fdescs []Descriptor, pattern string, style xfont.Style,
 	weight xfont.Weight) (match Descriptor, variant string, confidence MatchConfidence) {
 	//
+	r, err := regexp.Compile(pattern)
+	if err != nil {
+		trace().Errorf("invalid font name pattern")
+		return
+	}
 	for _, fdesc := range fdescs {
+		//trace().Debugf("trying to match %s", strings.ToLower(fdesc.Family))
+		if !r.MatchString(strings.ToLower(fdesc.Family)) {
+			continue
+		}
 		for _, v := range fdesc.Variants {
 			s := MatchStyle(v, style)
 			w := MatchWeight(v, weight)
 			if (s+w)/2 > confidence {
-				trace().Debugf("variant %+v match confidence = %d + %d", v, s, w)
+				//trace().Debugf("variant %+v match confidence = %d + %d", v, s, w)
 				confidence = (s + w) / 2
 				variant = v
 				match = fdesc
@@ -457,7 +468,7 @@ func MatchWeight(variantName string, weight xfont.Weight) MatchConfidence {
 		return PerfectConfidence
 	}
 	switch variantName {
-	case "regular", "400":
+	case "regular", "400", "italic", "oblique", "normal", "text":
 		switch weight {
 		case xfont.WeightNormal, xfont.WeightMedium:
 			return PerfectConfidence

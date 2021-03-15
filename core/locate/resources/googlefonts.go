@@ -97,7 +97,7 @@ func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]G
 			"cannot match Google font: invalid font name pattern: %v", err)
 	}
 	for _, finfo := range googleFontsDirectory.Items {
-		if r.MatchString(finfo.Family) {
+		if r.MatchString(strings.ToLower(finfo.Family)) {
 			trace().Debugf("Google font name matches pattern: %s", finfo.Family)
 			_, _, conf := font.ClosestMatch([]font.Descriptor{finfo.Descriptor}, pattern,
 				style, weight)

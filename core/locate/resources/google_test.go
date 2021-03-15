@@ -13,6 +13,24 @@ import (
 	xfont "golang.org/x/image/font"
 )
 
+// ATTENTION
+// ---------
+// Tests in this file require a Google Font Service API-key to be present.
+// The API-key has to be set with the GOOGLE_API_KEY environment variable.
+
+func TestAPIKeyPresent(t *testing.T) {
+	if os.Getenv("GOOGLE_API_KEY") == "" {
+		t.Fatalf(`
+
+ATTENTION
+---------
+Tests in this file require a Google Font Service API-key to be present.
+The API-key has to be set with the GOOGLE_API_KEY environment variable.
+
+`)
+	}
+}
+
 const exampleRespFragm string = `
 {
     "kind": "webfonts#webfontList",
