@@ -35,7 +35,7 @@ func DownloadCachedFile(filepath string, url string) error {
 // the base cache path. Non-existing sub-folders will be created as necessary
 // (with permissions 755).
 func CacheDirPath(subfolders ...string) (string, error) {
-	T().Debugf("config[%s] = %s", "app-key", gconf.GetString("app-key"))
+	trace().Debugf("config[%s] = %s", "app-key", gconf.GetString("app-key"))
 	if gconf.GetString("app-key") == "" {
 		return "", core.WrapError(errors.New("application key is not set"), core.EMISSING,
 			"application key is not configured; need to set it for cache access")
@@ -46,7 +46,7 @@ func CacheDirPath(subfolders ...string) (string, error) {
 	}
 	subs := path.Join(subfolders...)
 	cachedir = path.Join(cachedir, gconf.GetString("app-key"), subs)
-	T().Debugf("caching in %s", cachedir)
+	trace().Debugf("caching in %s", cachedir)
 	_, err = os.Stat(cachedir)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(cachedir, 0755)

@@ -65,5 +65,5 @@ func TestResolveGoogleFont(t *testing.T) {
 	}
 	t.Logf("pt-size of typecase = %f", typecase.PtSize())
 	t.Logf("name of typecase = %s", typecase.ScalableFontParent().Fontname)
-	font.GlobalRegistry().DebugList()
+	font.GlobalRegistry().LogFontList()
 }

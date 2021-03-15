@@ -1,34 +1,29 @@
 /*
 Package font is for typeface and font handling.
 
-There is a certain confusion in the nomenclature of typesetting. We will
+There is a certain confusion with the nomenclature of typesetting. We will
 stick to the following definitions:
 
-* A "typeface" is a family of fonts. An example is "Helvetica".
+▪︎ A "typeface" is a family of fonts. An example is "Helvetica".
 This corresponds to a TrueType "collection" (*.ttc).
 
-* A "scalable font" is a font, i.e. a variant of a typeface with a
+▪︎ A "scalable font" is a font, i.e. a variant of a typeface with a
 certain weight, slant, etc.  An example is "Helvetica regular".
 
-* A "typecase" is a scaled font, i.e. a font in a certain size for
+▪︎ A "typecase" is a scaled font, i.e. a font in a certain size for
 a certain script and language. The name is reminiscend on the wooden
-boxes of typesetters in the aera of metal type.
+boxes of typesetters in the era of metal type.
 An example is "Helvetica regular 11pt, Latin, en_US".
 
 Please note that Go (Golang) does use the terms "font" and "face"
 differently–actually more or less in an opposite manner.
 
-TODO: font collections (*.ttc), e.g., /System/Library/Fonts/Helvetica.ttc
+Status
 
-Eigenen Text-Processor schreiben, nur für Latin Script, in pur Go?
-Alternative zu Harfbuzz; also Latin-Harfbuzz für Arme in Go?
-Siehe
-https://docs.microsoft.com/en-us/typography/opentype/spec/ttochap1#text-processing-with-opentype-layout-fonts
+Does not yet contain methods for font collections (*.ttc), e.g.,
+/System/Library/Fonts/Helvetica.ttc on Mac OS.
 
-Utility to view a character map of a font: http://torinak.com/font/lsfont.html
-
-Website for fonts:
-https://www.fontsquirrel.com/fonts/list/popular
+Links
 
 OpenType explained:
 https://docs.microsoft.com/en-us/typography/opentype/
@@ -52,7 +47,7 @@ notice, this list of conditions and the following disclaimer.
 notice, this list of conditions and the following disclaimer in the
 documentation and/or other materials provided with the distribution.
 
-3. Neither the name of this software nor the names of its contributors
+3. Neither the name of the copyright holder nor the names of its contributors
 may be used to endorse or promote products derived from this software
 without specific prior written permission.
 
@@ -87,11 +82,13 @@ import (
 	"golang.org/x/image/font/sfnt"
 )
 
-// T traces to a global core-tracer.
-func T() tracing.Trace {
+// trace traces to a global core-tracer.
+func trace() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
+// ScalableFont is an internal representation of an outline-font of type
+// TTF of OTF.
 type ScalableFont struct {
 	Fontname string
 	Filepath string     // file path
@@ -99,6 +96,7 @@ type ScalableFont struct {
 	SFNT     *sfnt.Font // the font's container // TODO: not threadsafe???
 }
 
+//TypeCase represents a font at a specific point size, e.g. "Helvetica bold 10pt".
 type TypeCase struct {
 	scalableFontParent *ScalableFont
 	font               font.Face // Go uses 'face' and 'font' in an inverse manner
@@ -114,6 +112,7 @@ func NullTypeCase() *TypeCase {
 	}
 }
 
+// LoadOpenTypeFont loads an OpenType font (TTF or OTF) from a file.
 func LoadOpenTypeFont(fontfile string) (*ScalableFont, error) {
 	bytez, err := ioutil.ReadFile(fontfile)
 	if err != nil {
@@ -122,6 +121,7 @@ func LoadOpenTypeFont(fontfile string) (*ScalableFont, error) {
 	return ParseOpenTypeFont(bytez)
 }
 
+// ParseOpenTypeFont loads an OpenType font (TTF or OTF) from memory.
 func ParseOpenTypeFont(fbytes []byte) (f *ScalableFont, err error) {
 	f = &ScalableFont{Binary: fbytes}
 	f.SFNT, err = sfnt.Parse(f.Binary)
@@ -132,13 +132,15 @@ func ParseOpenTypeFont(fbytes []byte) (f *ScalableFont, err error) {
 	return
 }
 
-// TODO: check if language fits to script
-// TODO: check if font supports script
+// PrepareCase prepares a typecase in a given point size, e.g. "Helvetica bold 10pt"
+// from an existing font "Helvetiva bold", which has been previously loaded.
 func (sf *ScalableFont) PrepareCase(fontsize float64) (*TypeCase, error) {
+	// TODO: check if language fits to script
+	// TODO: check if font supports script
 	typecase := &TypeCase{}
 	typecase.scalableFontParent = sf
 	if fontsize < 5.0 || fontsize > 500.0 {
-		fmt.Printf("*** font size must be 5pt < size < 500pt, is %g (set to 10pt)\n", fontsize)
+		fmt.Printf("prepare typecase: size must be 5pt < size < 500pt, is %g (set to 10pt)\n", fontsize)
 		fontsize = 10.0
 	}
 	options := &opentype.FaceOptions{
@@ -153,10 +155,12 @@ func (sf *ScalableFont) PrepareCase(fontsize float64) (*TypeCase, error) {
 	return typecase, err
 }
 
+// ScalableFontParent returns the unscaled font a typecase has been derived from.
 func (tc *TypeCase) ScalableFontParent() *ScalableFont {
 	return tc.scalableFontParent
 }
 
+// PtSize returns the point-size of a typecase.
 func (tc *TypeCase) PtSize() float64 {
 	return tc.size
 }
@@ -194,6 +198,8 @@ func loadFallbackFont() *ScalableFont {
 
 // --- Font Registry ---------------------------------------------------------
 
+// Registry is a type for holding information about loaded fonts for a
+// typesetter.
 type Registry struct {
 	sync.Mutex
 	fonts     map[string]*ScalableFont
@@ -204,6 +210,8 @@ var globalFontRegistry *Registry
 
 var globalRegistryCreation sync.Once
 
+// GlobalRegistry is an application-wide singleton to hold information about
+// loaded fonts and typecases.
 func GlobalRegistry() *Registry {
 	globalRegistryCreation.Do(func() {
 		globalFontRegistry = NewRegistry()
@@ -219,62 +227,71 @@ func NewRegistry() *Registry {
 	return fr
 }
 
+// StoreFont pushes a font into the registry.
 func (fr *Registry) StoreFont(f *ScalableFont) {
 	if f == nil {
-		T().Errorf("registry cannot store null font")
+		trace().Errorf("registry cannot store null font")
 		return
 	}
 	fr.Lock()
 	defer fr.Unlock()
 	style, weight := GuessStyleAndWeight(f.Fontname)
 	fname := NormalizeFontname(f.Fontname, style, weight)
-	T().Debugf("registry stores font %s as %s", f.Fontname, fname)
+	trace().Debugf("registry stores font %s as %s", f.Fontname, fname)
 	fr.fonts[fname] = f
 }
 
+// TypeCase returns a concrete typecase with a given font, style, weight and size.
+// If a suitable typecase has already been cached, TypeCase will return the cached
+// typecase.
 func (fr *Registry) TypeCase(name string, style xfont.Style, weight xfont.Weight,
 	size float64) (*TypeCase, error) {
 	//
-	T().Debugf("registry searches for font %s at %.2f", name, size)
+	trace().Debugf("registry searches for font %s at %.2f", name, size)
 	fname := NormalizeFontname(name, style, weight)
-	tname := AppendSize(fname, size)
+	tname := appendSize(fname, size)
 	fr.Lock()
 	defer fr.Unlock()
 	if t, ok := fr.typecases[tname]; ok {
-		T().Debugf("registry found font %s", tname)
+		trace().Debugf("registry found font %s", tname)
 		return t, nil
 	}
 	if f, ok := fr.fonts[fname]; ok {
 		t, err := f.PrepareCase(size)
-		T().Infof("font registry has font %s, caches at %.2f", fname, size)
+		trace().Infof("font registry has font %s, caches at %.2f", fname, size)
 		t.scalableFontParent = f
 		fr.typecases[tname] = t
 		return t, err
 	}
-	T().Infof("registry does not contain font %s", name)
+	trace().Infof("registry does not contain font %s", name)
 	err := errors.New("font " + name + " not found in registry")
 	fname = "fallback"
-	tname = AppendSize("fallback", size)
+	tname = appendSize("fallback", size)
 	if t, ok := fr.typecases[fname]; ok {
 		return t, err
 	}
 	f := FallbackFont()
 	t, _ := f.PrepareCase(size)
-	T().Infof("font registry caches fallback font %s at %.2f", fname, size)
+	trace().Infof("font registry caches fallback font %s at %.2f", fname, size)
 	fr.fonts[fname] = f
 	fr.typecases[tname] = t
 	return t, err
 }
 
-func (fr *Registry) DebugList() {
-	T().Debugf("--- registered fonts ---")
+// LogFontList is a helper function to dump the list of known fonts and typecases
+// in a registry to the trace-file (log-level Info).
+func (fr *Registry) LogFontList() {
+	level := trace().GetTraceLevel()
+	trace().SetTraceLevel(tracing.LevelInfo)
+	trace().Infof("--- registered fonts ---")
 	for k, v := range fr.fonts {
-		T().Debugf("font [%s] = %v", k, v.Fontname)
+		trace().Infof("font [%s] = %v", k, v.Fontname)
 	}
 	for k, v := range fr.typecases {
-		T().Debugf("typecase [%s] = %v", k, v.scalableFontParent.Fontname)
+		trace().Infof("typecase [%s] = %v", k, v.scalableFontParent.Fontname)
 	}
-	T().Debugf("------------------------")
+	trace().Infof("------------------------")
+	trace().SetTraceLevel(level)
 }
 
 func NormalizeFontname(fname string, style xfont.Style, weight xfont.Weight) string {
@@ -297,7 +314,7 @@ func NormalizeFontname(fname string, style xfont.Style, weight xfont.Weight) str
 	return fname
 }
 
-func AppendSize(fname string, size float64) string {
+func appendSize(fname string, size float64) string {
 	fname = fmt.Sprintf("%s-%.2f", fname, size)
 	return fname
 }
@@ -340,7 +357,7 @@ func Matches(fontfilename, pattern string, style xfont.Style, weight xfont.Weigh
 	basename := path.Base(fontfilename)
 	basename = basename[:len(basename)-len(path.Ext(basename))]
 	basename = strings.ToLower(basename)
-	T().Debugf("basename of font = %s", basename)
+	trace().Debugf("basename of font = %s", basename)
 	if !strings.Contains(basename, strings.ToLower(pattern)) {
 		return false
 	}
@@ -351,27 +368,80 @@ func Matches(fontfilename, pattern string, style xfont.Style, weight xfont.Weigh
 	return false
 }
 
+// Descriptor represents all the known variants of a font.
+type Descriptor struct {
+	Family   string
+	Variants []string
+}
+
+// MatchConfidence is a type for expressing the confidence level of font matching.
+type MatchConfidence int
+
+const (
+	NoConfidence      MatchConfidence = 0
+	LowConfidence     MatchConfidence = 2
+	HighConfidence    MatchConfidence = 3
+	PerfectConfidence MatchConfidence = 4
+)
+
+// ClosestMatch scans a list of font desriptors and returns the closest match
+// for a given set of parametesrs.
+// If no variant matches, returns `NoConfidence`.
+//
+func ClosestMatch(fdescs []Descriptor, pattern string, style xfont.Style,
+	weight xfont.Weight) (match Descriptor, variant string, confidence MatchConfidence) {
+	//
+	for _, fdesc := range fdescs {
+		for _, v := range fdesc.Variants {
+			s := MatchStyle(v, style)
+			w := MatchWeight(v, weight)
+			if (s+w)/2 > confidence {
+				trace().Debugf("variant %+v match confidence = %d + %d", v, s, w)
+				confidence = (s + w) / 2
+				variant = v
+				match = fdesc
+			}
+		}
+	}
+	return
+}
+
 // ---------------------------------------------------------------------------
 
-func MatchStyle(variantName string, style xfont.Style) bool {
+// MatchStyle trys to match a font-variant to a given style.
+func MatchStyle(variantName string, style xfont.Style) MatchConfidence {
+	variantName = strings.ToLower(variantName)
 	switch style {
 	case xfont.StyleNormal:
 		switch variantName {
-		case "regular", "100", "200", "300", "400", "500":
-			return true
+		case "regular", "400":
+			return PerfectConfidence
+		case "100", "200", "300", "500":
+			return HighConfidence
 		}
-		return false
-	case xfont.StyleItalic, xfont.StyleOblique:
-		switch variantName {
-		case "italic", "100italic", "200italic", "300italic", "400italic", "500italic":
-			return true
+		return NoConfidence
+	case xfont.StyleItalic:
+		if strings.Contains(variantName, "italic") {
+			return PerfectConfidence
 		}
-		return false
+		if strings.Contains(variantName, "obliq") {
+			return HighConfidence
+		}
+		return NoConfidence
+	case xfont.StyleOblique:
+		if strings.Contains(variantName, "obliq") {
+			return PerfectConfidence
+		}
+		if strings.Contains(variantName, "italic") {
+			return HighConfidence
+		}
+		return NoConfidence
 	}
-	return false
+	return NoConfidence
 }
 
-func MatchWeight(variantName string, weight xfont.Weight) bool {
+// MatchWeight trys to match a font-variant to a given weight.
+func MatchWeight(variantName string, weight xfont.Weight) MatchConfidence {
 	/* from https://pkg.go.dev/golang.org/x/image/font
 	WeightThin       Weight = -3 // CSS font-weight value 100.
 	WeightExtraLight Weight = -2 // CSS font-weight value 200.
@@ -384,21 +454,51 @@ func MatchWeight(variantName string, weight xfont.Weight) bool {
 	WeightBlack      Weight = +5 // CSS font-weight value 900.
 	*/
 	if strconv.Itoa(int(weight)+4*100) == variantName {
-		return true
+		return PerfectConfidence
 	}
 	switch variantName {
-	case "regular", "100", "200", "300", "400", "500":
+	case "regular", "400":
 		switch weight {
-		case xfont.WeightThin, xfont.WeightExtraLight, xfont.WeightLight, xfont.WeightNormal, xfont.WeightMedium:
-			return true
+		case xfont.WeightNormal, xfont.WeightMedium:
+			return PerfectConfidence
+		case xfont.WeightThin, xfont.WeightExtraLight, xfont.WeightLight:
+			return LowConfidence
 		}
-		return false
-	case "bold", "extrabold", "600", "700", "800", "900":
+		return NoConfidence
+	case "100", "200", "300":
 		switch weight {
-		case xfont.WeightSemiBold, xfont.WeightBold, xfont.WeightExtraBold, xfont.WeightBlack:
-			return true
+		case xfont.WeightThin, xfont.WeightExtraLight, xfont.WeightLight:
+			return PerfectConfidence
+		case xfont.WeightNormal, xfont.WeightMedium:
+			return LowConfidence
 		}
-		return false
+		return NoConfidence
+	case "500":
+		switch weight {
+		case xfont.WeightMedium:
+			return PerfectConfidence
+		case xfont.WeightSemiBold:
+			return HighConfidence
+		case xfont.WeightNormal, xfont.WeightBold:
+			return LowConfidence
+		}
+		return NoConfidence
+	case "bold", "700":
+		switch weight {
+		case xfont.WeightBold:
+			return PerfectConfidence
+		case xfont.WeightSemiBold, xfont.WeightExtraBold:
+			return HighConfidence
+		}
+		return NoConfidence
+	case "extrabold", "600", "800", "900":
+		switch weight {
+		case xfont.WeightSemiBold:
+			return LowConfidence
+		case xfont.WeightBold:
+			return HighConfidence
+		}
+		return NoConfidence
 	}
-	return false
+	return NoConfidence
 }

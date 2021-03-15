@@ -21,11 +21,12 @@ import (
 
 // GoogleFontInfo describes a font entry in the Google Font Service.
 type GoogleFontInfo struct {
-	Family   string            `json:"family"`
-	Version  string            `json:"version"`
-	Variants []string          `json:"variants"`
-	Subsets  []string          `json:"subsets"`
-	Files    map[string]string `json:"files"`
+	font.Descriptor
+	//Family   string            `json:"family"`
+	//Variants []string          `json:"variants"`
+	Version string            `json:"version"`
+	Subsets []string          `json:"subsets"`
+	Files   map[string]string `json:"files"`
 }
 
 type googleFontsList struct {
@@ -45,7 +46,7 @@ func setupGoogleFontsDirectory() error {
 		}
 		if apikey == "" {
 			err := errors.New("Google API key not set")
-			T().Errorf(err.Error())
+			trace().Errorf(err.Error())
 			googleFontsLoadError = core.WrapError(err, core.EMISSING,
 				`Google Fonts API-key must be set in global configuration or as GOOGLE_API_KEY in environment;
       please refer to https://developers.google.com/fonts/docs/developer_api`)
@@ -57,14 +58,14 @@ func setupGoogleFontsDirectory() error {
 		}
 		resp, err := http.Get(googleFontsAPI + values.Encode())
 		if err != nil {
-			T().Errorf("Google Fonts API request not OK: %s", err.Error())
+			trace().Errorf("Google Fonts API request not OK: %s", err.Error())
 			googleFontsLoadError = core.WrapError(err, core.ECONNECTION,
 				"could not get fonts-diretory from Google font service")
 			return
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			T().Errorf("Google Fonts API request not OK: %v", resp.Status)
+			trace().Errorf("Google Fonts API request not OK: %v", resp.Status)
 			err := core.Error(resp.StatusCode, "response: %v", resp.Status)
 			googleFontsLoadError = core.WrapError(err, core.ECONNECTION,
 				"could not get fonts-diretory from Google font service")
@@ -80,8 +81,11 @@ func setupGoogleFontsDirectory() error {
 	return googleFontsLoadError
 }
 
-// FindGoogleFont scans the Google Font Service for fonts matching pattern, and
+// FindGoogleFont scans the Google Font Service for fonts matching `pattern` and
 // having a given style and weight.
+//
+// Will include all fonts with a matching index greater than `font.LowConfidence`.
+//
 func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]GoogleFontInfo, error) {
 	var fi []GoogleFontInfo
 	if err := setupGoogleFontsDirectory(); err != nil {
@@ -90,18 +94,16 @@ func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]G
 	r, err := regexp.Compile(pattern)
 	if err != nil {
 		return fi, core.WrapError(err, core.EINVALID,
-			"cannot match Google font: invalid pattern: %v", err)
+			"cannot match Google font: invalid font name pattern: %v", err)
 	}
 	for _, finfo := range googleFontsDirectory.Items {
 		if r.MatchString(finfo.Family) {
-			match := false
-			T().Debugf("Google font matches pattern: %s", finfo.Family)
-			for _, v := range finfo.Variants {
-				match = font.MatchStyle(v, style) && font.MatchWeight(v, weight)
-				if match {
-					fi = append(fi, finfo)
-					break
-				}
+			trace().Debugf("Google font name matches pattern: %s", finfo.Family)
+			_, _, conf := font.ClosestMatch([]font.Descriptor{finfo.Descriptor}, pattern,
+				style, weight)
+			if conf > font.LowConfidence {
+				fi = append(fi, finfo)
+				break
 			}
 		}
 	}
@@ -115,7 +117,7 @@ func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]G
 // ---------------------------------------------------------------------------
 
 // CacheGoogleFont loads a font described by fi with a given variant.
-// The loaded is cached in the user's cache directory.
+// The loaded font is cached in the user's cache directory.
 func CacheGoogleFont(fi GoogleFontInfo, variant string) (filepath string, err error) {
 	var fileurl string
 	for _, v := range fi.Variants {
@@ -134,9 +136,9 @@ func CacheGoogleFont(fi GoogleFontInfo, variant string) (filepath string, err er
 	ext := path.Ext(fileurl)
 	name := fi.Family + "-" + variant + ext
 	filepath = path.Join(cachedir, name)
-	T().Infof("caching font %s as %s", fi.Family, filepath)
+	trace().Infof("caching font %s as %s", fi.Family, filepath)
 	if _, err := os.Stat(filepath); err == nil {
-		T().Infof("font already cached: %s", filepath)
+		trace().Infof("font already cached: %s", filepath)
 	} else {
 		err = DownloadCachedFile(filepath, fileurl)
 		if err != nil {
@@ -150,32 +152,33 @@ func CacheGoogleFont(fi GoogleFontInfo, variant string) (filepath string, err er
 
 // ListGoogleFonts produces a listing of available fonts from the Google webfont
 // service, with font-family names matching a given pattern.
+// Output goes into the trace file with log-level info.
 //
-// If not aleady done, the list of fonts will be downloaded from Google.
+// If not aleady done, the list of available fonts will be downloaded from Google.
 func ListGoogleFonts(pattern string) {
-	level := T().GetTraceLevel()
-	T().SetTraceLevel(tracing.LevelInfo)
+	level := trace().GetTraceLevel()
+	trace().SetTraceLevel(tracing.LevelInfo)
 	if err := setupGoogleFontsDirectory(); err != nil {
-		T().Errorf(err.(core.AppError).UserMessage())
+		trace().Errorf(err.(core.AppError).UserMessage())
 	} else {
 		listGoogleFonts(googleFontsDirectory, pattern)
 	}
-	T().SetTraceLevel(level)
+	trace().SetTraceLevel(level)
 }
 
 func listGoogleFonts(list googleFontsList, pattern string) {
 	r, err := regexp.Compile(pattern)
 	if err != nil {
-		T().Errorf("cannot list Google fonts: invalid pattern: %v", err)
+		trace().Errorf("cannot list Google fonts: invalid pattern: %v", err)
 	}
-	T().Infof("%d fonts in list", len(list.Items))
-	T().Infof("======================================")
+	trace().Infof("%d fonts in list", len(list.Items))
+	trace().Infof("======================================")
 	for i, finfo := range list.Items {
 		if r.MatchString(finfo.Family) {
-			T().Infof("[%4d] %-20s: %s", i, finfo.Family, finfo.Version)
-			T().Infof("       subsets: %v", finfo.Subsets)
+			trace().Infof("[%4d] %-20s: %s", i, finfo.Family, finfo.Version)
+			trace().Infof("       subsets: %v", finfo.Subsets)
 			for k, v := range finfo.Files {
-				T().Infof("       - %-18s: %s", k, v[len(v)-4:])
+				trace().Infof("       - %-18s: %s", k, v[len(v)-4:])
 			}
 		}
 	}

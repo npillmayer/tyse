@@ -26,8 +26,8 @@ const (
 	imageResourceType
 )
 
-// NotFound returns an application error for a missing resource.
-func NotFound(res string, rtype resourceType) error {
+// notFound returns an application error for a missing resource.
+func notFound(res string, rtype resourceType) error {
 	e := fmt.Errorf("resouce missing: %v", res)
 	var s string
 	switch rtype {
@@ -52,6 +52,8 @@ type imgPlusErr struct {
 	err error
 }
 
+// ResolveImage currently will only search for images packaged with the
+// application.
 func ResolveImage(name string, resolution string) ImagePromise {
 	ch := make(chan imgPlusErr)
 	go func(ch chan<- imgPlusErr) {
@@ -73,7 +75,7 @@ func ResolveImage(name string, resolution string) ImagePromise {
 		}
 		if imagename == "" {
 			imagename = "packaged/images/placeholder.png"
-			result.err = NotFound(name, imageResourceType)
+			result.err = notFound(name, imageResourceType)
 		}
 		file, err := packaged.Open("packaged/images/" + imagename)
 		if err != nil {
@@ -100,6 +102,8 @@ func ResolveImage(name string, resolution string) ImagePromise {
 	}
 }
 
+// ImagePromise loads an image in the background. A call to `Image` will block
+// until loading is completed.
 type ImagePromise interface {
 	Image() (image.Image, error)
 }
@@ -119,6 +123,8 @@ type fontPlusErr struct {
 	err  error
 }
 
+// TypeCasePromise runs font location asynchronously in the background.
+// A call to `TypeCase()` blocks until font loading is completed.
 type TypeCasePromise interface {
 	TypeCase() (*font.TypeCase, error)
 }
@@ -131,12 +137,30 @@ func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 	return loader.await(context.Background())
 }
 
-// ResolveTypeCase resolves a font type case with a given size.
+// ResolveTypeCase resolves a font typecase with a given size.
+// It searches for fonts in the following order:
+//
+// ▪︎ Fonts packaged with the application binary
+//
+// ▪︎ System fonts
+//
+// ▪︎ Google Fonts service (https://fonts.google.com/)
+//
+// ResolveTypeCase will try to match style and weight requirements closely, but
+// will load a font variant anyway if it matches approximately. If, for example,
+// a system contains a font with weight 300, which would be considered a "light"
+// variant, but no variant with weight 400 (normal), it will load the 300-variant.
+//
+// If the user's application configuration contains an extended listing of system
+// fonts (e.g., created by `tyseconfig`), ResolveTypeCase is able to match fonts
+// reliably by name-pattern, style and weight. Otherwise it tries to derive style
+// and weight information from the fonts' filenames.
+//
 func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
+	// TODO include a context parameter
 	ch := make(chan fontPlusErr)
 	go func(ch chan<- fontPlusErr) {
 		result := fontPlusErr{}
-		name := font.NormalizeFontname(pattern, style, weight)
 		if t, err := font.GlobalRegistry().TypeCase(pattern, style, weight, size); err == nil {
 			result.font = t
 			ch <- result
@@ -147,14 +171,15 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 		var f *font.ScalableFont
 		var fname string
 		for _, f := range fonts {
-			T().Debugf("font file %s", f.Name())
+			trace().Debugf("font file %s", f.Name())
 			if font.Matches(f.Name(), pattern, style, weight) {
 				fname = f.Name()
 				break
 			}
 		}
+		name := font.NormalizeFontname(pattern, style, weight)
 		if fname != "" { // found font as packaged embedded font
-			T().Debugf("found font as embedded font file %s", fname)
+			trace().Debugf("found font as embedded font file %s", fname)
 			var file fs.File
 			file, result.err = packaged.Open("packaged/fonts/" + fname)
 			if result.err == nil {
@@ -165,21 +190,33 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 				}
 			}
 		}
-		if f == nil {
+		if f == nil { // next try system fonts
 			fpath, err := findfont.Find(pattern) // try to find as system font
 			if err == nil && fpath != "" {
-				T().Debugf("%s is a system font: %s", pattern, fpath)
+				trace().Debugf("%s is a system font: %s", pattern, fpath)
 				f, result.err = font.LoadOpenTypeFont(fpath)
 			}
 		}
-		if f == nil {
+		if f == nil { // next try Google font service
 			var fiList []GoogleFontInfo
 			if fiList, result.err = FindGoogleFont(pattern, style, weight); result.err == nil {
-				fi := fiList[0] // TODO select correct variant
-				var fpath string
-				if fpath, result.err = CacheGoogleFont(fi, fi.Variants[0]); result.err == nil {
-					f, result.err = font.LoadOpenTypeFont(fpath)
-					name = path.Base(fpath)
+				var l []font.Descriptor
+				for _, finfo := range fiList { // morph Google font info font font.Descriptor list
+					l = append(l, finfo.Descriptor)
+				}
+				desc, variant, confidence := font.ClosestMatch(l, pattern, style, weight)
+				if confidence > font.LowConfidence {
+					var fpath string
+					var i int
+					for j, d := range fiList { // find matching variant again
+						if d.Descriptor.Family == desc.Family {
+							i = j // this must succeed
+						}
+					}
+					if fpath, result.err = CacheGoogleFont(fiList[i], variant); result.err == nil {
+						f, result.err = font.LoadOpenTypeFont(fpath)
+						name = path.Base(fpath)
+					}
 				}
 			}
 		}
@@ -189,7 +226,6 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 			font.GlobalRegistry().StoreFont(f)
 			result.font, result.err = font.GlobalRegistry().TypeCase(name, style, weight, size)
 			//font.GlobalRegistry().DebugList()
-			//T().Debugf("name = %v", result.font.ScalableFontParent().Fontname)
 		}
 		ch <- result
 		close(ch)
