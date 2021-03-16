@@ -125,7 +125,7 @@ func TestFCLoad(t *testing.T) {
 		t.Fatalf("cannot load fontconfig list")
 	}
 	t.Logf("found %d fonts in fontconfig list", len(list))
-	f, v := FindFontConfigFont("new york", xfont.StyleItalic, xfont.WeightNormal)
+	f, v := findFontConfigFont("new york", xfont.StyleItalic, xfont.WeightNormal)
 	t.Logf("found font = %s in variant %s", f.Family, v)
 	if f.Family != "New York" {
 		t.Errorf("expected to find font New York, found %v", f)
@@ -140,7 +140,7 @@ func TestFCFind(t *testing.T) {
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	f, v := FindFontConfigFont("new york", xfont.StyleItalic, xfont.WeightNormal)
+	f, v := findFontConfigFont("new york", xfont.StyleItalic, xfont.WeightNormal)
 	t.Logf("found font = (%s) in variant (%s)", f.Family, v)
 	t.Logf("font file = %s", f.Path)
 	if f.Family != "New York" {

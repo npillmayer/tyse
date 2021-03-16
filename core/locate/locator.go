@@ -2,18 +2,13 @@
 Wait for the new filesystem API planned by a Go proposal (from the core team).
 
 This is currentyl just a stand-in for a real implementation.
+That means: it's a quick hack!
 
 It grows whenever I add some functionality needed for tests. Everything here
 is quick and dirty right now.
 
-TODO for fonts:
 
-- use "fontconfig" CLIs (via shell):
-https://www.freedesktop.org/wiki/Software/fontconfig/
 
-- use Google fonts API to locate remote fonts
-
-- use some webfont library interface
 */
 package locate
 

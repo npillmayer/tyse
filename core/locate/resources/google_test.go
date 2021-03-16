@@ -3,6 +3,7 @@ package resources
 import (
 	"encoding/json"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -103,6 +104,21 @@ func TestGoogleAPI(t *testing.T) {
 	if err != nil {
 		core.UserError(err)
 		t.Fatal(err)
+	}
+}
+
+func TestMatchFontname(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	pattern := "Inconsolata"
+	r, err := regexp.Compile(strings.ToLower(pattern))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.MatchString(strings.ToLower("Inconsolata")) {
+		t.Errorf("expected to find match, didn't")
 	}
 }
 

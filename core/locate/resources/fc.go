@@ -147,7 +147,7 @@ var loadFontConfigListTask sync.Once
 var loadedFontConfigListOK bool
 var fontConfigDescriptors []font.Descriptor
 
-// FindFontConfigFont searches for a locally installed font variant using the fontconfig
+// findFontConfigFont searches for a locally installed font variant using the fontconfig
 // system (https://www.freedesktop.org/wiki/Software/fontconfig/).
 // fontconfig has to be configured in the global application configuration by
 // setting the absolute path of the 'fc-list' binary.
@@ -157,10 +157,10 @@ var fontConfigDescriptors []font.Descriptor
 // a font, given a name pattern, a style and a weight.
 //
 // We call the binary instead of using the C library because of possible version
-// issues. If fontconfig is not configured, it will silently return an empty
-// font descriptor.
+// issues. If fontconfig is not configured, FindFontConfigFont will silently return an
+// empty font descriptor and an empty variant name.
 //
-func FindFontConfigFont(pattern string, style xfont.Style, weight xfont.Weight) (
+func findFontConfigFont(pattern string, style xfont.Style, weight xfont.Weight) (
 	desc font.Descriptor, variant string) {
 	//
 	loadFontConfigListTask.Do(func() {

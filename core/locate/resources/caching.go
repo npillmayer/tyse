@@ -34,6 +34,9 @@ func DownloadCachedFile(filepath string, url string) error {
 // Clients may specify a sequence of folder names, which will be appended to
 // the base cache path. Non-existing sub-folders will be created as necessary
 // (with permissions 755).
+//
+// Returns the path to the cache-(sub-)folder or an error.
+//
 func CacheDirPath(subfolders ...string) (string, error) {
 	trace().Debugf("config[%s] = %s", "app-key", gconf.GetString("app-key"))
 	if gconf.GetString("app-key") == "" {

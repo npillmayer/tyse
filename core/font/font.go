@@ -228,45 +228,56 @@ func NewRegistry() *Registry {
 	return fr
 }
 
-// StoreFont pushes a font into the registry.
-func (fr *Registry) StoreFont(f *ScalableFont) {
+// StoreFont pushes a font into the registry if it isn't contained yet.
+//
+// The font will be stored using the normalized font name as a key. If this
+// key is already associated with a font, that font will not be overridden.
+func (fr *Registry) StoreFont(normalizedName string, f *ScalableFont) {
 	if f == nil {
 		trace().Errorf("registry cannot store null font")
 		return
 	}
 	fr.Lock()
 	defer fr.Unlock()
-	style, weight := GuessStyleAndWeight(f.Fontname)
-	fname := NormalizeFontname(f.Fontname, style, weight)
-	trace().Debugf("registry stores font %s as %s", f.Fontname, fname)
-	fr.fonts[fname] = f
+	//style, weight := GuessStyleAndWeight(f.Fontname)
+	//fname := NormalizeFontname(f.Fontname, style, weight)
+	if _, ok := fr.fonts[normalizedName]; !ok {
+		trace().Debugf("registry stores font %s as %s", f.Fontname, normalizedName)
+		fr.fonts[normalizedName] = f
+	}
 }
 
 // TypeCase returns a concrete typecase with a given font, style, weight and size.
 // If a suitable typecase has already been cached, TypeCase will return the cached
-// typecase.
-func (fr *Registry) TypeCase(name string, style xfont.Style, weight xfont.Weight,
-	size float64) (*TypeCase, error) {
+// typecase. If a suitable font has previously been stored under key
+// `normalizedName`, a typecase will be derived from this font.
+//
+// If not typecase can be produced, TypeCase will derive one from a system-wide
+// fallback font and return it, together with an error message.
+//
+func (fr *Registry) TypeCase(normalizedName string, size float64) (*TypeCase, error) {
 	//
-	trace().Debugf("registry searches for font %s at %.2f", name, size)
-	fname := NormalizeFontname(name, style, weight)
-	tname := appendSize(fname, size)
+	trace().Debugf("registry searches for font %s at %.2f", normalizedName, size)
+	//fname := NormalizeFontname(name, style, weight)
+	tname := appendSize(normalizedName, size)
 	fr.Lock()
 	defer fr.Unlock()
 	if t, ok := fr.typecases[tname]; ok {
 		trace().Debugf("registry found font %s", tname)
 		return t, nil
 	}
-	if f, ok := fr.fonts[fname]; ok {
+	if f, ok := fr.fonts[normalizedName]; ok {
 		t, err := f.PrepareCase(size)
-		trace().Infof("font registry has font %s, caches at %.2f", fname, size)
+		trace().Infof("font registry has font %s, caches at %.2f", normalizedName, size)
 		t.scalableFontParent = f
 		fr.typecases[tname] = t
 		return t, err
 	}
-	trace().Infof("registry does not contain font %s", name)
-	err := errors.New("font " + name + " not found in registry")
-	fname = "fallback"
+	trace().Infof("registry does not contain font %s", normalizedName)
+	err := errors.New("font " + normalizedName + " not found in registry")
+	//
+	// store typecase from fallback font, if not present yet, and return it
+	fname := "fallback"
 	tname = appendSize("fallback", size)
 	if t, ok := fr.typecases[fname]; ok {
 		return t, err
@@ -371,9 +382,9 @@ func Matches(fontfilename, pattern string, style xfont.Style, weight xfont.Weigh
 
 // Descriptor represents all the known variants of a font.
 type Descriptor struct {
-	Family   string
-	Variants []string
-	Path     string
+	Family   string   `json:"family"`
+	Variants []string `json:"variants"`
+	Path     string   // only used if just a single variant
 }
 
 // MatchConfidence is a type for expressing the confidence level of font matching.
@@ -393,7 +404,7 @@ const (
 func ClosestMatch(fdescs []Descriptor, pattern string, style xfont.Style,
 	weight xfont.Weight) (match Descriptor, variant string, confidence MatchConfidence) {
 	//
-	r, err := regexp.Compile(pattern)
+	r, err := regexp.Compile(strings.ToLower(pattern))
 	if err != nil {
 		trace().Errorf("invalid font name pattern")
 		return

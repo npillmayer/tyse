@@ -22,8 +22,6 @@ import (
 // GoogleFontInfo describes a font entry in the Google Font Service.
 type GoogleFontInfo struct {
 	font.Descriptor
-	//Family   string            `json:"family"`
-	//Variants []string          `json:"variants"`
 	Version string            `json:"version"`
 	Subsets []string          `json:"subsets"`
 	Files   map[string]string `json:"files"`
@@ -40,6 +38,7 @@ var googleFontsAPI string = `https://www.googleapis.com/webfonts/v1/webfonts?`
 
 func setupGoogleFontsDirectory() error {
 	loadGoogleFontsDir.Do(func() {
+		trace().Infof("setting up Google Fonts service directory")
 		apikey := gconf.GetString("google-api-key")
 		if apikey == "" {
 			apikey = os.Getenv("GOOGLE_API_KEY")
@@ -74,9 +73,12 @@ func setupGoogleFontsDirectory() error {
 		dec := json.NewDecoder(resp.Body)
 		err = dec.Decode(&googleFontsDirectory)
 		if err != nil {
+			trace().Errorf("Google Fonts API response not decoded: %v", err)
 			googleFontsLoadError = core.WrapError(err, core.EINVALID,
 				"could not decode fonts-list from Google font service")
 		}
+		trace().Infof("transfered list of %d font from Google Fonts service",
+			len(googleFontsDirectory.Items))
 	})
 	return googleFontsLoadError
 }
@@ -84,19 +86,27 @@ func setupGoogleFontsDirectory() error {
 // FindGoogleFont scans the Google Font Service for fonts matching `pattern` and
 // having a given style and weight.
 //
-// Will include all fonts with a matching index greater than `font.LowConfidence`.
+// Will include all fonts with a match-confidence greater than `font.LowConfidence`.
+//
+// A prerequisite to looking for Google fonts is a valid API-key (refer to
+// https://developers.google.com/fonts/docs/developer_api). It has to be configured
+// either in the application setup or as an environment variable GOOGLE_API_KEY.
+//
+// (Please refer to function `ResolveTypeCase`, too)
 //
 func FindGoogleFont(pattern string, style xfont.Style, weight xfont.Weight) ([]GoogleFontInfo, error) {
 	var fi []GoogleFontInfo
 	if err := setupGoogleFontsDirectory(); err != nil {
 		return fi, err
 	}
-	r, err := regexp.Compile(pattern)
+	r, err := regexp.Compile(strings.ToLower(pattern))
 	if err != nil {
 		return fi, core.WrapError(err, core.EINVALID,
 			"cannot match Google font: invalid font name pattern: %v", err)
 	}
+	//trace().Debugf("trying to match (%s)", strings.ToLower(pattern))
 	for _, finfo := range googleFontsDirectory.Items {
+		//trace().Debugf("testing (%s)", strings.ToLower(finfo.Family))
 		if r.MatchString(strings.ToLower(finfo.Family)) {
 			trace().Debugf("Google font name matches pattern: %s", finfo.Family)
 			_, _, conf := font.ClosestMatch([]font.Descriptor{finfo.Descriptor}, pattern,

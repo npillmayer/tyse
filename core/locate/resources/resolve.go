@@ -142,7 +142,7 @@ func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 //
 // ▪︎ Fonts packaged with the application binary
 //
-// ▪︎ System fonts
+// ▪︎ System-fonts
 //
 // ▪︎ Google Fonts service (https://fonts.google.com/)
 //
@@ -151,35 +151,48 @@ func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 // a system contains a font with weight 300, which would be considered a "light"
 // variant, but no variant with weight 400 (normal), it will load the 300-variant.
 //
-// If the user's application configuration contains an extended listing of system
-// fonts (e.g., created by `tyseconfig`), ResolveTypeCase is able to match fonts
-// reliably by name-pattern, style and weight. Otherwise it tries to derive style
-// and weight information from the fonts' filenames.
+// When looking for sytem-fonts, ResolveTypeCase will use an existing fontconfig
+// (https://www.freedesktop.org/wiki/Software/fontconfig/)
+// installation, if present. fontconfig has to be configured in the global
+// application setup by pointing to the absolute path of the `fc-list` binary.
+// If fontconfig isn't installed or configured, then this step will silently be
+// skipped and a file system scan of the sytem's fonts-folders will be done.
+// (See also function `FindLocalFont`).
+//
+// A prerequisite to looking for Google fonts is a valid API-key (refer to
+// https://developers.google.com/fonts/docs/developer_api). It has to be configured
+// either in the application setup or as an environment variable GOOGLE_API_KEY.
+// (See also function `FindGoogleFont`).
+//
+// If no suitable font can be found, an application-wide fallback font will be
+// returned.
+//
+// Typecases are not returned synchronously, but rather as a promise
+// of kind TypeCasePromise (async/await-pattern).
 //
 func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
 	// TODO include a context parameter
 	ch := make(chan fontPlusErr)
 	go func(ch chan<- fontPlusErr) {
 		result := fontPlusErr{}
-		if t, err := font.GlobalRegistry().TypeCase(pattern, style, weight, size); err == nil {
+		name := font.NormalizeFontname(pattern, style, weight)
+		if t, err := font.GlobalRegistry().TypeCase(name, size); err == nil {
 			result.font = t
 			ch <- result
 			close(ch)
 			return
 		}
-		fonts, _ := packaged.ReadDir("packaged/fonts")
 		var f *font.ScalableFont
-		var fname string
+		fonts, _ := packaged.ReadDir("packaged/fonts")
+		var fname string // path to embedded font, if any
 		for _, f := range fonts {
-			trace().Debugf("font file %s", f.Name())
 			if font.Matches(f.Name(), pattern, style, weight) {
+				trace().Debugf("found embedded font file %s", f.Name())
 				fname = f.Name()
 				break
 			}
 		}
-		name := font.NormalizeFontname(pattern, style, weight)
-		if fname != "" { // found font as packaged embedded font
-			trace().Debugf("found font as embedded font file %s", fname)
+		if fname != "" { // font is packaged embedded font
 			var file fs.File
 			file, result.err = packaged.Open("packaged/fonts/" + fname)
 			if result.err == nil {
@@ -189,12 +202,17 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 					name = fname
 				}
 			}
+			if f == nil { // cannot process embedded font => seriously compromised installation
+				result.err = core.WrapError(result.err, core.EINTERNAL,
+					"internal application error - packaged font not readable: %s", fname)
+				ch <- result
+				close(ch)
+				return
+			}
 		}
 		if f == nil { // next try system fonts
-			fpath, err := findfont.Find(pattern) // try to find as system font
-			if err == nil && fpath != "" {
-				trace().Debugf("%s is a system font: %s", pattern, fpath)
-				f, result.err = font.LoadOpenTypeFont(fpath)
+			if desc, _ := FindLocalFont(pattern, style, weight); desc.Family != "" {
+				f, result.err = font.LoadOpenTypeFont(desc.Path)
 			}
 		}
 		if f == nil { // next try Google font service
@@ -220,12 +238,13 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 				}
 			}
 		}
-		//font.GlobalRegistry().DebugList()
-		if f != nil {
+		if f != nil { // if found, enter into font registry
 			f.Fontname = name
-			font.GlobalRegistry().StoreFont(f)
-			result.font, result.err = font.GlobalRegistry().TypeCase(name, style, weight, size)
+			font.GlobalRegistry().StoreFont(name, f)
+			result.font, result.err = font.GlobalRegistry().TypeCase(name, size)
 			//font.GlobalRegistry().DebugList()
+		} else { // use fallback font
+			result.font, _ = font.GlobalRegistry().TypeCase("fallback", size)
 		}
 		ch <- result
 		close(ch)
@@ -240,4 +259,42 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 			}
 		},
 	}
+}
+
+// FindLocalFont searches for a locally installed font variant.
+//
+// If present and configured, FindLocalFont will be using the fontconfig
+// system (https://www.freedesktop.org/wiki/Software/fontconfig/).
+// fontconfig has to be configured in the global application setup by
+// pointing to the absolute path of the 'fc-list' binary.
+//
+// We will copy the output of fc-list to the user's config directory once.
+// Subsequent calls will use the cached entries to search for
+// a font, given a name pattern, a style and a weight.
+// We call the binary instead of using the C library because of possible version
+// issues and to reduce compile-time dependencies.
+//
+// If fontconfig is not configured, FindLocalFont will fall back to scanning
+// the system's fonts-folders (OS dependent).
+//
+// (Please refer to function `ResolveTypeCase`, too)
+//
+func FindLocalFont(pattern string, style xfont.Style, weight xfont.Weight) (
+	desc font.Descriptor, variant string) {
+	//
+	desc, variant = findFontConfigFont(pattern, style, weight)
+	if desc.Family == "" {
+		if loadedFontConfigListOK { // fontconfig is active, but didn't find a font
+			return // don't do a file system scan
+		}
+	} // otherwise fontconfig is not active => scan file system
+	fpath, err := findfont.Find(pattern) // lib does not accept style & weight
+	if err == nil && fpath != "" {
+		trace().Debugf("%s is a system font: %s", pattern, fpath)
+		desc = font.Descriptor{
+			Family: font.NormalizeFontname(pattern, style, weight),
+			Path:   fpath,
+		}
+	}
+	return
 }
