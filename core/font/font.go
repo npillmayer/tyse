@@ -88,6 +88,18 @@ func trace() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
+const (
+	StyleNormal = xfont.StyleNormal
+	StyleItalic = xfont.StyleItalic
+)
+
+const (
+	WeightLight    = xfont.WeightLight
+	WeightNormal   = xfont.WeightNormal
+	WeightSemiBold = xfont.WeightSemiBold
+	WeightBold     = xfont.WeightBold
+)
+
 // ScalableFont is an internal representation of an outline-font of type
 // TTF of OTF.
 type ScalableFont struct {
@@ -263,7 +275,7 @@ func (fr *Registry) TypeCase(normalizedName string, size float64) (*TypeCase, er
 	fr.Lock()
 	defer fr.Unlock()
 	if t, ok := fr.typecases[tname]; ok {
-		trace().Debugf("registry found font %s", tname)
+		trace().Infof("registry found font %s", tname)
 		return t, nil
 	}
 	if f, ok := fr.fonts[normalizedName]; ok {
