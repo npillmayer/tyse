@@ -31,7 +31,7 @@ There are (at least) two Go packages around for parsing SFNT fonts:
 * <https://pkg.go.dev/github.com/ConradIrwin/font/sfnt>
 
 It’s always a good idea to prefer packages from the Go core team, and the
-x/image/font/sfnt package is certainly well suited for rasterinzing applications
+x/image/font/sfnt package is certainly well suited for rasterizing applications
 (as proven by the test cases). However, it is less well suited as a basis for
 the task of text-shaping. This task requires access to the tables contained in
 a font and means of navigating them, cross-checking entries, applying different
