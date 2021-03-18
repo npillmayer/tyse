@@ -9,8 +9,7 @@ The intended audience for this package are:
 
 *︎ glyph rasterizers, such as FreeType (https://github.com/golang/freetype)
 
-*︎ any application needing to have the internal structure of an OpenType font file
-available, and possibly extending the methods of this module by handling additional font tables
+*︎ any application needing to have the internal structure of an OpenType font file available, and possibly extending the methods of this module by handling additional font tables 
 
 This package is *not* intended for font manipulation applications. You may check out
 https://pkg.go.dev/github.com/ConradIrwin/font
@@ -54,4 +53,4 @@ as a byte-blob and does its own font parsing).
 A better suited blueprint of what we're trying to accomplish is this implementation
 in Rust:
 
-*︎ https://github.com/bodoni/opentype
+* https://github.com/bodoni/opentype
