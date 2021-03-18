@@ -80,7 +80,7 @@ It's always a good idea to prefer packages from the Go core team, and the
 x/image/font/sfnt package is certainly well suited for rasterinzing applications
 (as proven by the test cases). However, it is less well suited as a basis for
 the task of text-shaping. This task requires access to the tables contained in
-a font and means of navigating them, cross-checking entires, applying different
+a font and means of navigating them, cross-checking entries, applying different
 shaping algorithms, etc. Moreover, the API is not intended to be extended by
 other packages, but has been programmed with a concrete target in mind.
 
