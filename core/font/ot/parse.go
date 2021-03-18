@@ -7,12 +7,7 @@ import (
 	"io"
 
 	"github.com/ConradIrwin/font/sfnt"
-	"github.com/npillmayer/tyse/core"
 )
-
-func errFontFormat(x string) error {
-	return core.Error(core.EINVALID, "OpenType font format: %s", x)
-}
 
 // Parse parses an OpenType font from a byte slice.
 func Parse(font []byte) (*OTFont, error) {
@@ -77,45 +72,18 @@ func parseTable(t Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 // --- Head table ------------------------------------------------------------
 
-type HeadTable struct {
-	TableBase
-	flags      uint16
-	unitsPerEm uint16
-}
-
-func (t *HeadTable) Base() *TableBase {
-	return &t.TableBase
-}
-
 func parseHead(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	if size < 54 {
 		return nil, errFontFormat("size of head table")
 	}
-	f, _ := b.u16(16)
-	u, _ := b.u16(18)
+	f, _ := b.u16(16) // flags
+	u, _ := b.u16(18) // units per em
 	t := &HeadTable{flags: f, unitsPerEm: u}
 	t.self = t
 	return t, nil
 }
 
 // --- CMap table ------------------------------------------------------------
-
-type CMapTable struct {
-	TableBase
-	numTables int
-	encRec    encodingRecord
-}
-
-type encodingRecord struct {
-	platformId uint16
-	encodingId uint16
-	offset     uint32
-	width      int // encoding width
-}
-
-func (t *CMapTable) Base() *TableBase {
-	return &t.TableBase
-}
 
 func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	n, _ := b.u16(2)
@@ -153,11 +121,6 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	return t, nil
 }
 
-// TODO
-func platformEncodingWidth(pid, psid uint16) int {
-	return 7
-}
-
 // --- GSUB table ------------------------------------------------------------
 
 func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
@@ -179,8 +142,10 @@ func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 // --- Layout table header ---------------------------------------------------
 
-// LayoutHeader represents header information for layout tables, i.e.
-// GPOS and GSUB.
+// OpenType specifies two tables–GPOS and GSUB–which share some of their
+// structure. They are called "layout tables".
+
+// LayoutHeader represents header information common to the layout tables
 type LayoutHeader struct {
 	version versionHeader
 	offsets layoutHeader11
@@ -385,6 +350,8 @@ func read16arr(r *bytes.Reader, arr *[]uint16, size int) error {
 // The code below is partially replicated from github.com/ConradIrwin/font/sfnt because
 // we need finer control of GPOS and GSUB tables and the fields are not exported or
 // otherwise accessible.
+
+// TODO remove this
 
 // tagOffsetRecord is an on-disk format of a Tag and Offset record.
 type tagOffsetRecord struct {

@@ -8,11 +8,28 @@ import (
 // OTFont represents the internal structure of an OpenType font.
 // It is used to navigate properties of a font for typesetting tasks.
 type OTFont struct {
-	f      *font.ScalableFont
-	ot     *sfnt.Font
-	header *fontHeader
-	tables map[Tag]Table
+	f          *font.ScalableFont
+	ot         *sfnt.Font // TODO remove this and dependency to ConradIrwin/font
+	header     *fontHeader
+	tables     map[Tag]Table
+	glyphIndex glyphIndexFunc
 }
+
+// GlyphIndex is a glyph index in a font.
+type GlyphIndex uint16
+
+// GlyphIndex returns the glyph index for the given rune.
+//
+// It returns (0, nil) if there is no glyph for r.
+// https://www.microsoft.com/typography/OTSPEC/cmap.htm says that "Character
+// codes that do not correspond to any glyph in the font should be mapped to
+// glyph index 0. The glyph at this location must be a special glyph
+// representing a missing character, commonly known as .notdef."
+func (otf *OTFont) GlyphIndex(codePoint rune) (GlyphIndex, error) {
+	return otf.glyphIndex(otf, codePoint)
+}
+
+// --- Constants -------------------------------------------------------------
 
 // LayoutTableSectionName lists the sections of OT layout tables, i.e. GPOS and GSUB.
 type LayoutTableSectionName int
@@ -83,7 +100,7 @@ func (t Tag) String() string {
 type Table interface {
 	Offset() uint32   // offset within the font's binary data
 	Len() uint32      // byte size of table
-	String() string   // 4-letter table name
+	String() string   // 4-letter table name, e.g., "cmap"
 	Base() *TableBase // every table we use will be derived from TableBase
 }
 
@@ -144,6 +161,19 @@ func (tb *TableBase) AsGSub() *GSubTable {
 		return g
 	}
 	return nil
+}
+
+// HeadTable gives global information about the font. The bounding box values
+// should be computed using only glyphs that have contours. Glyphs with no contours
+// should be ignored for the purposes of these calculations.
+type HeadTable struct {
+	TableBase
+	flags      uint16
+	unitsPerEm uint16
+}
+
+func (t *HeadTable) Base() *TableBase {
+	return &t.TableBase
 }
 
 // --- Font header -----------------------------------------------------------

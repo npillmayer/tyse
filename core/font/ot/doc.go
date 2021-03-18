@@ -1,6 +1,25 @@
 /*
 Package ot provides access to OpenType font features.
 
+Status
+
+Work in progress.
+
+License
+
+Some code has originally been copied over from golang.org/x/image/font/sfnt/cmap.go,
+as the cmap-routines are not accessible through the sfnt package's API.
+I understand this to be legally okay as long as the Go license information
+stays intact.
+
+    Copyright 2017 The Go Authors. All rights reserved.
+    Use of this source code is governed by a BSD-style
+    license that can be found in the LICENSE file.
+
+The license file mentioned can be found in file GO-LICENSE at the root folder
+of this module.
+
+Code in this module beyond the x/image/font/sfnt parts is subject to the following license:
 
 BSD 3-Clause License
 
@@ -32,16 +51,25 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 */
 package ot
+
+// https://pkg.go.dev/golang.org/x/image/font/sfnt
+// https://github.com/bodoni/opentype
+// https://pkg.go.dev/github.com/ConradIrwin/font/sfnt
 
 import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/tyse/core"
 )
 
 // trace traces to a global core-tracer.
 func trace() tracing.Trace {
 	return gtrace.CoreTracer
+}
+
+// errFontFormat produces user level errors for font parsing.
+func errFontFormat(x string) error {
+	return core.Error(core.EINVALID, "OpenType font format: %s", x)
 }
