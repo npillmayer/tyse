@@ -163,9 +163,7 @@ func (tb *TableBase) AsGSub() *GSubTable {
 	return nil
 }
 
-// HeadTable gives global information about the font. The bounding box values
-// should be computed using only glyphs that have contours. Glyphs with no contours
-// should be ignored for the purposes of these calculations.
+// HeadTable gives global information about the font.
 type HeadTable struct {
 	TableBase
 	flags      uint16

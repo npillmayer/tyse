@@ -2,8 +2,6 @@ package ot
 
 import (
 	"strconv"
-
-	"github.com/npillmayer/schuko/tracing"
 )
 
 // GSubTable is a type representing an OpenType GSUB table
@@ -52,29 +50,4 @@ func GSubLookupTypeString(lutype uint16) string {
 		return "GSUB_ChainingContext"
 	}
 	return strconv.Itoa(int(lutype))
-}
-
-func GSubDebugInfo(otf *OTFont) {
-	level := trace().GetTraceLevel()
-	trace().SetTraceLevel(tracing.LevelInfo)
-	defer trace().SetTraceLevel(level)
-	gsub, err := otf.ot.GsubTable()
-	if err != nil {
-		trace().Errorf("cannot read GSUB table of OpenType font %s", otf.f.Fontname)
-		trace().Errorf(err.Error())
-		return
-	}
-	trace().Infof("OpenType GSUB table of %s", otf.f.Fontname)
-	trace().Infof("scripts:")
-	for _, script := range gsub.Scripts {
-		trace().Infof("   script = %s", script.String())
-	}
-	trace().Infof("features:")
-	for _, feature := range gsub.Features {
-		trace().Infof("   feature = %s", feature.String())
-	}
-	trace().Infof("lookups:")
-	for _, lookup := range gsub.Lookups {
-		trace().Infof("   lookup = %s", GSubLookupTypeString(lookup.Type))
-	}
 }
