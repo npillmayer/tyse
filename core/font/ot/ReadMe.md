@@ -5,12 +5,12 @@ ot – OpenType Font Tables and Features
 Package `ot` provides access to OpenType font tables and features.
 The intended audience for this package are:
 
-    *︎ text shapers, such as HarfBuzz (https://harfbuzz.github.io/what-does-harfbuzz-do.html)
+*︎ text shapers, such as HarfBuzz (https://harfbuzz.github.io/what-does-harfbuzz-do.html)
 
-    *︎ glyph rasterizers, such as FreeType (https://github.com/golang/freetype)
+*︎ glyph rasterizers, such as FreeType (https://github.com/golang/freetype)
 
-    *︎ any application needing to have the internal structure of an OpenType font file
-    available, and possibly extending the methods of this module by handling additional font tables
+*︎ any application needing to have the internal structure of an OpenType font file
+available, and possibly extending the methods of this module by handling additional font tables
 
 This package is *not* intended for font manipulation applications. You may check out
 https://pkg.go.dev/github.com/ConradIrwin/font
@@ -28,9 +28,9 @@ where I talk to myself and ask, this is what you do in your spare time? Really?
 
 There are (at least) two Go packages around for parsing SFNT fonts:
 
-    * https://pkg.go.dev/golang.org/x/image/font/sfnt
+* https://pkg.go.dev/golang.org/x/image/font/sfnt
 
-    * https://pkg.go.dev/github.com/ConradIrwin/font/sfnt
+* https://pkg.go.dev/github.com/ConradIrwin/font/sfnt
 
 It’s always a good idea to prefer packages from the Go core team, and the
 x/image/font/sfnt package is certainly well suited for rasterinzing applications
@@ -54,4 +54,4 @@ as a byte-blob and does its own font parsing).
 A better suited blueprint of what we're trying to accomplish is this implementation
 in Rust:
 
-    *︎ https://github.com/bodoni/opentype
+*︎ https://github.com/bodoni/opentype
