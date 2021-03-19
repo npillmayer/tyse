@@ -30,6 +30,19 @@ type encodingRecord struct {
 	width      int // encoding width
 }
 
+func newCMapTable(tag Tag, b fontBinSegm, offset, size uint32) *CMapTable {
+	t := &CMapTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
+}
+
 func (t *CMapTable) Base() *TableBase {
 	return &t.TableBase
 }
@@ -64,7 +77,7 @@ const (
 	maxNumSubroutines = 40000
 )
 
-type glyphIndexFunc func(otf *OTFont, r rune) (GlyphIndex, error)
+type glyphIndexFunc func(otf *Font, r rune) (GlyphIndex, error)
 
 // platformEncodingWidth returns the number of bytes per character assumed by
 // the given Platform ID and Platform Specific ID.
@@ -150,7 +163,7 @@ func (cmap *CMapTable) makeCachedGlyphIndexFormat0(offset, length uint32) ([]byt
 	}
 	var table [256]byte
 	copy(table[:], buf[6:])
-	return buf, func(f *OTFont, r rune) (GlyphIndex, error) {
+	return buf, func(f *Font, r rune) (GlyphIndex, error) {
 		x, ok := charmap.Macintosh.EncodeRune(r)
 		if !ok {
 			// The source rune r is not representable in the Macintosh-Roman encoding.
@@ -199,7 +212,7 @@ func (cmap *CMapTable) makeCachedGlyphIndexFormat4(offset, length uint32) ([]byt
 	indexesBase := offset
 	indexesLength := cmap.Len() - offset
 
-	return segmentsData, func(otf *OTFont, r rune) (GlyphIndex, error) {
+	return segmentsData, func(otf *Font, r rune) (GlyphIndex, error) {
 		if uint32(r) > 0xffff {
 			return 0, nil
 		}
@@ -262,7 +275,7 @@ func (cmap *CMapTable) makeCachedGlyphIndexFormat6(offset, length uint32) ([]byt
 		entries[i] = u16(buf[2*i:])
 	}
 
-	return buf, func(otf *OTFont, r rune) (GlyphIndex, error) {
+	return buf, func(otf *Font, r rune) (GlyphIndex, error) {
 		if uint16(r) < firstCode {
 			return 0, nil
 		}
@@ -310,7 +323,7 @@ func (cmap *CMapTable) makeCachedGlyphIndexFormat12(offset, _ uint32) ([]byte, g
 		}
 	}
 
-	return buf, func(otf *OTFont, r rune) (GlyphIndex, error) {
+	return buf, func(otf *Font, r rune) (GlyphIndex, error) {
 		c := uint32(r)
 		for i, j := 0, len(entries); i < j; {
 			h := i + (j-i)/2

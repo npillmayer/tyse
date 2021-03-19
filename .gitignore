@@ -10,3 +10,4 @@
 ,*.txt
 generator
 engine/frame/lines/experiments/experiments
+core/locate/resources/packaged/fonts/Calibri.ttf

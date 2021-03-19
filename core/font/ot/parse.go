@@ -5,15 +5,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-
-	"github.com/ConradIrwin/font/sfnt"
 )
 
 // Parse parses an OpenType font from a byte slice.
-func Parse(font []byte) (*OTFont, error) {
+func Parse(font []byte) (*Font, error) {
 	// https://www.microsoft.com/typography/otspec/otff.htm: Offset Table is 12 bytes.
 	r := bytes.NewReader(font)
-	h := fontHeader{}
+	h := FontHeader{}
 	if err := binary.Read(r, binary.BigEndian, &h); err != nil {
 		return nil, err
 	}
@@ -23,7 +21,7 @@ func Parse(font []byte) (*OTFont, error) {
 		h.FontType == 0x74727565) { // true
 		return nil, errFontFormat(fmt.Sprintf("font type not supported: %x", h.FontType))
 	}
-	otf := &OTFont{header: &h, tables: make(map[Tag]Table)}
+	otf := &Font{Header: &h, tables: make(map[Tag]Table)}
 	src := fontBinSegm(font)
 	// "The Offset Table is followed immediately by the Table Record entries …
 	// sorted in ascending order by tag", 16 bytes each.
@@ -32,7 +30,7 @@ func Parse(font []byte) (*OTFont, error) {
 		return nil, errFontFormat("table record entries")
 	}
 	for b, prevTag := buf, Tag(0); len(b) > 0; b = b[16:] {
-		tag := tag(b)
+		tag := MakeTag(b)
 		if tag < prevTag {
 			return nil, errFontFormat("table order")
 		}
@@ -46,28 +44,41 @@ func Parse(font []byte) (*OTFont, error) {
 			return nil, err
 		}
 	}
+	// TODO consistency check
+	//
+	// The number of glyphs in the font is restricted only by the value stated in the 'head' table. The order in which glyphs are placed in a font is arbitrary.
+	// Note that a font must have at least two glyphs, and that glyph index 0 musthave an outline. See Glyph Mappings for details.
+	//
 	return otf, nil
 }
 
 func parseTable(t Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	switch t {
-	case tag([]byte("name")), tag([]byte("DSIG")), tag([]byte("Feat")):
-		return nil, nil // currently not needed / supported
-	case tag([]byte("head")):
+	case T("cmap"):
+		return parseCMap(t, b, offset, size)
+	case T("head"):
 		return parseHead(t, b, offset, size)
-	case tag([]byte("cmap")):
-		return newTable(t, b, offset, size), nil
-	case tag([]byte("GSUB")):
+	case T("glyf"):
+		return newTable(t, b, offset, size), nil // TODO
+	case T("GDEF"):
+		return parseGDef(t, b, offset, size)
+	case T("GPOS"):
+		return parseGPos(t, b, offset, size)
+	case T("GSUB"):
 		return parseGSub(t, b, offset, size)
-	case tag([]byte("GPOS")):
-		return newTable(t, b, offset, size), nil
-	case tag([]byte("kern")):
-		return newTable(t, b, offset, size), nil
-	case tag([]byte("CBLC")), tag([]byte("OS/2")), tag([]byte("math")), tag([]byte("hhea")),
-		tag([]byte("GDEF")):
-		return newTable(t, b, offset, size), nil
+	case T("hhea"):
+		return parseHHea(t, b, offset, size)
+	case T("hmtx"):
+		return parseHMtx(t, b, offset, size)
+	case T("kern"):
+		return parseKern(t, b, offset, size)
+	case T("loca"):
+		return parseLoca(t, b, offset, size)
+	case T("maxp"):
+		return parseMaxP(t, b, offset, size)
 	}
-	return nil, errFontFormat(fmt.Sprintf("unsupported table tag: %s", t))
+	trace().Infof("font contains table (%s), will not be interpreted", t)
+	return newTable(t, b, offset, size), nil
 }
 
 // --- Head table ------------------------------------------------------------
@@ -76,10 +87,12 @@ func parseHead(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	if size < 54 {
 		return nil, errFontFormat("size of head table")
 	}
-	f, _ := b.u16(16) // flags
-	u, _ := b.u16(18) // units per em
-	t := &HeadTable{flags: f, unitsPerEm: u}
-	t.self = t
+	t := newHeadTable(tag, b, offset, size)
+	t.Flags, _ = b.u16(16)      // flags
+	t.UnitsPerEm, _ = b.u16(18) // units per em
+	// IndexToLocFormat is needed to interpret the loca table:
+	// 0 for short offsets, 1 for long
+	t.IndexToLocFormat, _ = b.u16(50)
 	return t, nil
 }
 
@@ -87,9 +100,8 @@ func parseHead(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	n, _ := b.u16(2)
-	t := &CMapTable{
-		numTables: int(n),
-	}
+	t := newCMapTable(tag, b, offset, size)
+	t.numTables = int(n)
 	const headerSize, entrySize = 4, 8
 	if size < headerSize+entrySize*uint32(t.numTables) {
 		return nil, errFontFormat("size of cmap table")
@@ -121,15 +133,225 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	return t, nil
 }
 
+// --- Kern table ------------------------------------------------------------
+
+type kernSubTableHeader struct {
+	directory [4]uint16 // information to support binary search on sub-table
+	offset    uint16    // start position of this sub-table's kern pairs
+	length    uint32    // size of the sub-table in bytes, without header
+	coverage  uint16    // info about type of information contained in this sub-table
+}
+
+// TrueType and OpenType slightly differ on formats of kern tables:
+// see https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6kern.html
+// and https://docs.microsoft.com/en-us/typography/opentype/spec/kern
+
+// parseKern parses the kern table. There is significant confusion with this table
+// concerning format differences between OpenType, TrueType, and fonts in the wild.
+// We currently only support kern table format 0, which should be supported on any
+// platform. In the real world, fonts usually have just on kern sub-table, and
+// older Windows versions cannot handle more than one.
+func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	if size <= 4 {
+		return nil, nil
+	}
+	var N, suboffset, subheaderlen int
+	if version := u32(b); version == 0x00010000 {
+		trace().Debugf("font has Apple TTF kern table format")
+		n, _ := b.u32(4) // number of kerning tables is uint32
+		N, suboffset, subheaderlen = int(n), 8, 16
+	} else {
+		trace().Debugf("font has OTF (MS) kern table format")
+		n, _ := b.u16(2) // number of kerning tables is uint16
+		N, suboffset, subheaderlen = int(n), 4, 14
+	}
+	trace().Debugf("kern table has %d sub-tables", N)
+	t := newKernTable(tag, b, offset, size)
+	for i := 0; i < N; i++ { // read in N sub-tables
+		if suboffset+subheaderlen >= int(size) { // check for sub-table header size
+			return nil, errFontFormat("kern table format")
+		}
+		h := kernSubTableHeader{
+			offset: uint16(suboffset + subheaderlen),
+			// sub-tables are of varying size; size may be off ⇒ see below
+			length:   uint32(u16(b[suboffset+2:]) - uint16(subheaderlen)),
+			coverage: u16(b[suboffset+4:]),
+		}
+		if format := h.coverage >> 8; format != 0 {
+			trace().Infof("kern sub-table format %d not supported, ignoring sub-table", format)
+			continue // we only support format 0 kerning tables; skip this one
+		}
+		h.directory = [4]uint16{
+			u16(b[suboffset+subheaderlen-8:]),
+			u16(b[suboffset+subheaderlen-6:]),
+			u16(b[suboffset+subheaderlen-4:]),
+			u16(b[suboffset+subheaderlen-2:]),
+		}
+		kerncnt := uint32(h.directory[0])
+		trace().Debugf("kern sub-table has %d entries", kerncnt)
+		// For some fonts, size calculation of kern sub-tables is off; see
+		// https://github.com/fonttools/fonttools/issues/314#issuecomment-118116527
+		// Testable with the Calibri font.
+		sz := kerncnt * 6 // kern pair is of size 6
+		if sz != h.length {
+			trace().Infof("kern sub-table size should be %d, but given as %d; fixing",
+				sz, h.length)
+		}
+		if uint32(suboffset)+sz >= size {
+			return nil, errFontFormat("kern sub-table size exceeds kern table bounds")
+		}
+		t.headers = append(t.headers, h)
+		suboffset += int(subheaderlen + int(h.length))
+	}
+	trace().Debugf("table kern has %d sub-table(s)", len(t.headers))
+	return t, nil
+}
+
+// --- Loca table ------------------------------------------------------------
+
+// Dependencies (taken from Apple Developer page about TrueType):
+// The size of entries in the 'loca' table must be appropriate for the value of the
+// indexToLocFormat field of the 'head' table. The number of entries must be the same
+// as the numGlyphs field of the 'maxp' table.
+// The 'loca' table is most intimately dependent upon the contents of the 'glyf' table
+// and vice versa. Changes to the 'loca' table must not be made unless appropriate
+// changes to the 'glyf' table are simultaneously made.
+func parseLoca(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	return newLocaTable(tag, b, offset, size), nil
+}
+
+// --- MaxP table ------------------------------------------------------------
+
+// This table establishes the memory requirements for this font. Fonts with CFF data
+// must use Version 0.5 of this table, specifying only the numGlyphs field. Fonts
+// with TrueType outlines must use Version 1.0 of this table, where all data is required.
+func parseMaxP(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	if size <= 6 {
+		return nil, nil
+	}
+	t := newMaxPTable(tag, b, offset, size)
+	n, _ := b.u16(4)
+	t.NumGlyphs = int(n)
+	return t, nil
+}
+
+// --- HHea table ------------------------------------------------------------
+
+// This table establishes the memory requirements for this font. Fonts with CFF data
+// must use Version 0.5 of this table, specifying only the numGlyphs field. Fonts
+// with TrueType outlines must use Version 1.0 of this table, where all data is required.
+func parseHHea(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	if size == 0 {
+		return nil, nil
+	}
+	trace().Debugf("HHea table has size %d", size)
+	if size < 36 {
+		return nil, errFontFormat("hhea table incomplete")
+	}
+	t := newHHeaTable(tag, b, offset, size)
+	n, _ := b.u16(34)
+	t.NumberOfHMetrics = int(n)
+	return t, nil
+}
+
+// --- HMtx table ------------------------------------------------------------
+
+// Dependencies (taken from Apple Developer page about TrueType):
+// The value of the numOfLongHorMetrics field is found in the 'hhea' (Horizontal Header)
+// table. Fonts that lack an 'hhea' table must not have an 'hmtx' table.
+// Other tables may have information duplicating data contained in the 'hmtx' table.
+// For example, glyph metrics can also be found in the 'hdmx' (Horizontal Device Metrics)
+// table and 'bloc' (Bitmap Location) table. There is naturally no requirement that
+// the ideal metrics of the 'hmtx' table be perfectly consistent with the device metrics
+// found in other tables, but care should be taken that they are not significantly
+// inconsistent.
+func parseHMtx(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	if size == 0 {
+		return nil, nil
+	}
+	t := newHMtxTable(tag, b, offset, size)
+	return t, nil
+}
+
+// --- GDEF table ------------------------------------------------------------
+
+func parseGDef(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	var err error
+	gdef := newGDefTable(tag, b, offset, size)
+	b, err = parseGDefHeader(gdef, b, err)
+	b, err = parseGlyphClassDefinitions(gdef, b, err)
+	//b, err = parse...(gdef, b, err)
+	if err != nil {
+		trace().Errorf("error parsing GDEF table: %v", err)
+		return gdef, err
+	}
+	mj, mn := gdef.header.Version()
+	trace().Debugf("GDEF table has version %d.%d", mj, mn)
+	return gdef, err
+}
+
+func parseGDefHeader(gdef *GDefTable, b fontBinSegm, err error) (fontBinSegm, error) {
+	if err != nil {
+		return b, err
+	}
+	h := GDefHeader{}
+	r := bytes.NewReader(b)
+	if err = binary.Read(r, binary.BigEndian, &h.gDefHeaderV1_0); err != nil {
+		return b, err
+	}
+	headerlen := 12
+	if h.versionHeader.Minor >= 2 {
+		h.MarkGlyphSetsDefOffset, _ = b.u16(headerlen)
+		headerlen += 2
+	}
+	if h.versionHeader.Minor >= 3 {
+		h.ItemVarStoreOffset, _ = b.u32(headerlen)
+		headerlen += 2
+	}
+	gdef.header = h
+	return b[headerlen:], err
+}
+
+func parseGlyphClassDefinitions(gdef *GDefTable, b fontBinSegm, err error) (fontBinSegm, error) {
+	if err != nil {
+		return b, err
+	}
+	cdef, err := parseClassDefinitions(b)
+	if err != nil {
+		return b, err
+	}
+	gdef.classDef = cdef
+	return b[cdef.size:], nil
+}
+
+// --- GPOS table ------------------------------------------------------------
+
+func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	var err error
+	gpos := newGPosTable(tag, b, offset, size)
+	err = parseLayoutHeader(gpos.LayoutBase(), b, err)
+	err = parseLookupList(gpos.LayoutBase(), b, err)
+	err = parseFeatureList(gpos.LayoutBase(), b, err)
+	err = parseScriptList(gpos.LayoutBase(), b, err)
+	if err != nil {
+		trace().Errorf("error parsing GPOS table: %v", err)
+		return gpos, err
+	}
+	mj, mn := gpos.header.Version()
+	trace().Debugf("GPOS table has version %d.%d", mj, mn)
+	trace().Debugf("GPOS table has %d lookup list entries", len(gpos.lookups))
+	return gpos, err
+}
+
 // --- GSUB table ------------------------------------------------------------
 
 func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	var err error
-	gsub := &GSubTable{}
-	err = parseLayoutHeader(gsub, b, err)
-	err = parseLookupList(gsub, b, err)
-	//err = parseFeatureList(otf, gsub, err)
-	//err = parseScriptList(otf, gsub, err)
+	gsub := newGSubTable(tag, b, offset, size)
+	err = parseLayoutHeader(gsub.LayoutBase(), b, err)
+	err = parseLookupList(gsub.LayoutBase(), b, err)
+	err = parseFeatureList(gsub.LayoutBase(), b, err)
+	err = parseScriptList(gsub.LayoutBase(), b, err)
 	if err != nil {
 		trace().Errorf("error parsing GSUB table: %v", err)
 		return gsub, err
@@ -140,65 +362,12 @@ func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	return gsub, err
 }
 
-// --- Layout table header ---------------------------------------------------
-
-// OpenType specifies two tables–GPOS and GSUB–which share some of their
-// structure. They are called "layout tables".
-
-// LayoutHeader represents header information common to the layout tables
-type LayoutHeader struct {
-	version versionHeader
-	offsets layoutHeader11
-}
-
-// Version returns major and minor version number for this layout table.
-func (lh *LayoutHeader) Version() (int, int) {
-	return int(lh.version.Major), int(lh.version.Minor)
-}
-
-// Offset returns an offset for a layout table section
-func (lh *LayoutHeader) Offset(which LayoutTableSectionName) int {
-	switch which {
-	case LayoutScriptSection:
-		return int(lh.offsets.ScriptListOffset)
-	case LayoutFeatureSection:
-		return int(lh.offsets.FeatureListOffset)
-	case LayoutLookupSection:
-		return int(lh.offsets.LookupListOffset)
-	case LayoutFeatureVariationsSection:
-		return int(lh.offsets.FeatureVariationsOffset)
-	}
-	return 0 // cannot happen
-}
-
-// versionHeader is the beginning of on-disk format of the GPOS/GSUB version header.
-// See https://www.microsoft.com/typography/otspec/GPOS.htm
-// See https://www.microsoft.com/typography/otspec/GSUB.htm
-// Fields are public for reflection-access.
-type versionHeader struct {
-	Major uint16 // Major version of the GPOS/GSUB table.
-	Minor uint16 // Minor version of the GPOS/GSUB table.
-}
-
-// layoutHeader10 is the on-disk format of GPOS/GSUB version header when major=1 and minor=0.
-// Fields are public for reflection-access.
-type layoutHeader10 struct {
-	ScriptListOffset  uint16 // offset to ScriptList table, from beginning of GPOS/GSUB table.
-	FeatureListOffset uint16 // offset to FeatureList table, from beginning of GPOS/GSUB table.
-	LookupListOffset  uint16 // offset to LookupList table, from beginning of GPOS/GSUB table.
-}
-
-// layoutHeader11 is the on-disk format of GPOS/GSUB version header when major=1 and minor=1.
-// Fields are public for reflection-access.
-type layoutHeader11 struct {
-	layoutHeader10
-	FeatureVariationsOffset uint32 // offset to FeatureVariations table, from beginning of GPOS/GSUB table (may be NULL).
-}
+// --- Common code for GPos and GSub -----------------------------------------
 
 // parseLayoutHeader parses a layout table header, i.e. reads version information
 // and header information (containing offsets).
 // Supports header versions 1.0 and 1.1
-func parseLayoutHeader(gsub *GSubTable, b []byte, err error) error {
+func parseLayoutHeader(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
@@ -221,34 +390,11 @@ func parseLayoutHeader(gsub *GSubTable, b []byte, err error) error {
 			return err
 		}
 	}
-	gsub.header = h
+	lytt.header = h
 	return nil
 }
 
-// --- GSUB lookup list ------------------------------------------------------
-
-type lookupRecord struct {
-	lookupRecordInfo
-	subrecordOffsets []uint16 // Array of offsets to lookup subrecords, from beginning of Lookup table
-	// markFilteringSet uint16 // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
-}
-
-type lookupRecordInfo struct {
-	Type           uint16
-	Flag           uint16 // Lookup qualifiers
-	SubRecordCount uint16 // Number of subrecords for this lookup
-}
-
-type lookupSubstFormat1 struct {
-	Format         uint16 // 1
-	CoverageOffset uint16 // Offset to Coverage table, from beginning of substitution subtable
-	Glyphs         int16  // Changes meaning, depending on format 1 or 2
-}
-
-type lookupSubstFormat2 struct {
-	lookupSubstFormat1
-	SubstituteGlyphIDs []uint16
-}
+// --- Layout table lookup list ----------------------------------------------
 
 // parseLookup parses a single Lookup record. b expected to be the beginning of LookupList.
 // See https://www.microsoft.com/typography/otspec/chapter2.htm#featTbl
@@ -264,7 +410,7 @@ func parseLookup(b []byte, offset uint16) (*lookupRecord, error) {
 	if err := binary.Read(r, binary.BigEndian, &lookup.lookupRecordInfo); err != nil {
 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
 	}
-	trace().Debugf("lookup table %s has %d subtables", GSubLookupTypeString(lookup.Type), lookup.SubRecordCount)
+	//trace().Debugf("lookup table (%d) has %d subtables", lookup.Type, lookup.SubRecordCount)
 	subs := make([]uint16, lookup.SubRecordCount, lookup.SubRecordCount)
 	if err := binary.Read(r, binary.BigEndian, &subs); err != nil {
 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
@@ -275,13 +421,13 @@ func parseLookup(b []byte, offset uint16) (*lookupRecord, error) {
 	}
 	for i := 0; i < len(subs); i++ {
 		off := subs[i]
-		trace().Debugf("offset of sub-table[%d] = %d", i, subs[i])
+		//trace().Debugf("offset of sub-table[%d] = %d", i, subs[i])
 		r = bytes.NewReader(b[offset+off:])
 		subst := lookupSubstFormat1{}
 		if err := binary.Read(r, binary.BigEndian, &subst); err != nil {
 			return nil, fmt.Errorf("reading lookupRecord: %s", err)
 		}
-		trace().Debugf("   format spec = %d", subst.Format)
+		//trace().Debugf("   format spec = %d", subst.Format)
 		if subst.Format == 2 {
 			subst2 := lookupSubstFormat2{}
 			subst2.lookupSubstFormat1 = subst
@@ -296,11 +442,11 @@ func parseLookup(b []byte, offset uint16) (*lookupRecord, error) {
 
 // parseLookupList parses the LookupList.
 // See https://www.microsoft.com/typography/otspec/chapter2.htm#lulTbl
-func parseLookupList(gsub *GSubTable, b []byte, err error) error {
+func parseLookupList(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
-	lloffset := gsub.header.Offset(LayoutLookupSection)
+	lloffset := lytt.header.Offset(LayoutLookupSection)
 	if lloffset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -316,25 +462,78 @@ func parseLookupList(gsub *GSubTable, b []byte, err error) error {
 		if err := binary.Read(r, binary.BigEndian, &lookupOffsets); err != nil {
 			return fmt.Errorf("reading lookup offsets: %s", err)
 		}
-		// if err = read16arr(b, 2, &lookupOffsets, int(count)); err != nil {
-		// 	return err
-		// }
-		gsub.lookups = nil
+		lytt.lookups = nil
 		for i := 0; i < int(count); i++ {
-			//for i := 0; i < 1; i++ {
-			trace().Debugf("lookup offset #%d = %d", i, lookupOffsets[i])
-			// var record tagOffsetRecord
-			// if err := binary.Read(r, binary.BigEndian, &record); err != nil {
-			// 	return fmt.Errorf("reading lookupRecord[%d]: %s", i, err)
-			// }
+			//trace().Debugf("lookup offset #%d = %d", i, lookupOffsets[i])
 			lookup, err := parseLookup(b, lookupOffsets[i])
 			if err != nil {
 				return err
 			}
-			gsub.lookups = append(gsub.lookups, lookup)
+			lytt.lookups = append(lytt.lookups, lookup)
 		}
 	}
 	return nil
+}
+
+// --- Feature list ----------------------------------------------------------
+
+func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
+	if err != nil {
+		return err
+	}
+	floffset := lytt.header.Offset(LayoutFeatureSection)
+	if floffset >= len(b) {
+		return io.ErrUnexpectedEOF
+	}
+	flist, n, err := lytt.data.varLenView(floffset, 2, 0, 6)
+	r := bytes.NewReader(flist[2:])
+	frecords := make([]featureRecord, n, n)
+	if err := binary.Read(r, binary.BigEndian, &frecords); err != nil {
+		return fmt.Errorf("reading feature records: %s", err)
+	}
+	lytt.features = frecords
+	return nil
+}
+
+// --- Script list -----------------------------------------------------------
+
+func parseScriptList(lytt *LayoutTable, b []byte, err error) error {
+	if err != nil {
+		return err
+	}
+	sloffset := lytt.header.Offset(LayoutScriptSection)
+	if sloffset >= len(b) {
+		return io.ErrUnexpectedEOF
+	}
+	slist, n, err := lytt.data.varLenView(sloffset, 2, 0, 6)
+	r := bytes.NewReader(slist[2:])
+	srecords := make([]scriptRecord, n, n)
+	if err := binary.Read(r, binary.BigEndian, &srecords); err != nil {
+		return fmt.Errorf("reading script records: %s", err)
+	}
+	lytt.scripts = srecords
+	return nil
+}
+
+// --- parse class def table -------------------------------------------------
+
+func parseClassDefinitions(b fontBinSegm) (ClassDefTable, error) {
+	cdef := ClassDefTable{}
+	r := bytes.NewReader(b)
+	if err := binary.Read(r, binary.BigEndian, &cdef.format); err != nil {
+		return cdef, err
+	}
+	var n uint16
+	if cdef.format == 1 {
+		n, _ = b.u16(4)
+	} else if cdef.format == 2 {
+		n, _ = b.u16(2)
+	} else {
+		return cdef, errFontFormat(fmt.Sprintf("unknown ClassDef format %d", n))
+	}
+	cdef.count = int(n)
+	cdef.size = cdef.calcSize(int(n))
+	return cdef, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -343,18 +542,4 @@ func read16arr(r *bytes.Reader, arr *[]uint16, size int) error {
 	*arr = make([]uint16, size, size)
 	//r := bytes.NewReader(b[offset:])
 	return binary.Read(r, binary.BigEndian, arr)
-}
-
-// ---------------------------------------------------------------------------
-
-// The code below is partially replicated from github.com/ConradIrwin/font/sfnt because
-// we need finer control of GPOS and GSUB tables and the fields are not exported or
-// otherwise accessible.
-
-// TODO remove this
-
-// tagOffsetRecord is an on-disk format of a Tag and Offset record.
-type tagOffsetRecord struct {
-	Tag    sfnt.Tag // 4-byte script tag identifier
-	Offset uint16   // Offset to object from beginning of list
 }

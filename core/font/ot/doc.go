@@ -20,6 +20,8 @@ applications in their own right. I often need a break from the vast desert of
 bytes (without any sign posts), which is what font data files are at their core. Breaks,
 where I talk to myself and ask, this is what you do in your spare time? Really?
 
+No font collections nor variable fonts are supported yet.
+
 License
 
 Some code has originally been copied over from golang.org/x/image/font/sfnt/cmap.go,

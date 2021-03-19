@@ -5,14 +5,59 @@ import (
 	"github.com/npillmayer/tyse/core/font"
 )
 
-// OTFont represents the internal structure of an OpenType font.
+// Font represents the internal structure of an OpenType font.
 // It is used to navigate properties of a font for typesetting tasks.
-type OTFont struct {
+type Font struct {
 	f          *font.ScalableFont
-	ot         *sfnt.Font // TODO remove this and dependency to ConradIrwin/font
-	header     *fontHeader
+	ot         *sfnt.Font // TODO remove this
+	Header     *FontHeader
 	tables     map[Tag]Table
 	glyphIndex glyphIndexFunc
+}
+
+type FontHeader struct {
+	FontType      uint32
+	TableCount    uint16
+	EntrySelector uint16
+	SearchRange   uint16
+	RangeShift    uint16
+}
+
+// Table returns the font table for a given tag. If a table for a tag cannot
+// be found in the font, nil is returned.
+//
+// Please note that the current implementation will not interpret every kind of
+// font table, either because there is no need to do so (with regard to
+// text shaping or rasterization), or because implementation is not yet finished.
+// However, `Table` will return at least a generic table type for each table contained in
+// the font, i.e. no table information will be dropped.
+//
+// For example to receive the `OS/2` and the `loca` table, clients may call
+//
+//    os2  := Table(ot.T("OS/2"))
+//    loca := Table(ot.T("loca")).Base().AsLoca()
+//
+// Table tag names are case-sensitive, following the names in the OpenType specification,
+// i.e., one of:
+//
+// avar BASE CBDT CBLC CFF CFF2 cmap COLR CPAL cvar cvt DSIG EBDT EBLC EBSC fpgm fvar
+// gasp GDEF glyf GPOS GSUB gvar hdmx head hhea hmtx HVAR JSTF kern loca LTSH MATH
+// maxp MERG meta MVAR name OS/2 PCLT post prep sbix STAT SVG VDMX vhea vmtx VORG VVAR
+//
+func (f *Font) Table(tag Tag) Table {
+	if t, ok := f.tables[tag]; ok {
+		return t
+	}
+	return nil
+}
+
+// TableTags returns a list of tags, one for each table contained in the font.
+func (f *Font) TableTags() []Tag {
+	var tags = make([]Tag, 0, len(f.tables))
+	for tag := range f.tables {
+		tags = append(tags, tag)
+	}
+	return tags
 }
 
 // GlyphIndex is a glyph index in a font.
@@ -25,11 +70,11 @@ type GlyphIndex uint16
 // codes that do not correspond to any glyph in the font should be mapped to
 // glyph index 0. The glyph at this location must be a special glyph
 // representing a missing character, commonly known as .notdef."
-func (otf *OTFont) GlyphIndex(codePoint rune) (GlyphIndex, error) {
+func (otf *Font) GlyphIndex(codePoint rune) (GlyphIndex, error) {
 	return otf.glyphIndex(otf, codePoint)
 }
 
-// --- Constants -------------------------------------------------------------
+// --- Layout tables (GSUB & GPOS) -------------------------------------------
 
 // LayoutTableSectionName lists the sections of OT layout tables, i.e. GPOS and GSUB.
 type LayoutTableSectionName int
@@ -37,41 +82,56 @@ type LayoutTableSectionName int
 const (
 	LayoutScriptSection LayoutTableSectionName = iota
 	LayoutFeatureSection
+	// Lookup records:
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
 	LayoutLookupSection
 	LayoutFeatureVariationsSection
 )
 
-// Lookup Tables
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
+// LayoutTableLookupFlag is a flag type for layout tables (GPOS and GSUB).
+type LayoutTableLookupFlag uint16
 
 // Lookup flags of layout tables (GPOS and GSUB)
 const ( // LookupFlag bit enumeration
 	// Note that the RIGHT_TO_LEFT flag is used only for GPOS type 3 lookups and is ignored
 	// otherwise. It is not used by client software in determining text direction.
-	LOOKUP_FLAG_RIGHT_TO_LEFT             uint16 = 0x0001
-	LOOKUP_FLAG_IGNORE_BASE_GLYPHS        uint16 = 0x0002 // If set, skips over base glyphs
-	LOOKUP_FLAG_IGNORE_LIGATURES          uint16 = 0x0004 // If set, skips over ligatures
-	LOOKUP_FLAG_IGNORE_MARKS              uint16 = 0x0008 // If set, skips over all combining marks
-	LOOKUP_FLAG_USE_MARK_FILTERING_SET    uint16 = 0x0010 // If set, indicates that the lookup table structure is followed by a MarkFilteringSet field.
-	LOOKUP_FLAG_reserved                  uint16 = 0x00E0 // For future use (Set to zero)
-	LOOKUP_FLAG_MARK_ATTACHMENT_TYPE_MASK uint16 = 0xFF00 // If not zero, skips over all marks of attachment type different from specified.
+	LOOKUP_FLAG_RIGHT_TO_LEFT             LayoutTableLookupFlag = 0x0001
+	LOOKUP_FLAG_IGNORE_BASE_GLYPHS        LayoutTableLookupFlag = 0x0002 // If set, skips over base glyphs
+	LOOKUP_FLAG_IGNORE_LIGATURES          LayoutTableLookupFlag = 0x0004 // If set, skips over ligatures
+	LOOKUP_FLAG_IGNORE_MARKS              LayoutTableLookupFlag = 0x0008 // If set, skips over all combining marks
+	LOOKUP_FLAG_USE_MARK_FILTERING_SET    LayoutTableLookupFlag = 0x0010 // If set, indicates that the lookup table structure is followed by a MarkFilteringSet field.
+	LOOKUP_FLAG_reserved                  LayoutTableLookupFlag = 0x00E0 // For future use (Set to zero)
+	LOOKUP_FLAG_MARK_ATTACHMENT_TYPE_MASK LayoutTableLookupFlag = 0xFF00 // If not zero, skips over all marks of attachment type different from specified.
 )
 
-// GPOS Table
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#table-organization
+// LayoutTableLookupType is a type identifier for layout lookup records (GPOS and GSUB).
+// Enum values are different for GPOS and GSUB.
+type LayoutTableLookupType uint16
 
-// GPOS LookupType Enumeration
-const (
-	GPOS_LUTYPE_Single              uint16 = 1 // Adjust position of a single glyph
-	GPOS_LUTYPE_Pair                uint16 = 2 // Adjust position of a pair of glyphs
-	GPOS_LUTYPE_Cursive             uint16 = 3 // Attach cursive glyphs
-	GPOS_LUTYPE_MarkToBase          uint16 = 4 // Attach a combining mark to a base glyph
-	GPOS_LUTYPE_MarkToLigature      uint16 = 5 // Attach a combining mark to a ligature
-	GPOS_LUTYPE_MarkToMark          uint16 = 6 // Attach a combining mark to another mark
-	GPOS_LUTYPE_Context_Pos         uint16 = 7 // Position one or more glyphs in context
-	GPOS_LUTYPE_Chained_Context_Pos uint16 = 8 // Position one or more glyphs in chained context
-	GPOS_LUTYPE_Extension_Pos       uint16 = 9 // Extension mechanism for other positionings
-)
+// Layout table script record
+type scriptRecord struct {
+	Tag    Tag
+	Offset uint16
+}
+
+// Layout table feature record
+type featureRecord struct {
+	Tag    Tag
+	Offset uint16
+}
+
+// Layout table lookup list
+type lookupRecord struct {
+	lookupRecordInfo
+	subrecordOffsets []uint16 // Array of offsets to lookup subrecords, from beginning of Lookup table
+	// markFilteringSet uint16 // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
+}
+
+type lookupRecordInfo struct {
+	Type           LayoutTableLookupType
+	Flag           LayoutTableLookupFlag
+	SubRecordCount uint16 // Number of subrecords for this lookup
+}
 
 // --- Tag -------------------------------------------------------------------
 
@@ -80,10 +140,29 @@ const (
 // script, language system, feature, or baseline
 type Tag uint32
 
-// tag creates a tag from 4 bytes.
-func tag(b []byte) Tag {
+// MakeTag creates a Tag from 4 bytes, e.g.,
+// If b is shorter or longer, it will be silently extended or cut as appropriate
+//
+//    MakeTag([]byte("cmap"))
+//
+func MakeTag(b []byte) Tag {
+	if b == nil {
+		b = []byte{0, 0, 0, 0}
+	} else if len(b) > 4 {
+		b = b[:4]
+	} else if len(b) < 4 {
+		b = append([]byte{0, 0, 0, 0}[:4-len(b)], b...)
+	}
 	return Tag(u32(b))
 }
+
+// T returns a Tag from a (4-letter) string.
+// If t is shorter or longer, it will be silently extended or cut as appropriate
+func T(t string) Tag {
+	t = "    "[:4-len(t)] + t
+	return Tag(u32([]byte(t)))
+}
+
 func (t Tag) String() string {
 	bytes := []byte{
 		byte(t >> 24 & 0xff),
@@ -100,11 +179,12 @@ func (t Tag) String() string {
 type Table interface {
 	Offset() uint32   // offset within the font's binary data
 	Len() uint32      // byte size of table
+	Binary() []byte   // the bytes of this table; should be treatet as read-only by clients
 	String() string   // 4-letter table name, e.g., "cmap"
 	Base() *TableBase // every table we use will be derived from TableBase
 }
 
-func newTable(tag Tag, b fontBinSegm, offset, size uint32) Table {
+func newTable(tag Tag, b fontBinSegm, offset, size uint32) *genericTable {
 	t := &genericTable{TableBase{
 		data:   b,
 		name:   tag,
@@ -143,6 +223,12 @@ func (tb *TableBase) Len() uint32 {
 	return tb.length
 }
 
+// Binary returns the bytes of this table. Should be treatet as read-only by
+// clients, as it is a view into the original data.
+func (tb *TableBase) Binary() []byte {
+	return tb.data
+}
+
 // String returns the 4-letter name of a table.
 func (tb *TableBase) String() string {
 	return tb.name.String()
@@ -152,9 +238,20 @@ func (tb *TableBase) bytes() fontBinSegm {
 	return tb.data
 }
 
+// AsGPos returns this table as a GPOS table, or nil.
+func (tb *TableBase) AsGPos() *GPosTable {
+	if tb == nil || tb.self == nil {
+		return nil
+	}
+	if g, ok := tb.self.(*GPosTable); ok {
+		return g
+	}
+	return nil
+}
+
 // AsGSub returns this table as a GSUB table, or nil.
 func (tb *TableBase) AsGSub() *GSubTable {
-	if tb.self == nil {
+	if tb == nil || tb.self == nil {
 		return nil
 	}
 	if g, ok := tb.self.(*GSubTable); ok {
@@ -163,23 +260,416 @@ func (tb *TableBase) AsGSub() *GSubTable {
 	return nil
 }
 
+// AsLoca returns this table as a kern table, or nil.
+func (tb *TableBase) AsLoca() *LocaTable {
+	if tb == nil || tb.self == nil {
+		return nil
+	}
+	if k, ok := tb.self.(*LocaTable); ok {
+		return k
+	}
+	return nil
+}
+
+// AsMaxP returns this table as a kern table, or nil.
+func (tb *TableBase) AsMaxP() *MaxPTable {
+	if tb == nil || tb.self == nil {
+		return nil
+	}
+	if k, ok := tb.self.(*MaxPTable); ok {
+		return k
+	}
+	return nil
+}
+
+// AsKern returns this table as a kern table, or nil.
+func (tb *TableBase) AsKern() *KernTable {
+	if tb == nil || tb.self == nil {
+		return nil
+	}
+	if k, ok := tb.self.(*KernTable); ok {
+		return k
+	}
+	return nil
+}
+
+// AsHHea returns this table as a hhea table, or nil.
+func (tb *TableBase) AsHHea() *HHeaTable {
+	if tb == nil || tb.self == nil {
+		return nil
+	}
+	if k, ok := tb.self.(*HHeaTable); ok {
+		return k
+	}
+	return nil
+}
+
+// AsHMtx returns this table as a hhea table, or nil.
+func (tb *TableBase) AsHMtx() *HMtxTable {
+	if tb == nil || tb.self == nil {
+		return nil
+	}
+	if k, ok := tb.self.(*HMtxTable); ok {
+		return k
+	}
+	return nil
+}
+
+// --- Concrete table implementations ----------------------------------------
+
 // HeadTable gives global information about the font.
 type HeadTable struct {
 	TableBase
-	flags      uint16
-	unitsPerEm uint16
+	Flags            uint16
+	UnitsPerEm       uint16
+	IndexToLocFormat uint16 // needed to read loca table
+}
+
+func newHeadTable(tag Tag, b fontBinSegm, offset, size uint32) *HeadTable {
+	t := &HeadTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
 }
 
 func (t *HeadTable) Base() *TableBase {
 	return &t.TableBase
 }
 
-// --- Font header -----------------------------------------------------------
+// KernTable gives information about kerning and kern pairs.
+type KernTable struct {
+	TableBase
+	headers []kernSubTableHeader
+}
 
-type fontHeader struct {
-	FontType      uint32
-	TableCount    uint16
-	EntrySelector uint16
-	SearchRange   uint16
-	RangeShift    uint16
+func newKernTable(tag Tag, b fontBinSegm, offset, size uint32) *KernTable {
+	t := &KernTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
+}
+
+// KernSubTableInfo contains header information for a kerning sub-table.
+// Currently only format 0 of kerning tables is supported (as does MS Windows).
+type KernSubTableInfo struct {
+	IsHorizontal  bool // kern data may be horizontal or vertical
+	IsMinimum     bool // if false, table has kerning values, otherwise has minimum values
+	IsOverride    bool // if true, the value in this table should replace the value currently being accumulated
+	IsCrossStream bool // if true, kerning is perpendicular to the flow of the text
+	Offset        uint16
+	Length        uint32
+}
+
+// SubTableInfo returns information about a kerning sub-table. n is 0…N-1.
+func (t *KernTable) SubTableInfo(n int) KernSubTableInfo {
+	// Mask    Name
+	// 0x8000  kernVertical
+	// 0x4000  kernCrossStream
+	// 0x2000  kernVariation
+	// 0x1000  kernOverride
+	// 0x0F00  kernUnusedBits
+	// 0x00FF  kernFormatMask
+	info := KernSubTableInfo{}
+	if len(t.headers) >= n {
+		h := t.headers[n]
+		info.IsHorizontal = h.coverage&0x8000 == 0
+		info.IsMinimum = h.coverage&0x4000 > 0
+		info.IsCrossStream = h.coverage&0x2000 > 0
+		info.IsOverride = h.coverage&0x08 > 0
+		info.Offset = h.offset
+		info.Length = h.length
+	}
+	return info
+}
+
+func (t *KernTable) Base() *TableBase {
+	return &t.TableBase
+}
+
+// LocaTable stores the offsets to the locations of the glyphs in the font,
+// relative to the beginning of the glyph data table.
+type LocaTable struct {
+	TableBase
+	loca func(t *LocaTable, n int) uint32 // returns glyph location for glyph n
+}
+
+func newLocaTable(tag Tag, b fontBinSegm, offset, size uint32) *LocaTable {
+	t := &LocaTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.loca = shortLocaVersion // may get changed by font consistency check
+	t.self = t
+	return t
+}
+
+func shortLocaVersion(t *LocaTable, n int) uint32 {
+	loc, err := t.data.u16(n * 2)
+	if err != nil {
+		// should have been catched by font consistency check
+		panic("access to non-existent loca offset")
+	}
+	return uint32(loc) * 2
+}
+
+func longLocaVersion(t *LocaTable, n int) uint32 {
+	loc, err := t.data.u32(n * 4)
+	if err != nil {
+		// should have been catched by font consistency check
+		panic("access to non-existent loca offset")
+	}
+	return loc
+}
+
+func (t *LocaTable) Base() *TableBase {
+	return &t.TableBase
+}
+
+// MaxPTable establishes the memory requirements for this font.
+type MaxPTable struct {
+	TableBase
+	NumGlyphs int
+}
+
+func newMaxPTable(tag Tag, b fontBinSegm, offset, size uint32) *MaxPTable {
+	t := &MaxPTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
+}
+
+func (t *MaxPTable) Base() *TableBase {
+	return &t.TableBase
+}
+
+// HHeaTable contains information for horizontal layout.
+type HHeaTable struct {
+	TableBase
+	NumberOfHMetrics int
+}
+
+func newHHeaTable(tag Tag, b fontBinSegm, offset, size uint32) *HHeaTable {
+	t := &HHeaTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
+}
+
+func (t *HHeaTable) Base() *TableBase {
+	return &t.TableBase
+}
+
+// HMtxTable contains metric information for the horizontal layout each of the glyphs in
+// the font. Each element in the contained hMetrics-array has two parts: the advance width
+// and left side bearing. The value NumberOfHMetrics is taken from the `hhea` table. In
+// a monospaced font, only one entry is required but that entry may not be omitted.
+// Optionally, an array of left side bearings follows.
+// The corresponding glyphs are assumed to have the same
+// advance width as that found in the last entry in the hMetrics array. Since there
+// must be a left side bearing and an advance width associated with each glyph in the font,
+// the number of entries in this array is derived from the total number of glyphs in the
+// font minus the value `HHea.NumberOfHMetrics`, which is copied into the
+// HMtxTable for easier access.
+type HMtxTable struct {
+	TableBase
+	NumberOfHMetrics int
+}
+
+func newHMtxTable(tag Tag, b fontBinSegm, offset, size uint32) *HMtxTable {
+	t := &HMtxTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
+}
+
+// hMetrics returns the advance width and left side bearing of a glyph.
+// TODO: call from font or from HMtx ?
+func (t *HMtxTable) hMetrics(g GlyphIndex) (uint16, int16) {
+	if t.NumberOfHMetrics < int(g) {
+		a, _ := t.data.u16(int(g) * 4)
+		lsb, _ := t.data.u16(int(g)*4 + 2)
+		return a, int16(lsb)
+	}
+	diff := int(g) - t.NumberOfHMetrics
+	a, _ := t.data.u16((t.NumberOfHMetrics - 1) * 4)
+	lsb, _ := t.data.u16((t.NumberOfHMetrics-1)*4 + diff*2)
+	return a, int16(lsb)
+}
+
+func (t *HMtxTable) Base() *TableBase {
+	return &t.TableBase
+}
+
+// --- GDEF table ------------------------------------------------------------
+
+// GDefTable, the Glyph Definition (GDEF) table, provides various glyph properties
+// used in OpenType Layout processing.
+type GDefTable struct {
+	TableBase
+	header   GDefHeader
+	classDef ClassDefTable
+}
+
+func newGDefTable(tag Tag, b fontBinSegm, offset, size uint32) *GDefTable {
+	t := &GDefTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
+}
+
+func (t *GDefTable) Base() *TableBase {
+	return &t.TableBase
+}
+
+// GDefHeader starts with a version number. Three versions are defined:
+// 1.0, 1.2 and 1.3.
+type GDefHeader struct {
+	gDefHeaderV1_0
+	MarkGlyphSetsDefOffset uint16
+	ItemVarStoreOffset     uint32
+}
+
+type gDefHeaderV1_0 struct {
+	versionHeader
+	GlyphClassDefOffset      uint16
+	AttachListOffset         uint16
+	LigCaretListOffset       uint16
+	MarkAttachClassDefOffset uint16
+}
+
+// --- Layout tables ---------------------------------------------------------
+
+// LayoutTable is a base type for layout tables.
+// OpenType specifies two tables–GPOS and GSUB–which share some of their
+// structure. They are called "layout tables".
+type LayoutTable struct {
+	TableBase
+	header   *LayoutHeader
+	scripts  []scriptRecord
+	features []featureRecord
+	lookups  []*lookupRecord
+}
+
+// Header returns the layout table header for this GSUB table.
+func (t *LayoutTable) Header() LayoutHeader {
+	return *t.header
+}
+
+// LayoutHeader represents header information common to the layout tables.
+type LayoutHeader struct {
+	version versionHeader
+	offsets layoutHeader11
+}
+
+// Version returns major and minor version numbers for this layout table.
+func (lh *LayoutHeader) Version() (int, int) {
+	return int(lh.version.Major), int(lh.version.Minor)
+}
+
+// Offset returns an offset for a layout table section within the layout table
+// (GPOS or GSUB).
+// A layout table contains four sections:
+//
+// ▪︎ Script Section
+//
+// ▪︎ Feature Section
+//
+// ▪︎ Lookup Section
+//
+// ▪︎ Feature Variations Section
+//
+func (lh *LayoutHeader) Offset(which LayoutTableSectionName) int {
+	switch which {
+	case LayoutScriptSection:
+		return int(lh.offsets.ScriptListOffset)
+	case LayoutFeatureSection:
+		return int(lh.offsets.FeatureListOffset)
+	case LayoutLookupSection:
+		return int(lh.offsets.LookupListOffset)
+	case LayoutFeatureVariationsSection:
+		return int(lh.offsets.FeatureVariationsOffset)
+	}
+	return 0 // cannot happen
+}
+
+// versionHeader is the beginning of on-disk format of some format headers.
+// See https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-header
+// See https://www.microsoft.com/typography/otspec/GPOS.htm
+// See https://www.microsoft.com/typography/otspec/GSUB.htm
+// Fields are public for reflection-access.
+type versionHeader struct {
+	Major uint16 // Major version of the GPOS/GSUB table.
+	Minor uint16 // Minor version of the GPOS/GSUB table.
+}
+
+// Version returns major and minor version numbers.
+func (h *versionHeader) Version() (int, int) {
+	return int(h.Major), int(h.Minor)
+}
+
+// layoutHeader10 is the on-disk format of GPOS/GSUB version header when major=1 and minor=0.
+// Fields are public for reflection-access.
+type layoutHeader10 struct {
+	ScriptListOffset  uint16 // offset to ScriptList table, from beginning of GPOS/GSUB table.
+	FeatureListOffset uint16 // offset to FeatureList table, from beginning of GPOS/GSUB table.
+	LookupListOffset  uint16 // offset to LookupList table, from beginning of GPOS/GSUB table.
+}
+
+// layoutHeader11 is the on-disk format of GPOS/GSUB version header when major=1 and minor=1.
+// Fields are public for reflection-access.
+type layoutHeader11 struct {
+	layoutHeader10
+	FeatureVariationsOffset uint32 // offset to FeatureVariations table, from beginning of GPOS/GSUB table (may be NULL).
+}
+
+// --- Class definition tables -----------------------------------------------
+
+type ClassDefTable struct {
+	format uint16 // format version 1 or 2
+	count  int    // number of entries
+	size   uint32 // size in bytes, including header
+}
+
+func (cdef *ClassDefTable) calcSize(numEntries int) uint32 {
+	return 0
 }
