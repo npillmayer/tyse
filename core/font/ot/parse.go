@@ -7,7 +7,15 @@ import (
 	"io"
 )
 
+// Code comment often will cite passage from the
+// OpenType specification version 1.8.4;
+// see https://docs.microsoft.com/en-us/typography/opentype/spec/.
+
+// ---------------------------------------------------------------------------
+
 // Parse parses an OpenType font from a byte slice.
+// An ot.Font needs ongoing access to the fonts byte-data after the Parse function returns.
+// Its elements are assumed immutable while the ot.Font remains in use.
 func Parse(font []byte) (*Font, error) {
 	// https://www.microsoft.com/typography/otspec/otff.htm: Offset Table is 12 bytes.
 	r := bytes.NewReader(font)
@@ -275,29 +283,41 @@ func parseHMtx(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 // --- GDEF table ------------------------------------------------------------
 
+// The Glyph Definition (GDEF) table provides various glyph properties used in
+// OpenType Layout processing.
 func parseGDef(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	var err error
 	gdef := newGDefTable(tag, b, offset, size)
-	b, err = parseGDefHeader(gdef, b, err)
-	b, err = parseGlyphClassDefinitions(gdef, b, err)
-	//b, err = parse...(gdef, b, err)
+	err = parseGDefHeader(gdef, b, err)
+	err = parseGlyphClassDefinitions(gdef, b, err)
+	err = parseAttachmentPointList(gdef, b, err)
+	// we currently do not parse the Ligature Caret List Table
+	err = parseMarkAttachmentClassDef(gdef, b, err)
+	err = parseMarkGlyphSets(gdef, b, err)
 	if err != nil {
 		trace().Errorf("error parsing GDEF table: %v", err)
 		return gdef, err
 	}
-	mj, mn := gdef.header.Version()
+	mj, mn := gdef.Header().Version()
 	trace().Debugf("GDEF table has version %d.%d", mj, mn)
 	return gdef, err
 }
 
-func parseGDefHeader(gdef *GDefTable, b fontBinSegm, err error) (fontBinSegm, error) {
+// The GDEF table begins with a header that starts with a version number. Three
+// versions are defined. Version 1.0 contains an offset to a Glyph Class Definition
+// table (GlyphClassDef), an offset to an Attachment List table (AttachList), an offset
+// to a Ligature Caret List table (LigCaretList), and an offset to a Mark Attachment
+// Class Definition table (MarkAttachClassDef). Version 1.2 also includes an offset to
+// a Mark Glyph Sets Definition table (MarkGlyphSetsDef). Version 1.3 also includes an
+// offset to an Item Variation Store table.
+func parseGDefHeader(gdef *GDefTable, b fontBinSegm, err error) error {
 	if err != nil {
-		return b, err
+		return err
 	}
 	h := GDefHeader{}
 	r := bytes.NewReader(b)
 	if err = binary.Read(r, binary.BigEndian, &h.gDefHeaderV1_0); err != nil {
-		return b, err
+		return err
 	}
 	headerlen := 12
 	if h.versionHeader.Minor >= 2 {
@@ -306,26 +326,117 @@ func parseGDefHeader(gdef *GDefTable, b fontBinSegm, err error) (fontBinSegm, er
 	}
 	if h.versionHeader.Minor >= 3 {
 		h.ItemVarStoreOffset, _ = b.u32(headerlen)
-		headerlen += 2
+		headerlen += 4
 	}
 	gdef.header = h
-	return b[headerlen:], err
+	gdef.header.headerSize = uint8(headerlen)
+	return err
 }
 
-func parseGlyphClassDefinitions(gdef *GDefTable, b fontBinSegm, err error) (fontBinSegm, error) {
+// Thise table uses the same format as the Class Definition table (defined in the
+// OpenType Layout Common Table Formats chapter).
+func parseGlyphClassDefinitions(gdef *GDefTable, b fontBinSegm, err error) error {
 	if err != nil {
-		return b, err
+		return err
 	}
+	offset := gdef.Header().OffsetFor(GDefGlyphClassDefSection)
+	if offset >= len(b) {
+		return io.ErrUnexpectedEOF
+	}
+	b = b[offset:]
 	cdef, err := parseClassDefinitions(b)
 	if err != nil {
-		return b, err
+		return err
 	}
 	gdef.classDef = cdef
-	return b[cdef.size:], nil
+	return nil
+}
+
+/*
+AttachList:
+Type      Name                            Description
+---------+-------------------------------+-----------------------
+Offset16  coverageOffset                  Offset to Coverage table - from beginning of AttachList table
+uint16    glyphCount                      Number of glyphs with attachment points
+Offset16  attachPointOffsets[glyphCount]  Array of offsets to AttachPoint tables-from beginning of
+                                          AttachList table-in Coverage Index order
+*/
+func parseAttachmentPointList(gdef *GDefTable, b fontBinSegm, err error) error {
+	if err != nil {
+		return err
+	}
+	offset := gdef.Header().OffsetFor(GDefAttachListSection)
+	if offset >= len(b) {
+		return io.ErrUnexpectedEOF
+	}
+	b = b[offset:]
+	if count, err := b.u16(2); count == 0 {
+		if err != nil {
+			return errFontFormat("GDEF has corrupt attachment point list")
+		}
+		return nil // no entries
+	}
+	covOffset := u16(b)
+	coverage := parseCoverage(b[covOffset:])
+	if coverage == nil {
+		return errFontFormat("GDEF attachement point coverage table unreadable")
+	}
+	count, _ := b.u16(2)
+	gdef.attachPointList = AttachmentPointList{
+		Count:              int(count),
+		Coverage:           coverage,
+		attachPointOffsets: b[4:],
+	}
+	return nil
+}
+
+// A Mark Attachment Class Definition Table defines the class to which a mark glyph may
+// belong. This table uses the same format as the Class Definition table.
+func parseMarkAttachmentClassDef(gdef *GDefTable, b fontBinSegm, err error) error {
+	if err != nil {
+		return err
+	}
+	offset := gdef.Header().OffsetFor(GDefMarkAttachClassSection)
+	if offset >= len(b) {
+		return io.ErrUnexpectedEOF
+	}
+	b = b[offset:]
+	cdef, err := parseClassDefinitions(b)
+	if err != nil {
+		return err
+	}
+	gdef.markAttachClassDef = cdef
+	return nil
+}
+
+// Mark glyph sets are defined in a MarkGlyphSets table, which contains offsets to
+// individual sets each represented by a standard Coverage table.
+func parseMarkGlyphSets(gdef *GDefTable, b fontBinSegm, err error) error {
+	if err != nil {
+		return err
+	}
+	offset := gdef.Header().OffsetFor(GDefMarkGlyphSetsDefSection)
+	if offset >= len(b) {
+		return io.ErrUnexpectedEOF
+	}
+	b = b[offset:]
+	count, _ := b.u16(2)
+	for i := 0; i < int(count); i++ {
+		covOffset, _ := b.u32(i * 4)
+		coverage := parseCoverage(b[covOffset:])
+		if coverage == nil {
+			return errFontFormat("GDEF mark glyph set coverage table unreadable")
+		}
+		gdef.markGlyphSets = append(gdef.markGlyphSets, coverage)
+	}
+	return nil
 }
 
 // --- GPOS table ------------------------------------------------------------
 
+// The Glyph Positioning table (GPOS) provides precise control over glyph placement for
+// sophisticated text layout and rendering in each script and language system that a font
+// supports.
 func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	var err error
 	gpos := newGPosTable(tag, b, offset, size)
@@ -345,6 +456,9 @@ func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 // --- GSUB table ------------------------------------------------------------
 
+// The Glyph Substitution (GSUB) table provides data for substition of glyphs for
+// appropriate rendering of scripts, such as cursively-connecting forms in Arabic script,
+// or for advanced typographic effects, such as ligatures.
 func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	var err error
 	gsub := newGSubTable(tag, b, offset, size)
@@ -373,14 +487,14 @@ func parseLayoutHeader(lytt *LayoutTable, b []byte, err error) error {
 	}
 	h := &LayoutHeader{}
 	r := bytes.NewReader(b)
-	if err = binary.Read(r, binary.BigEndian, &h.version); err != nil {
+	if err = binary.Read(r, binary.BigEndian, &h.versionHeader); err != nil {
 		return err
 	}
-	if h.version.Major != 1 || (h.version.Minor != 0 && h.version.Minor != 1) {
+	if h.Major != 1 || (h.Minor != 0 && h.Minor != 1) {
 		return fmt.Errorf("unsupported layout version (major: %d, minor: %d)",
-			h.version.Major, h.version.Minor)
+			h.Major, h.Minor)
 	}
-	switch h.version.Minor {
+	switch h.Minor {
 	case 0:
 		if err = binary.Read(r, binary.BigEndian, &h.offsets.layoutHeader10); err != nil {
 			return err
@@ -446,7 +560,7 @@ func parseLookupList(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
-	lloffset := lytt.header.Offset(LayoutLookupSection)
+	lloffset := lytt.header.OffsetFor(LayoutLookupSection)
 	if lloffset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -477,11 +591,16 @@ func parseLookupList(lytt *LayoutTable, b []byte, err error) error {
 
 // --- Feature list ----------------------------------------------------------
 
+// The FeatureList table enumerates features in an array of records (FeatureRecord) and
+// specifies the total number of features (FeatureCount). Every feature must have a
+// FeatureRecord, which consists of a FeatureTag that identifies the feature and an offset
+// to a Feature table (described next). The FeatureRecord array is arranged alphabetically
+// by FeatureTag names.
 func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
-	floffset := lytt.header.Offset(LayoutFeatureSection)
+	floffset := lytt.header.OffsetFor(LayoutFeatureSection)
 	if floffset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -497,11 +616,17 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 
 // --- Script list -----------------------------------------------------------
 
+// A ScriptList table consists of a count of the scripts represented by the glyphs in the
+// font (ScriptCount) and an array of records (ScriptRecord), one for each script for which
+// the font defines script-specific features (a script without script-specific features
+// does not need a ScriptRecord). Each ScriptRecord consists of a ScriptTag that identifies
+// a script, and an offset to a Script table. The ScriptRecord array is stored in
+// alphabetic order of the script tags.
 func parseScriptList(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
-	sloffset := lytt.header.Offset(LayoutScriptSection)
+	sloffset := lytt.header.OffsetFor(LayoutScriptSection)
 	if sloffset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -517,8 +642,11 @@ func parseScriptList(lytt *LayoutTable, b []byte, err error) error {
 
 // --- parse class def table -------------------------------------------------
 
-func parseClassDefinitions(b fontBinSegm) (ClassDefTable, error) {
-	cdef := ClassDefTable{}
+// The ClassDef table can have either of two formats: one that assigns a range of
+// consecutive glyph indices to different classes, or one that puts groups of consecutive
+// glyph indices into the same class.
+func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
+	cdef := ClassDefinitions{}
 	r := bytes.NewReader(b)
 	if err := binary.Read(r, binary.BigEndian, &cdef.format); err != nil {
 		return cdef, err
@@ -534,6 +662,20 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefTable, error) {
 	cdef.count = int(n)
 	cdef.size = cdef.calcSize(int(n))
 	return cdef, nil
+}
+
+// --- parse coverage table-module -------------------------------------------
+
+// Read a coverage table-module, which comes in two formats (1 and 2).
+// A Coverage table defines a unique index value, the Coverage Index, for each
+// covered glyph.
+func parseCoverage(b fontBinSegm) GlyphRange {
+	h := coverageHeader{}
+	r := bytes.NewReader(b)
+	if err := binary.Read(r, binary.BigEndian, &h); err != nil {
+		return nil
+	}
+	return buildGlyphRangeFromCoverage(h, b)
 }
 
 // ---------------------------------------------------------------------------

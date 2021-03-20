@@ -21,11 +21,6 @@ func newGPosTable(tag Tag, b fontBinSegm, offset, size uint32) *GPosTable {
 	return t
 }
 
-// Header returns the layout table header for this GPOS table.
-func (g *GPosTable) Header() LayoutHeader {
-	return *g.header
-}
-
 // Base returns the enclosed LayoutTable type this table inherits from.
 func (g *GPosTable) LayoutBase() *LayoutTable {
 	return &g.LayoutTable

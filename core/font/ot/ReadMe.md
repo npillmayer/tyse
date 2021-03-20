@@ -23,6 +23,8 @@ applications in their own right. I often need a break from the vast desert of
 bytes (without any sign posts), which is what font data files are at their core. Breaks,
 where I talk to myself and ask, this is what you do in your spare time? Really?
 
+ No font collections nor variable fonts are supported yet. 
+
 ### Other Solutions to Font Parsing
 
 There are (at least) two Go packages around for parsing SFNT fonts:
@@ -33,8 +35,8 @@ There are (at least) two Go packages around for parsing SFNT fonts:
 It’s always a good idea to prefer packages from the Go core team, and the
 x/image/font/sfnt package is certainly well suited for rasterizing applications
 (as proven by the test cases). However, it is less well suited as a basis for
-the task of text-shaping. This task requires access to the tables contained in
-a font and means of navigating them, cross-checking entries, applying different
+the task of text-shaping. That task requires access to the tables contained in
+a font and utilities for navigating them, cross-checking entries, applying different
 shaping algorithms, etc. Moreover, the API is not intended to be extended by
 other packages, but has been programmed with a concrete target in mind.
 
@@ -42,7 +44,7 @@ ConradIrwin/font allows access to the font tables it has parsed. However, its
 focus is on font file manipulation (read in ⇒ manipulate ⇒ export), thus
 access to tables means more or less access to the tables binaries and
 doing much of the interpretation on the client side. I started out pursuing this
-approach, but at the end abondened it. The main reason for this is that I
+approach, but at the end abondened it. The main reason is that I
 prefer the approach of the Go core team of keeping the initial font binary
 in memory, and not copying out too much into separate buffers or data structures.
 I need to have the binary data in memory anyway, as for complex-script shaping

@@ -2,6 +2,8 @@ package ot
 
 import "errors"
 
+// --- Reading bytes from a font's binary representation ---------------------
+
 /*
 We replicate some of the code of the Go core team here, available from
 https://github.com/golang/image/tree/master/font/sfnt.
@@ -75,9 +77,7 @@ func (b fontBinSegm) varLenView(offset, staticLength, countOffset, itemLength in
 	return buf, count, nil
 }
 
-// u16 returns the uint16 in the table t at the relative offset i.
-//
-// buf is an optional scratch buffer as per the source.view method.
+// u16 returns the uint16 in b at the relative offset i.
 func (b fontBinSegm) u16(i int) (uint16, error) {
 	// //func (b fontBinSegm) u16(t Table, i int) (uint16, error) {
 	// 	if i < 0 || uint(t.Len()) < uint(i+2) {
@@ -91,9 +91,7 @@ func (b fontBinSegm) u16(i int) (uint16, error) {
 	return u16(buf), nil
 }
 
-// u32 returns the uint32 in the table t at the relative offset i.
-//
-// buf is an optional scratch buffer as per the source.view method.
+// u32 returns the uint32 in b at the relative offset i.
 func (b fontBinSegm) u32(i int) (uint32, error) {
 	//func (b fontBinSegm) u32(t Table, i int) (uint32, error) {
 	// if i < 0 || uint(t.Len()) < uint(i+4) {
@@ -105,4 +103,103 @@ func (b fontBinSegm) u32(i int) (uint32, error) {
 		return 0, err
 	}
 	return u32(buf), nil
+}
+
+// --- Ranges of glyphs ------------------------------------------------------
+
+type GlyphRange interface {
+	Lookup(g rune) (int, bool)
+	ByteSize() int
+}
+
+type glyphRangeArray struct {
+	is32     bool // keys are 32 bit
+	count    int  // number of glyph keys
+	data     fontBinSegm
+	byteSize int
+}
+
+// glyphRangeArrays have entries stored as a block of consecutive keys.
+// glyphRangeArrays return the index of the key in the range table.
+// 0 is a valid return value.
+func (r *glyphRangeArray) Lookup(g rune) (int, bool) {
+	if r.count <= 0 {
+		return 0, false
+	}
+	if r.is32 {
+		for i := 0; i < r.count; i++ {
+			k, err := r.data.u32(i * 4)
+			if err != nil {
+				return 0, false
+			} else if rune(k) == g {
+				return i, true
+			}
+		}
+	} else {
+		for i := 0; i < r.count; i++ {
+			k, err := r.data.u16(i * 2)
+			if err != nil {
+				return 0, false
+			} else if rune(k) == g {
+				return i, true
+			}
+		}
+	}
+	return 0, false
+}
+
+type rangeRecord struct {
+	from, to rune
+	index    uint16
+}
+
+func (r *glyphRangeArray) ByteSize() int {
+	return r.byteSize
+}
+
+type glyphRangeRecords struct {
+	is32     bool // keys are 32 bit
+	count    int  // number of range records
+	data     fontBinSegm
+	byteSize int
+}
+
+// glyphRangeRecords have entries stored as range records.
+// glyphRangeRecords return the index of the key in the range table.
+// 0 is a valid return value.
+func (r *glyphRangeRecords) Lookup(g rune) (int, bool) {
+	if r.count <= 0 {
+		return 0, false
+	}
+	record := rangeRecord{}
+	if r.is32 {
+		for i := 0; i < r.count; i++ {
+			k, err := r.data.u32(i * (4 + 4 + 2))
+			if err != nil {
+				return 0, false
+			}
+			record.from = rune(k)
+			k, _ = r.data.u32(i*(2+2+2) + 4)
+			record.to = rune(k)
+			v, _ := r.data.u16(i*(2+2+2) + 6)
+			record.index = v
+		}
+	} else {
+		for i := 0; i < r.count; i++ {
+			k, err := r.data.u16(i * (2 + 2 + 2))
+			if err != nil {
+				return 0, false
+			}
+			record.from = rune(k)
+			k, _ = r.data.u16(i*(2+2+2) + 2)
+			record.to = rune(k)
+			k, _ = r.data.u16(i*(2+2+2) + 4)
+			record.index = k
+		}
+	}
+	return 0, false
+}
+
+func (r *glyphRangeRecords) ByteSize() int {
+	return r.byteSize
 }
