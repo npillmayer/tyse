@@ -1,25 +1,12 @@
 package ot
 
-import "errors"
+import (
+	"bytes"
+	"errors"
+	"io"
+)
 
-// --- Reading bytes from a font's binary representation ---------------------
-
-/*
-We replicate some of the code of the Go core team here, available from
-https://github.com/golang/image/tree/master/font/sfnt.
-I understand it's legal to do so, as long as the license information stays intact.
-
-We do not use the parsing routines, as they do not fit out purpose, but rather
-re-use basic byte-decoding routines, which are not exported. We even simplify
-those, as we are always dealing with font data in memory (no io.ReaderAt stuff).
-
-// Copyright 2017 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-The LICENSE file mentioned is replicated as GO-LICENSE at the root directory of
-this module.
-*/
+// Reading bytes from a font's binary representation
 
 var errBufferBounds = errors.New("internal inconsistency: buffer bounds error")
 
@@ -33,25 +20,40 @@ func u32(b []byte) uint32 {
 	return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])<<0
 }
 
-// fontBinSegm is a segment of byte data. Conceptually, it is like an io.ReaderAt,
-// except that a common segment of SFNT font data is in-memory instead of
-// on-disk (e.g. "goregular.TTF") or the result of an ioutil.ReadFile call. In such
-// cases, as an optimization, we skip the io.Reader / io.ReaderAt model of
-// copying from the fontBinSegm to a caller-supplied buffer, and instead provide
-// direct access to the underlying []byte data.
+// ---Locations, i.e. byte segments/slices -----------------------------------
+
+// Location is a position at a byte within a font's binary data.
+// It represents the start of a segment/slice of binary data.
+type Location interface {
+	Size() int     // size in bytes
+	Bytes() []byte // return as a byte slice
+	Reader() io.Reader
+}
+
+// fontBinSegm is a segment of byte data.
+// It implements the Location interface. We use it throughout in this module to
+// naviagte the font's binary data.
 type fontBinSegm []byte
 
-// view returns the length bytes at the given offset.
-// The []byte returned is a sub-slice of s.b[]. The caller should not modify the
-// contents of the returned []byte
-func (b fontBinSegm) view(offset, length int) ([]byte, error) {
-	if 0 > offset || offset > offset+length {
+func (b fontBinSegm) Size() int {
+	return len(b)
+}
+
+func (b fontBinSegm) Bytes() []byte {
+	return b
+}
+
+func (b fontBinSegm) Reader() io.Reader {
+	return bytes.NewReader(b)
+}
+
+// view returns n bytes at the given offset.
+// The byte segment returned is a sub-slice of b.
+func (b fontBinSegm) view(offset, n int) (fontBinSegm, error) {
+	if offset < 0 || n <= 0 || offset+n > len(b) {
 		return nil, errBufferBounds
 	}
-	if offset+length > len(b) {
-		return nil, errBufferBounds
-	}
-	return b[offset : offset+length], nil
+	return b[offset : offset+n], nil
 }
 
 // varLenView returns bytes from the given offset for sub-tables with varying
@@ -202,4 +204,126 @@ func (r *glyphRangeRecords) Lookup(g rune) (int, bool) {
 
 func (r *glyphRangeRecords) ByteSize() int {
 	return r.byteSize
+}
+
+// --- Tag list --------------------------------------------------------------
+
+type tagList struct {
+	Count int
+	link  Link
+}
+
+func parseTagList(b fontBinSegm) tagList {
+	tl := tagList{Count: int(u16(b))}
+	tl.link = link16{
+		base:   b,
+		offset: 2,
+	}
+	return tl
+}
+
+func (l tagList) Tag(i int) Tag {
+	const taglen = 4
+	if b := l.link.Jump(); len(b.Bytes()) >= (i+1)*taglen {
+		if n, err := fontBinSegm(b.Bytes()).u32(i * taglen); err == nil {
+			return Tag(n)
+		}
+	}
+	return Tag(0)
+}
+
+// --- Link ------------------------------------------------------------------
+
+type Link interface {
+	Base() Location
+	Jump() Location
+	IsNull() bool
+}
+
+func parseLink16(b fontBinSegm, offset int) (Link, error) {
+	if len(b) < offset {
+		return link16{}, errBufferBounds
+	}
+	n, err := b.u16(offset)
+	if err != nil {
+		return link16{}, errBufferBounds
+	}
+	return link16{
+		base:   b,
+		offset: n,
+	}, nil
+}
+
+type link16 struct {
+	base   fontBinSegm
+	offset uint16
+}
+
+func (l16 link16) IsNull() bool {
+	return len(l16.base) == 0
+}
+
+func (l16 link16) Base() Location {
+	return l16.base
+}
+
+func (l16 link16) Jump() Location {
+	if l16.offset <= uint16(len(l16.base)) {
+		return fontBinSegm{}
+	}
+	return l16.base[l16.offset:]
+}
+
+type link32 struct {
+	base   fontBinSegm
+	offset uint32
+}
+
+func (l32 link32) IsNull() bool {
+	return len(l32.base) == 0
+}
+
+func (l32 link32) Base() []byte {
+	return l32.base
+}
+
+func (l32 link32) Jump() Location {
+	if l32.offset <= uint32(len(l32.base)) {
+		//	, errFontFormat("offset32 location out of table bounds")
+		return fontBinSegm{}
+	}
+	return l32.base[l32.offset:]
+}
+
+// ---------------------------------------------------------------------------
+
+// A TagRecordMap is a dict-typ (map) to receive a data record (returned as a link)
+// from a given tag. This kind of map is used within OpenType fonts in several
+// instances, e.g.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
+type TagRecordMap interface {
+	Lookup(Tag) Link
+}
+
+func parseTagRecordMap16(b fontBinSegm, offset, recsize int) TagRecordMap {
+	size, err := b.u16(offset)
+	if err != nil {
+		return tagRecordMap16{}
+	}
+	m := tagRecordMap16{base: b[offset+2 : offset+2+int(size)], recordSize: recsize}
+	return m
+}
+
+type tagRecordMap16 struct {
+	base       fontBinSegm
+	recordSize int
+}
+
+func (m tagRecordMap16) Lookup(tag Tag) Link {
+	if m.recordSize <= 0 {
+		return link16{}
+	}
+	// TODO
+	panic("TagRecordMap.Lookup() not yet implemented")
+	//return nil
 }

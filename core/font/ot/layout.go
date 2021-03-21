@@ -193,6 +193,43 @@ func (h GDefHeader) OffsetFor(which GDefTableSectionName) int {
 	return 0 // illegal call, nothing sensible to return
 }
 
+// --- BASE table ------------------------------------------------------------
+
+// BaseTable, the Baseline table (BASE), provides information used to align glyphs
+// of different scripts and sizes in a line of text, whether the glyphs are in the
+// same font or in different fonts.
+// BaseTable, the Glyph Definition (BSE) table, provides various glyph properties
+// used in OpenType Layout processing.
+//
+// See also
+// https://docs.microsoft.com/en-us/typography/opentype/spec/base
+type BaseTable struct {
+	TableBase
+	axisTables [2]AxisTable
+}
+
+func newBaseTable(tag Tag, b fontBinSegm, offset, size uint32) *BaseTable {
+	t := &BaseTable{}
+	base := TableBase{
+		data:   b,
+		name:   tag,
+		offset: offset,
+		length: size,
+	}
+	t.TableBase = base
+	t.self = t
+	return t
+}
+
+func (t *BaseTable) Base() *TableBase {
+	return &t.TableBase
+}
+
+type AxisTable struct {
+	baselineTags      tagList
+	baseScriptRecords TagRecordMap
+}
+
 // --- Coverage table module -------------------------------------------------
 
 // Each subtable (except an Extension LookupType subtable) in a lookup references

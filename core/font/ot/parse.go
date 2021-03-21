@@ -62,6 +62,8 @@ func Parse(font []byte) (*Font, error) {
 
 func parseTable(t Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	switch t {
+	case T("BASE"):
+		return parseBase(t, b, offset, size)
 	case T("cmap"):
 		return parseCMap(t, b, offset, size)
 	case T("head"):
@@ -104,8 +106,96 @@ func parseHead(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	return t, nil
 }
 
+// --- BASE table ------------------------------------------------------------
+
+// The Baseline table (BASE) provides information used to align glyphs of different
+// scripts and sizes in a line of text, whether the glyphs are in the same font or
+// in different fonts.
+func parseBase(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+	var err error
+	base := newBaseTable(tag, b, offset, size)
+	// The BASE table begins with offsets to Axis tables that describe layout data for
+	// the horizontal and vertical layout directions of text. A font can provide layout
+	// data for both text directions or for only one text direction.
+	xaxis, errx := parseLink16(b, 4)
+	yaxis, erry := parseLink16(b, 6)
+	if errx != nil || erry != nil {
+		return nil, errFontFormat("BASE table axis-tables")
+	}
+	err = parseBaseAxis(base, 0, xaxis, err)
+	err = parseBaseAxis(base, 1, yaxis, err)
+	if err != nil {
+		trace().Errorf("error parsing BASE table: %v", err)
+		return base, err
+	}
+	return base, err
+}
+
+// An Axis table consists of offsets, measured from the beginning of the Axis table,
+// to a BaseTagList and a BaseScriptList.
+func parseBaseAxis(base *BaseTable, hOrV int, link Link, err error) error {
+	if err != nil {
+		return err
+	}
+	base.axisTables[hOrV] = AxisTable{}
+	axisHeader := link.Jump()
+	// The BaseTagList enumerates all baselines used to render the scripts in the
+	// text layout direction. If no baseline data is available for a text direction,
+	// the offset to the corresponding BaseTagList may be set to NULL.
+	if basetags, err := parseLink16(axisHeader.Bytes(), 0); err == nil {
+		b := basetags.Jump()
+		base.axisTables[hOrV].baselineTags = parseTagList(b.Bytes())
+		trace().Debugf("axis table %d has %d entries", hOrV,
+			base.axisTables[hOrV].baselineTags.Count)
+	}
+	// For each script listed in the BaseScriptList table, a BaseScriptRecord must be
+	// defined that identifies the script and references its layout data.
+	// BaseScriptRecords are stored in the baseScriptRecords array, ordered
+	// alphabetically by the baseScriptTag in each record.
+	if basescripts, err := parseLink16(axisHeader.Bytes(), 2); err == nil {
+		b := basescripts.Jump()
+		base.axisTables[hOrV].baseScriptRecords = parseTagRecordMap16(b.Bytes(), 0, 2)
+
+		trace().Debugf("axis table %d has %d entries", hOrV,
+			base.axisTables[hOrV].baselineTags.Count)
+	}
+	trace().Infof("BASE axis %d has no/unreadable entires", hOrV)
+	return nil
+}
+
 // --- CMap table ------------------------------------------------------------
 
+// This table defines mapping of character codes to a default glyph index. Different
+// subtables may be defined that each contain mappings for different character encoding
+// schemes. The table header indicates the character encodings for which subtables are
+// present.
+//
+// From the spec.: “Apart from a format 14 subtable, all other subtables are exclusive:
+// applications should select and use one and ignore the others. […]
+// If a font includes Unicode subtables for both 16-bit encoding (typically, format 4)
+// and also 32-bit encoding (formats 10 or 12), then the characters supported by the
+// subtable for 32-bit encoding should be a superset of the characters supported by
+// the subtable for 16-bit encoding, and the 32-bit encoding should be used by
+// applications. Fonts should not include 16-bit Unicode subtables using both format 4
+// and format 6; format 4 should be used. Similarly, fonts should not include 32-bit
+// Unicode subtables using both format 10 and format 12; format 12 should be used.
+// If a font includes encoding records for Unicode subtables of the same format but
+// with different platform IDs, an application may choose which to select, but should
+// make this selection consistently each time the font is used.”
+//
+// From Apple: // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html
+// “The use of the Macintosh platformID is currently discouraged. Subtables with a
+//  Macintosh platformID are only required for backwards compatibility.”
+// and:
+// “The Unicode platform's platform-specific ID 6 was intended to mark a 'cmap' subtable
+//  as one used by a last resort font. This is not required by any Apple platform.”
+//
+// All in all, we only support the following plaform/encoding/format combinations:
+//   0 (Unicode)  3    4   Unicode BMB
+//   0 (Unicode)  4    12  Unicode full
+//   3 (Win)      1    4   Unicode BMP
+//   3 (Win)      10   12  Unicode full
+//
 func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	n, _ := b.u16(2)
 	t := newCMapTable(tag, b, offset, size)
@@ -114,20 +204,6 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	if size < headerSize+entrySize*uint32(t.numTables) {
 		return nil, errFontFormat("size of cmap table")
 	}
-	// Apart from a format 14 subtable, all other subtables are exclusive: applications
-	// should select and use one and ignore the others. If a Unicode subtable is used
-	// (platform 0, or platform 3 / encoding 1 or 10), then a format 14 subtable using
-	// platform 0/encoding 5 can also be supplemented for mapping Unicode Variation Sequences.
-	// If a font includes Unicode subtables for both 16-bit encoding (typically, format 4)
-	// and also 32-bit encoding (formats 10 or 12), then the characters supported by the
-	// subtable for 32-bit encoding should be a superset of the characters supported by
-	// the subtable for 16-bit encoding, and the 32-bit encoding should be used by
-	// applications. Fonts should not include 16-bit Unicode subtables using both format 4
-	// and format 6; format 4 should be used. Similarly, fonts should not include 32-bit
-	// Unicode subtables using both format 10 and format 12; format 12 should be used.
-	// If a font includes encoding records for Unicode subtables of the same format but
-	// with different platform IDs, an application may choose which to select, but should
-	// make this selection consistently each time the font is used.
 	var enc encodingRecord
 	for i := 0; i < t.numTables; i++ {
 		rec, _ := b.view(headerSize+entrySize*i, entrySize)
@@ -136,6 +212,7 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		if width <= enc.width {
 			continue
 		}
+		enc.width = width
 		enc.offset = u32(rec[4:])
 	}
 	return t, nil
