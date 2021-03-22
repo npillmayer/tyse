@@ -1,10 +1,8 @@
 package ot
 
 import (
-	"bytes"
 	"testing"
 
-	"github.com/ConradIrwin/font/sfnt"
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
@@ -66,7 +64,7 @@ func loadTestFont(t *testing.T, pattern string) *Font {
 	trace().SetTraceLevel(tracing.LevelInfo)
 	defer trace().SetTraceLevel(level)
 	//
-	var err error
+	//var err error
 	otf := &Font{}
 	if pattern == "fallback" {
 		otf.f = font.FallbackFont()
@@ -78,11 +76,11 @@ func loadTestFont(t *testing.T, pattern string) *Font {
 		}
 		otf.f = tyc.ScalableFontParent()
 	}
-	fontreader := bytes.NewReader(otf.f.Binary)
-	otf.ot, err = sfnt.StrictParse(fontreader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// fontreader := bytes.NewReader(otf.f.Binary)
+	// otf.ot, err = sfnt.StrictParse(fontreader)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 	t.Logf("loaded font = %s", otf.f.Fontname)
 	return otf
 }

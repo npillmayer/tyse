@@ -192,18 +192,3 @@ func TestParseOtherTables(t *testing.T) {
 		t.Errorf("expected Calibri to have 3843 metrics, but %d indicated", hhea.NumberOfHMetrics)
 	}
 }
-
-// ---------------------------------------------------------------------------
-
-func GposDebugInfo(otf *Font) {
-	level := trace().GetTraceLevel()
-	trace().SetTraceLevel(tracing.LevelInfo)
-	defer trace().SetTraceLevel(level)
-	_, err := otf.ot.GposTable()
-	if err != nil {
-		trace().Errorf("cannot read GPOS table of OpenType font %s", otf.f.Fontname)
-		trace().Errorf(err.Error())
-		return
-	}
-	trace().Infof("OpenType GPOS table of %s", otf.f.Fontname)
-}

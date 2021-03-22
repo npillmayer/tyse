@@ -225,8 +225,6 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 			enc.width = width
 			enc.format = format
 			enc.link = link
-			enc.size = int(u16(subtable.Bytes()[2:]))
-			trace().Debugf("cmap sub-table has size %d", enc.size)
 		}
 	}
 	if enc.width == 0 {

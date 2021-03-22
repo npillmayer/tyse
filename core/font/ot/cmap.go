@@ -20,9 +20,8 @@ this module.
 //
 // Consulting the cmap table is a very frequent operation on fonts. We therefore
 // construct an internal representation of the looup table. A cmap table may contain
-// more than one lookup table, but we will only instatiate the one most appropriate
-// for our needs. Clients who need access to all the lookup tables will have to parse
-// them themselves.
+// more than one lookup table, but we will only instantiate the most appropriate one.
+// Clients who need access to all the lookup tables will have to parse them themselves.
 type CMapTable struct {
 	TableBase
 	GlyphIndexMap CMapGlyphIndex
@@ -121,12 +120,11 @@ func supportedCmapFormat(format, pid, psid uint16) bool {
 // Dispatcher to create the correct implementation of a CMapGlyphIndex from a given format.
 func makeGlyphIndex(b fontBinSegm, which encodingRecord) (CMapGlyphIndex, error) {
 	subtable := which.link.Jump()
-	trace().Debugf("cmap sub-table has size %d>%d", len(subtable.Bytes()), which.size)
 	switch which.format {
 	case 4:
-		return makeGlyphIndexFormat4(subtable.Bytes()[:which.size])
+		return makeGlyphIndexFormat4(subtable.Bytes())
 	case 12:
-		return makeGlyphIndexFormat12(subtable.Bytes()[:which.size])
+		return makeGlyphIndexFormat12(subtable.Bytes())
 	}
 	panic("unreachable") // unsupported formats should have been weeded out beforehand
 }

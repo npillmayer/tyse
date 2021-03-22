@@ -1,7 +1,6 @@
 package ot
 
 import (
-	"github.com/ConradIrwin/font/sfnt"
 	"github.com/npillmayer/tyse/core/font"
 )
 
@@ -9,7 +8,6 @@ import (
 // It is used to navigate properties of a font for typesetting tasks.
 type Font struct {
 	f      *font.ScalableFont
-	ot     *sfnt.Font // TODO remove this
 	Header *FontHeader
 	tables map[Tag]Table
 }
@@ -18,12 +16,13 @@ type Font struct {
 // contains only one font, the table directory will begin at byte 0 of the file.
 // If the font file is an OpenType Font Collection file (see below), the beginning
 // point of the table directory for each font is indicated in the TTCHeader.
+//
+// OpenType fonts that contain TrueType outlines should use the value of 0x00010000
+// for the FontType. OpenType fonts containing CFF data (version 1 or 2) should
+// use 0x4F54544F ('OTTO', when re-interpreted as a Tag).
+// The Apple specification for TrueType fonts allows for 'true' and 'typ1',
+// but these version tags should not be used for OpenType fonts.
 type FontHeader struct {
-	// OpenType fonts that contain TrueType outlines should use the value of 0x00010000
-	// for the FontType. OpenType fonts containing CFF data (version 1 or 2) should
-	// use 0x4F54544F ('OTTO', when re-interpreted as a Tag).
-	// The Apple specification for TrueType fonts allows for 'true' and 'typ1',
-	// but these version tags should not be used for OpenType fonts.
 	FontType   uint32
 	TableCount uint16
 }
