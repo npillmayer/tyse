@@ -13,26 +13,20 @@ The LICENSE file mentioned is replicated as GO-LICENSE at the root directory of
 this module.
 */
 
-import (
-	"fmt"
-)
-
 // CMapTable represents an OpenType cmap table, i.e. the table to receive glyphs
 // from code-points.
 //
 // See https://docs.microsoft.com/de-de/typography/opentype/spec/cmap
 //
+// Consulting the cmap table is a very frequent operation on fonts. We therefore
+// construct an internal representation of the looup table. A cmap table may contain
+// more than one lookup table, but we will only instatiate the one most appropriate
+// for our needs. Clients who need access to all the lookup tables will have to parse
+// them themselves.
 type CMapTable struct {
 	TableBase
 	GlyphIndexMap CMapGlyphIndex
 }
-
-// type encodingRecord struct {
-// 	platformId uint16
-// 	encodingId uint16
-// 	offset     uint32
-// 	width      int // encoding width
-// }
 
 func newCMapTable(tag Tag, b fontBinSegm, offset, size uint32) *CMapTable {
 	t := &CMapTable{}
@@ -51,25 +45,7 @@ func (t *CMapTable) Base() *TableBase {
 	return &t.TableBase
 }
 
-// Platform IDs and Platform Specific IDs as per
-// https://www.microsoft.com/typography/otspec/name.htm
-const (
-	pidUnicode   = 0
-	pidMacintosh = 1
-	pidWindows   = 3
-
-	// Note that FontForge may generate a bogus Platform Specific ID (value 10)
-	// for the Unicode Platform ID (value 0). See
-	// https://github.com/fontforge/fontforge/issues/2728
-	psidUnicode2BMPOnly        = 3
-	psidUnicode2FullRepertoire = 4
-	psidMacintoshRoman         = 0
-	psidWindowsSymbol          = 0
-	psidWindowsUCS2            = 1
-	psidWindowsUCS4            = 10
-)
-
-const (
+const ( // taken from https://github.com/golang/image/tree/master/font/sfnt.
 	// This value is arbitrary, but defends against parsing malicious font
 	// files causing excessive memory allocations. For reference, Adobe's
 	// SourceHanSansSC-Regular.otf has 65535 glyphs and:
@@ -81,13 +57,8 @@ const (
 	maxNumSubroutines = 40000
 )
 
-type glyphIndexFunc func(otf *Font, r rune) (GlyphIndex, error)
-
 // platformEncodingWidth returns the number of bytes per character assumed by
 // the given Platform ID and Platform Specific ID.
-//
-// Very old fonts, from before Unicode was widely adopted, assume only 1 byte
-// per character: a character map.
 //
 // Old fonts, from when Unicode meant the Basic Multilingual Plane (BMP),
 // assume that 2 bytes per character is sufficient.
@@ -99,36 +70,36 @@ type glyphIndexFunc func(otf *Font, r rune) (GlyphIndex, error)
 // size can be smaller.
 func platformEncodingWidth(pid, psid uint16) int {
 	switch pid {
-	case pidUnicode:
+	case 0: // Unicode platform
 		switch psid {
-		case psidUnicode2BMPOnly:
+		case 3: // Unicode BMB
 			return 2
-		case psidUnicode2FullRepertoire:
+		case 4, 10: // Unicode full  (include 10 from FontForge bug)
 			return 4
 		}
-
-	case pidMacintosh:
+	case 3: // Windows platform
 		switch psid {
-		case psidMacintoshRoman:
-			return 1
-		}
-
-	case pidWindows:
-		switch psid {
-		case psidWindowsSymbol:
+		case 1: // Unicode BMP
 			return 2
-		case psidWindowsUCS2:
-			return 2
-		case psidWindowsUCS4:
+		case 10: // Unicode full
 			return 4
 		}
 	}
-	return 0
+	return 0 // width 0 will never get selected
 }
 
 // The various cmap formats are described at
 // https://www.microsoft.com/typography/otspec/cmap.htm
-
+//
+// From the spec.: Of the seven available formats, not all are commonly used today.
+// Formats 4 or 12 are appropriate for most new fonts, depending on the Unicode character
+// repertoire supported. Format 14 is used in many applications for support of Unicode
+// variation sequences. Some platforms also make use for format 13 for a last-resort
+// fallback font. Other subtable formats are not recommended for use in new fonts.
+// Application developers, however, should anticipate that any of the formats may be used
+// in fonts.
+//
+// Right now we do not support variable fonts nor fallback fonts.
 // All in all, we only support the following plaform/encoding/format combinations:
 //   0 (Unicode)  3    4   Unicode BMB
 //   0 (Unicode)  4    12  Unicode full  (10 from FontForge, error)
@@ -138,27 +109,29 @@ func platformEncodingWidth(pid, psid uint16) int {
 // Note that FontForge may generate a bogus Platform Specific ID (value 10)
 // for the Unicode Platform ID (value 0). See
 // https://github.com/fontforge/fontforge/issues/2728
-var supportedCmapFormat = func(format, pid, psid uint16) bool {
+//
+func supportedCmapFormat(format, pid, psid uint16) bool {
 	return (pid == 0 && psid == 3 && format == 4) ||
 		(pid == 0 && psid == 4 && format == 12) ||
 		(pid == 3 && psid == 1 && format == 4) ||
 		(pid == 3 && psid == 10 && format == 12)
 }
 
-func (cmap *CMapTable) makeCachedGlyphIndex(buf []byte, offset, length uint32, format uint16) ([]byte, glyphIndexFunc, error) {
+// Dispatcher to create the correct implementation of a CMapGlyphIndex from a given format.
+func (cmap *CMapTable) makeGlyphIndex(b fontBinSegm, format uint16) (CMapGlyphIndex, error) {
 	switch format {
 	case 4:
-		return cmap.makeCachedGlyphIndexFormat4(offset, length)
+		return makeGlyphIndexFormat4(b)
 	case 12:
-		return cmap.makeCachedGlyphIndexFormat12(offset, length)
+		return makeGlyphIndexFormat12(b)
 	}
-	panic("unreachable")
+	panic("unreachable") // unsupported formats should have been weeded out beforehand
 }
 
 // CMapGlyphIndex represents a CMap table index to receive a glyph index from
 // a code-point.
 type CMapGlyphIndex interface {
-	GlyphIndex(rune) GlyphIndex
+	Lookup(rune) GlyphIndex
 }
 
 // Format 4: Segment mapping to delta values
@@ -168,22 +141,80 @@ type CMapGlyphIndex interface {
 // This format is used when the character codes for the characters represented by a font
 // fall into several contiguous ranges, possibly with holes in some or all of the ranges
 // (that is, some of the codes in a range may not have a representation in the font).
-// The format-dependent data is divided into three parts, which must occur in the following
-// order:
-// - A four-word header gives parameters for an optimized search of the segment list;
-// - Four parallel arrays describe the segments (one segment for each contiguous range of codes);
-// - A variable-length array of glyph IDs (unsigned words).
 //
+type format4GlyphIndex struct {
+	segCnt   int
+	entries  []cmapEntry16
+	glyphIds array
+}
+
+// Format 4 holds four parallel arrays to describe the segments (one segment for
+// each contiguous range of codes).
+// see https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
 type cmapEntry16 struct {
 	end, start, delta, offset uint16
 }
 
-func (cmap *CMapTable) makeCachedGlyphIndexFormat4(b fontBinSegm) (glyphIndexFunc, error) {
+func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
+	if uint32(r) > 0xffff { // format 4 is for BMP code-points only
+		return 0 // return index for 'missing character'
+	}
+	c := uint16(r)
+	N := len(f4.entries)
+	for i, j := 0, N; i < j; {
+		h := i + (j-i)/2 // do a binary search on f4.entries (which may get large)
+		entry := &f4.entries[h]
+		if c < entry.start {
+			j = h
+		} else if entry.end < c {
+			i = h + 1
+		} else if entry.offset == 0 {
+			return GlyphIndex(c + entry.delta)
+		} else {
+			// The spec describes the calculation the find the link into the glyph ID array
+			// as follows:
+			// “The character code offset from startCode is added to the idRangeOffset value.
+			//  This sum is used as an offset from the current location within idRangeOffset
+			//  itself to index out the correct glyphIdArray value. This obscure indexing
+			//  trick works because glyphIdArray immediately follows idRangeOffset in the
+			//  font file.”
+			// We already sliced the cmap into sub-segments, so this will not work for us
+			// (intentionally–I'm not a big fan of 'obscure' tricks). Instead, we will
+			// calculate a clean index into the glyph ID array. Unfortunately this requires
+			// us to reverse some of the magic pre-calculations in the font—a procedure which
+			// one may consider obscure as well, but that's life…
+			//
+			// First cut off the part off the trailing part of offset which results from
+			// skipping over to the start of the glyph ID array:
+			deltaToEndOfEntries := (N - h) * 8 // 8 = byte size of cmapEntry16
+			offset := int(entry.offset) - deltaToEndOfEntries
+			// Now normalize the index into the glyph ID array
+			index := offset / 2 // offset is in bytes, we need an array index
+			glyphInx := f4.glyphIds.UnsafeGet(index).U16()
+			if glyphInx > 0 {
+				// If the value obtained from the indexing operation is not 0 (which indicates
+				// missingGlyph), idDelta[i] is added to it to get the glyph index
+				glyphInx += entry.delta
+			}
+			return GlyphIndex(glyphInx) // will be 0 in case of indexing error
+		}
+	}
+	return GlyphIndex(0)
+}
+
+// The format's data is divided into three parts, which must occur in the following order:
+//
+// - A four-word header gives parameters for an optimized search of the segment list;
+// - Four parallel arrays describe the segments (one segment for each contiguous range of codes);
+// - A variable-length array of glyph IDs (unsigned words).
+//
+func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 	const headerSize = 14
 	if headerSize > b.Size() {
 		return nil, errFontFormat("cmap subtable bounds overflow")
 	}
-	//size, _ := b.u16(2)
+	size, _ := b.u16(2)
+	b = b[:size] // TODO this may crash
 	segCount, _ := b.u16(6)
 	if segCount&1 != 0 {
 		return nil, errFontFormat("cmap table format, illegal segment count")
@@ -193,106 +224,95 @@ func (cmap *CMapTable) makeCachedGlyphIndexFormat4(b fontBinSegm) (glyphIndexFun
 	if eLength > b.Size() {
 		return nil, errFontFormat("cmap internal structure")
 	}
-	segmentsData, err := b.view(headerSize, eLength)
-	if err != nil {
-		return nil, err
-	}
+	b = b[headerSize:]
+	endCodes := parseArray16(b[:segCount*2])
+	next := endCodes.Size() + 2 // 2 is a padding entry in the cmap table
+	startCodes := parseArray16(b[next : segCount*2])
+	next += startCodes.Size()
+	deltas := parseArray16(b[next : segCount*2])
+	next += deltas.Size()
+	offsets := parseArray16(b[next : segCount*2])
+	next += offsets.Size()
 	entries := make([]cmapEntry16, segCount)
 	for i := range entries {
 		entries[i] = cmapEntry16{
-			end:    u16(segmentsData[0*len(entries)+0+2*i:]),
-			start:  u16(segmentsData[2*len(entries)+2+2*i:]),
-			delta:  u16(segmentsData[4*len(entries)+2+2*i:]),
-			offset: u16(segmentsData[6*len(entries)+2+2*i:]),
+			end:    endCodes.UnsafeGet(i).U16(),
+			start:  startCodes.UnsafeGet(i).U16(),
+			delta:  deltas.UnsafeGet(i).U16(),
+			offset: offsets.UnsafeGet(i).U16(),
 		}
 	}
-	indexesBase := offset
-	indexesLength := cmap.Len() - offset
-
-	return segmentsData, func(otf *Font, r rune) (GlyphIndex, error) {
-		if uint32(r) > 0xffff {
-			return 0, nil
-		}
-
-		c := uint16(r)
-		for i, j := 0, len(entries); i < j; {
-			h := i + (j-i)/2
-			entry := &entries[h]
-			if c < entry.start {
-				j = h
-			} else if entry.end < c {
-				i = h + 1
-			} else if entry.offset == 0 {
-				return GlyphIndex(c + entry.delta), nil
-			} else {
-				offset := uint32(entry.offset) + 2*uint32(h-len(entries)+int(c-entry.start))
-				if offset > indexesLength || offset+2 > indexesLength {
-					return 0, errFontFormat("cmap bounds overflow")
-				}
-				x, err := cmap.data.view(int(indexesBase+offset), 2)
-				if err != nil {
-					return 0, err
-				}
-				return GlyphIndex(u16(x)), nil
-			}
-		}
-		return 0, nil
-	}, nil
-}
-
-func (cmap *CMapTable) makeCachedGlyphIndexFormat12(offset, _ uint32) ([]byte, glyphIndexFunc, error) {
-	const headerSize = 16
-	if offset+headerSize > cmap.Len() {
-		return nil, nil, errFontFormat("cmap bounds overflow")
-	}
-	buf, err := cmap.data.view(int(offset), headerSize)
-	if err != nil {
-		return nil, nil, err
-	}
-	length := u32(buf[4:])
-	if cmap.Len() < offset || length > cmap.Len()-offset {
-		return nil, nil, errFontFormat("cmap bounds overflow")
-	}
-	offset += headerSize
-	numGroups := u32(buf[12:])
-	if numGroups > maxCMapSegments {
-		return nil, nil, errFontFormat(fmt.Sprintf("more than %d cmap segments not supported", maxCMapSegments))
-	}
-	eLength := 12 * numGroups
-	if headerSize+eLength != length {
-		return nil, nil, errFontFormat("cmap table format")
-	}
-	buf, err = cmap.data.view(int(offset), int(eLength))
-	if err != nil {
-		return nil, nil, err
-	}
-	offset += eLength
-	entries := make([]cmapEntry32, numGroups)
-	for i := range entries {
-		entries[i] = cmapEntry32{
-			start: u32(buf[0+12*i:]),
-			end:   u32(buf[4+12*i:]),
-			delta: u32(buf[8+12*i:]),
-		}
-	}
-
-	return buf, func(otf *Font, r rune) (GlyphIndex, error) {
-		c := uint32(r)
-		for i, j := 0, len(entries); i < j; {
-			h := i + (j-i)/2
-			entry := &entries[h]
-			if c < entry.start {
-				j = h
-			} else if entry.end < c {
-				i = h + 1
-			} else {
-				return GlyphIndex(c - entry.start + entry.delta), nil
-			}
-		}
-		return 0, nil
+	glyphTable := parseArray16(b[next:])
+	return format4GlyphIndex{
+		segCnt:   int(segCount),
+		entries:  entries,
+		glyphIds: glyphTable,
 	}, nil
 }
 
 type cmapEntry32 struct {
 	start, end, delta uint32
+}
+
+// Each sequential map group record specifies a character range and the starting glyph ID
+// mapped from the first character. Glyph IDs for subsequent characters follow in sequence.
+type format12GlyphIndex struct {
+	grpCnt  int
+	entries []cmapEntry32
+}
+
+func (f12 format12GlyphIndex) Lookup(r rune) GlyphIndex {
+	c := uint32(r)
+	for i, j := 0, len(f12.entries); i < j; {
+		h := i + (j-i)/2 // do a binary search on f12.entries (which may get large)
+		entry := &f12.entries[h]
+		if c < entry.start {
+			j = h
+		} else if entry.end < c {
+			i = h + 1
+		} else {
+			return GlyphIndex(c - entry.start + entry.delta)
+		}
+	}
+	return 0
+}
+
+// This is the standard character-to-glyph-index mapping subtable for fonts supporting
+// Unicode character repertoires that include supplementary-plane characters (U+10000 to
+// U+10FFFF).
+//
+// Format 12 is similar to format 4 in that it defines segments for sparse representation.
+// It differs, however, in that it uses 32-bit character codes, and Glyph ID lookup
+// and calculation is a lot simpler.
+//
+func makeGlyphIndexFormat12(b fontBinSegm) (CMapGlyphIndex, error) {
+	const headerSize = 16
+	if headerSize > b.Size() {
+		return nil, errFontFormat("cmap subtable bounds overflow")
+	}
+	size, _ := b.u32(4)
+	grpCount, _ := b.u32(12)
+	eLength := 12 * int(grpCount)
+	if eLength > b.Size() || eLength+headerSize > int(size) {
+		return nil, errFontFormat("cmap internal structure")
+	}
+	b = b[headerSize:size]
+	// SequentialMapGroup Record:
+	// Type     Name            Description
+	// uint32   startCharCode   First character code in this group
+	// uint32   endCharCode     Last character code in this group
+	// uint32   startGlyphID    Glyph index corresponding to the starting character code
+	groups := parseArray(b, 12) // 12 is byte size of group-record
+	entries := make([]cmapEntry32, grpCount)
+	for i := range entries {
+		entries[i] = cmapEntry32{
+			start: groups.UnsafeGet(i).U32(),
+			end:   u32(groups.UnsafeGet(i).Bytes()[4:]),
+			delta: u32(groups.UnsafeGet(i).Bytes()[8:]),
+		}
+	}
+	return format12GlyphIndex{
+		grpCnt:  int(grpCount),
+		entries: entries,
+	}, nil
 }

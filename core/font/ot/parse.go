@@ -117,8 +117,8 @@ func parseBase(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	// The BASE table begins with offsets to Axis tables that describe layout data for
 	// the horizontal and vertical layout directions of text. A font can provide layout
 	// data for both text directions or for only one text direction.
-	xaxis, errx := parseLink16(b, 4)
-	yaxis, erry := parseLink16(b, 6)
+	xaxis, errx := parseLink16(b, 4, b)
+	yaxis, erry := parseLink16(b, 6, b)
 	if errx != nil || erry != nil {
 		return nil, errFontFormat("BASE table axis-tables")
 	}
@@ -139,10 +139,11 @@ func parseBaseAxis(base *BaseTable, hOrV int, link Link, err error) error {
 	}
 	base.axisTables[hOrV] = AxisTable{}
 	axisHeader := link.Jump()
+	axisbase := axisHeader.Bytes()
 	// The BaseTagList enumerates all baselines used to render the scripts in the
 	// text layout direction. If no baseline data is available for a text direction,
 	// the offset to the corresponding BaseTagList may be set to NULL.
-	if basetags, err := parseLink16(axisHeader.Bytes(), 0); err == nil {
+	if basetags, err := parseLink16(axisbase, 0, axisbase); err == nil {
 		b := basetags.Jump()
 		base.axisTables[hOrV].baselineTags = parseTagList(b.Bytes())
 		trace().Debugf("axis table %d has %d entries", hOrV,
@@ -152,7 +153,7 @@ func parseBaseAxis(base *BaseTable, hOrV int, link Link, err error) error {
 	// defined that identifies the script and references its layout data.
 	// BaseScriptRecords are stored in the baseScriptRecords array, ordered
 	// alphabetically by the baseScriptTag in each record.
-	if basescripts, err := parseLink16(axisHeader.Bytes(), 2); err == nil {
+	if basescripts, err := parseLink16(axisbase, 2, axisbase); err == nil {
 		b := basescripts.Jump()
 		base.axisTables[hOrV].baseScriptRecords = parseTagRecordMap16(b.Bytes(), 0, 2)
 
@@ -197,25 +198,42 @@ func parseBaseAxis(base *BaseTable, hOrV int, link Link, err error) error {
 //   3 (Win)      10   12  Unicode full
 //
 func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
-	n, _ := b.u16(2)
+	n, _ := b.u16(2) // number of sub-tables
+	trace().Debugf("font cmap has %d sub-tables in %d|%d bytes", n, len(b), size)
 	t := newCMapTable(tag, b, offset, size)
-	t.numTables = int(n)
 	const headerSize, entrySize = 4, 8
-	if size < headerSize+entrySize*uint32(t.numTables) {
+	if size < headerSize+entrySize*uint32(n) {
 		return nil, errFontFormat("size of cmap table")
 	}
 	var enc encodingRecord
-	for i := 0; i < t.numTables; i++ {
+	for i := 0; i < int(n); i++ {
 		rec, _ := b.view(headerSize+entrySize*i, entrySize)
 		pid, psid := u16(rec), u16(rec[2:])
 		width := platformEncodingWidth(pid, psid)
 		if width <= enc.width {
 			continue
 		}
-		enc.width = width
-		enc.offset = u32(rec[4:])
+		link, err := parseLink32(rec, 4, b) // link to subtable
+		if err != nil {
+			trace().Infof("cmap sub-table cannot be parsed")
+			continue
+		}
+		subtable := link.Jump()
+		format := subtable.U16()
+		trace().Debugf("cmap table contains subtable with format %d", format)
+		if supportedCmapFormat(format, pid, psid) {
+			enc.width = width
+			enc.offset = u32(rec[4:])
+		}
 	}
 	return t, nil
+}
+
+type encodingRecord struct {
+	platformId uint16
+	encodingId uint16
+	offset     uint32
+	width      int // encoding width in bytes
 }
 
 // --- Kern table ------------------------------------------------------------

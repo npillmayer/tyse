@@ -8,11 +8,10 @@ import (
 // Font represents the internal structure of an OpenType font.
 // It is used to navigate properties of a font for typesetting tasks.
 type Font struct {
-	f          *font.ScalableFont
-	ot         *sfnt.Font // TODO remove this
-	Header     *FontHeader
-	tables     map[Tag]Table
-	glyphIndex glyphIndexFunc
+	f      *font.ScalableFont
+	ot     *sfnt.Font // TODO remove this
+	Header *FontHeader
+	tables map[Tag]Table
 }
 
 // FontHeader is a directory of the top-level tables in a font. If the font file
@@ -76,9 +75,9 @@ type GlyphIndex uint16
 // codes that do not correspond to any glyph in the font should be mapped to
 // glyph index 0. The glyph at this location must be a special glyph
 // representing a missing character, commonly known as .notdef."
-func (otf *Font) GlyphIndex(codePoint rune) (GlyphIndex, error) {
-	return otf.glyphIndex(otf, codePoint)
-}
+// func (otf *Font) GlyphIndex(codePoint rune) (GlyphIndex, error) {
+// 	return otf.glyphIndex(otf, codePoint)
+// }
 
 // --- Layout tables (GSUB & GPOS) -------------------------------------------
 

@@ -28,6 +28,8 @@ type Location interface {
 	Size() int     // size in bytes
 	Bytes() []byte // return as a byte slice
 	Reader() io.Reader
+	U16() uint16
+	U32() uint32
 }
 
 // fontBinSegm is a segment of byte data.
@@ -45,6 +47,14 @@ func (b fontBinSegm) Bytes() []byte {
 
 func (b fontBinSegm) Reader() io.Reader {
 	return bytes.NewReader(b)
+}
+
+func (b fontBinSegm) U16() uint16 {
+	return u16(b)
+}
+
+func (b fontBinSegm) U32() uint32 {
+	return u32(b)
 }
 
 // view returns n bytes at the given offset.
@@ -240,7 +250,21 @@ type Link interface {
 	IsNull() bool
 }
 
-func parseLink16(b fontBinSegm, offset int) (Link, error) {
+func parseLink32(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
+	if len(b) < offset {
+		return link32{}, errBufferBounds
+	}
+	n, err := b.u32(offset)
+	if err != nil {
+		return link32{}, errBufferBounds
+	}
+	return link32{
+		base:   base,
+		offset: n,
+	}, nil
+}
+
+func parseLink16(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
 	if len(b) < offset {
 		return link16{}, errBufferBounds
 	}
@@ -249,7 +273,7 @@ func parseLink16(b fontBinSegm, offset int) (Link, error) {
 		return link16{}, errBufferBounds
 	}
 	return link16{
-		base:   b,
+		base:   base,
 		offset: n,
 	}, nil
 }
@@ -268,7 +292,7 @@ func (l16 link16) Base() Location {
 }
 
 func (l16 link16) Jump() Location {
-	if l16.offset <= uint16(len(l16.base)) {
+	if l16.offset > uint16(len(l16.base)) {
 		return fontBinSegm{}
 	}
 	return l16.base[l16.offset:]
@@ -283,19 +307,75 @@ func (l32 link32) IsNull() bool {
 	return len(l32.base) == 0
 }
 
-func (l32 link32) Base() []byte {
+func (l32 link32) Base() Location {
 	return l32.base
 }
 
 func (l32 link32) Jump() Location {
-	if l32.offset <= uint32(len(l32.base)) {
-		//	, errFontFormat("offset32 location out of table bounds")
+	if l32.offset > uint32(len(l32.base)) {
+		trace().Debugf("base has size %d", len(l32.base))
+		trace().Debugf("link to %d", l32.offset)
+		trace().Debugf("offset32 location out of table bounds")
 		return fontBinSegm{}
 	}
 	return l32.base[l32.offset:]
 }
 
-// ---------------------------------------------------------------------------
+// --- Arrays ----------------------------------------------------------------
+
+type array struct {
+	recordSize int
+	length     int
+	loc        fontBinSegm
+}
+
+func parseArrary32(b fontBinSegm) array {
+	if b.Size()&0x11 != 0 {
+		trace().Errorf("cannot create array32: size not aligned")
+		return array{}
+	}
+	n := b.Size() / 4
+	return array{
+		recordSize: 4,
+		length:     n,
+		loc:        b,
+	}
+}
+
+func parseArray16(b fontBinSegm) array {
+	if b.Size()&0x1 != 0 {
+		trace().Errorf("cannot create array16: size not aligned")
+		return array{}
+	}
+	n := b.Size() / 2
+	return array{
+		recordSize: 2,
+		length:     n,
+		loc:        b,
+	}
+}
+
+func parseArray(b fontBinSegm, recordSize int) array {
+	return array{
+		recordSize: recordSize,
+		length:     b.Size() / recordSize,
+		loc:        b,
+	}
+}
+
+func (a array) Size() int {
+	return a.length * a.recordSize
+}
+
+func (a array) UnsafeGet(i int) Location {
+	if i < 0 || (i+1)*a.recordSize > len(a.loc.Bytes()) {
+		i = 0
+	}
+	b, _ := a.loc.view(i*a.recordSize, a.recordSize)
+	return b
+}
+
+// --- Tag record map --------------------------------------------------------
 
 // A TagRecordMap is a dict-typ (map) to receive a data record (returned as a link)
 // from a given tag. This kind of map is used within OpenType fonts in several
