@@ -221,10 +221,6 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		subtable := link.Jump()
 		format := subtable.U16()
 		trace().Debugf("cmap table contains subtable with format %d", format)
-		// TODO For Test ONLY TODO REMOVE
-		if format == 12 {
-			format = 777
-		}
 		if supportedCmapFormat(format, pid, psid) {
 			enc.width = width
 			enc.format = format
