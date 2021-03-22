@@ -221,10 +221,24 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		subtable := link.Jump()
 		format := subtable.U16()
 		trace().Debugf("cmap table contains subtable with format %d", format)
+		// TODO For Test ONLY TODO REMOVE
+		if format == 12 {
+			format = 777
+		}
 		if supportedCmapFormat(format, pid, psid) {
 			enc.width = width
-			enc.offset = u32(rec[4:])
+			enc.format = format
+			enc.link = link
+			enc.size = int(u16(subtable.Bytes()[2:]))
+			trace().Debugf("cmap sub-table has size %d", enc.size)
 		}
+	}
+	if enc.width == 0 {
+		return nil, errFontFormat("no supported cmap format found")
+	}
+	var err error
+	if t.GlyphIndexMap, err = makeGlyphIndex(b, enc); err != nil {
+		return nil, err
 	}
 	return t, nil
 }
@@ -232,7 +246,9 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 type encodingRecord struct {
 	platformId uint16
 	encodingId uint16
-	offset     uint32
+	link       Link
+	format     uint16
+	size       int
 	width      int // encoding width in bytes
 }
 

@@ -248,6 +248,7 @@ type Link interface {
 	Base() Location
 	Jump() Location
 	IsNull() bool
+	//Offset() uint32
 }
 
 func parseLink32(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
@@ -258,6 +259,7 @@ func parseLink32(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
 	if err != nil {
 		return link32{}, errBufferBounds
 	}
+	//trace().Debugf("link has offset %d", n)
 	return link32{
 		base:   base,
 		offset: n,
@@ -291,6 +293,10 @@ func (l16 link16) Base() Location {
 	return l16.base
 }
 
+// func (l16 link16) Offset() uint32 {
+// 	return uint32(l16.offset)
+// }
+
 func (l16 link16) Jump() Location {
 	if l16.offset > uint16(len(l16.base)) {
 		return fontBinSegm{}
@@ -306,6 +312,10 @@ type link32 struct {
 func (l32 link32) IsNull() bool {
 	return len(l32.base) == 0
 }
+
+// func (l32 link32) Offset() uint32 {
+// 	return l32.offset
+// }
 
 func (l32 link32) Base() Location {
 	return l32.base

@@ -111,6 +111,7 @@ func platformEncodingWidth(pid, psid uint16) int {
 // https://github.com/fontforge/fontforge/issues/2728
 //
 func supportedCmapFormat(format, pid, psid uint16) bool {
+	trace().Debugf("checking supported cmap format (%d | %d | %d)", pid, psid, format)
 	return (pid == 0 && psid == 3 && format == 4) ||
 		(pid == 0 && psid == 4 && format == 12) ||
 		(pid == 3 && psid == 1 && format == 4) ||
@@ -118,12 +119,14 @@ func supportedCmapFormat(format, pid, psid uint16) bool {
 }
 
 // Dispatcher to create the correct implementation of a CMapGlyphIndex from a given format.
-func (cmap *CMapTable) makeGlyphIndex(b fontBinSegm, format uint16) (CMapGlyphIndex, error) {
-	switch format {
+func makeGlyphIndex(b fontBinSegm, which encodingRecord) (CMapGlyphIndex, error) {
+	subtable := which.link.Jump()
+	trace().Debugf("cmap sub-table has size %d>%d", len(subtable.Bytes()), which.size)
+	switch which.format {
 	case 4:
-		return makeGlyphIndexFormat4(b)
+		return makeGlyphIndexFormat4(subtable.Bytes()[:which.size])
 	case 12:
-		return makeGlyphIndexFormat12(b)
+		return makeGlyphIndexFormat12(subtable.Bytes()[:which.size])
 	}
 	panic("unreachable") // unsupported formats should have been weeded out beforehand
 }
@@ -214,24 +217,24 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 		return nil, errFontFormat("cmap subtable bounds overflow")
 	}
 	size, _ := b.u16(2)
-	b = b[:size] // TODO this may crash
 	segCount, _ := b.u16(6)
 	if segCount&1 != 0 {
+		trace().Debugf("cmap format 4 segment count is %d", segCount)
 		return nil, errFontFormat("cmap table format, illegal segment count")
 	}
 	segCount /= 2
 	eLength := 8*int(segCount) + 2
-	if eLength > b.Size() {
+	if eLength > b.Size() || headerSize+eLength > int(size) {
 		return nil, errFontFormat("cmap internal structure")
 	}
-	b = b[headerSize:]
+	b = b[headerSize:size]
 	endCodes := parseArray16(b[:segCount*2])
 	next := endCodes.Size() + 2 // 2 is a padding entry in the cmap table
-	startCodes := parseArray16(b[next : segCount*2])
+	startCodes := parseArray16(b[next : next+int(segCount)*2])
 	next += startCodes.Size()
-	deltas := parseArray16(b[next : segCount*2])
+	deltas := parseArray16(b[next : next+int(segCount)*2])
 	next += deltas.Size()
-	offsets := parseArray16(b[next : segCount*2])
+	offsets := parseArray16(b[next : next+int(segCount)*2])
 	next += offsets.Size()
 	entries := make([]cmapEntry16, segCount)
 	for i := range entries {
@@ -240,6 +243,9 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 			start:  startCodes.UnsafeGet(i).U16(),
 			delta:  deltas.UnsafeGet(i).U16(),
 			offset: offsets.UnsafeGet(i).U16(),
+		}
+		if entries[i].offset > 0 && entries[i].delta > 0 {
+			panic("Hurray! Font with cmap format 4, offset > 0 and delta > 0, detected!")
 		}
 	}
 	glyphTable := parseArray16(b[next:])
