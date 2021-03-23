@@ -226,13 +226,13 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 		return nil, errFontFormat("cmap internal structure")
 	}
 	b = b[headerSize:size]
-	endCodes := parseArray16(b[:segCount*2])
+	endCodes := viewArray16(b[:segCount*2])
 	next := endCodes.Size() + 2 // 2 is a padding entry in the cmap table
-	startCodes := parseArray16(b[next : next+int(segCount)*2])
+	startCodes := viewArray16(b[next : next+int(segCount)*2])
 	next += startCodes.Size()
-	deltas := parseArray16(b[next : next+int(segCount)*2])
+	deltas := viewArray16(b[next : next+int(segCount)*2])
 	next += deltas.Size()
-	offsets := parseArray16(b[next : next+int(segCount)*2])
+	offsets := viewArray16(b[next : next+int(segCount)*2])
 	next += offsets.Size()
 	entries := make([]cmapEntry16, segCount)
 	for i := range entries {
@@ -246,7 +246,7 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 			panic("Hurray! Font with cmap format 4, offset > 0 and delta > 0, detected!")
 		}
 	}
-	glyphTable := parseArray16(b[next:])
+	glyphTable := viewArray16(b[next:])
 	return format4GlyphIndex{
 		segCnt:   int(segCount),
 		entries:  entries,
@@ -306,7 +306,7 @@ func makeGlyphIndexFormat12(b fontBinSegm) (CMapGlyphIndex, error) {
 	// uint32   startCharCode   First character code in this group
 	// uint32   endCharCode     Last character code in this group
 	// uint32   startGlyphID    Glyph index corresponding to the starting character code
-	groups := parseArray(b, 12) // 12 is byte size of group-record
+	groups := viewArray(b, 12) // 12 is byte size of group-record
 	entries := make([]cmapEntry32, grpCount)
 	for i := range entries {
 		entries[i] = cmapEntry32{

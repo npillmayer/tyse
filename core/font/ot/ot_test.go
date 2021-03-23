@@ -67,20 +67,20 @@ func loadTestFont(t *testing.T, pattern string) *Font {
 	//var err error
 	otf := &Font{}
 	if pattern == "fallback" {
-		otf.f = font.FallbackFont()
+		otf.F = font.FallbackFont()
 	} else {
 		loader := resources.ResolveTypeCase(pattern, font.StyleNormal, font.WeightNormal, 10.0)
 		tyc, err := loader.TypeCase()
 		if err != nil {
 			t.Fatal(err)
 		}
-		otf.f = tyc.ScalableFontParent()
+		otf.F = tyc.ScalableFontParent()
 	}
 	// fontreader := bytes.NewReader(otf.f.Binary)
 	// otf.ot, err = sfnt.StrictParse(fontreader)
 	// if err != nil {
 	// 	t.Fatal(err)
 	// }
-	t.Logf("loaded font = %s", otf.f.Fontname)
+	t.Logf("loaded font = %s", otf.F.Fontname)
 	return otf
 }

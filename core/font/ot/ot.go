@@ -7,7 +7,7 @@ import (
 // Font represents the internal structure of an OpenType font.
 // It is used to navigate properties of a font for typesetting tasks.
 type Font struct {
-	f      *font.ScalableFont
+	F      *font.ScalableFont
 	Header *FontHeader
 	tables map[Tag]Table
 }

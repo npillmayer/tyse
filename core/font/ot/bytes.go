@@ -248,10 +248,11 @@ type Link interface {
 	Base() Location
 	Jump() Location
 	IsNull() bool
-	//Offset() uint32
+	Navigate() Navigator
+	Name() string
 }
 
-func parseLink32(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
+func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (Link, error) {
 	if len(b) < offset {
 		return link32{}, errBufferBounds
 	}
@@ -266,7 +267,7 @@ func parseLink32(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
 	}, nil
 }
 
-func parseLink16(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
+func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (Link, error) {
 	if len(b) < offset {
 		return link16{}, errBufferBounds
 	}
@@ -275,53 +276,90 @@ func parseLink16(b fontBinSegm, offset int, base fontBinSegm) (Link, error) {
 		return link16{}, errBufferBounds
 	}
 	return link16{
+		target: target,
 		base:   base,
 		offset: n,
 	}, nil
 }
 
+func makeLink16(b fontBinSegm, offset uint16, base fontBinSegm, target string) Link {
+	return link16{
+		target: target,
+		base:   base,
+		offset: offset,
+	}
+}
+
 type link16 struct {
+	err    error
+	target string
 	base   fontBinSegm
 	offset uint16
 }
 
 func (l16 link16) IsNull() bool {
+	if l16.err != nil {
+		return true
+	}
 	return len(l16.base) == 0
+}
+
+func (l16 link16) Name() string {
+	return l16.target
 }
 
 func (l16 link16) Base() Location {
 	return l16.base
 }
 
-// func (l16 link16) Offset() uint32 {
-// 	return uint32(l16.offset)
-// }
-
 func (l16 link16) Jump() Location {
+	trace().Debugf("jump to %s", l16.target)
+	if l16.err != nil {
+		return fontBinSegm{}
+	}
 	if l16.offset > uint16(len(l16.base)) {
+		trace().Debugf("base has size %d", len(l16.base))
+		trace().Debugf("link to %d", l16.offset)
+		trace().Debugf("offset16 location out of table bounds")
 		return fontBinSegm{}
 	}
 	return l16.base[l16.offset:]
 }
 
+func (l16 link16) Navigate() Navigator {
+	if l16.err != nil {
+		return null(l16.err)
+	}
+	return navFactory(l16.target, l16.Jump(), l16.base)
+}
+
 type link32 struct {
+	err    error
+	target string
 	base   fontBinSegm
 	offset uint32
 }
 
 func (l32 link32) IsNull() bool {
+	if l32.err != nil {
+		return true
+	}
 	return len(l32.base) == 0
 }
 
-// func (l32 link32) Offset() uint32 {
-// 	return l32.offset
-// }
+func (l32 link32) Name() string {
+	return l32.target
+}
 
 func (l32 link32) Base() Location {
 	return l32.base
 }
 
 func (l32 link32) Jump() Location {
+	trace().Debugf("jump to %s", l32.target)
+	if l32.err != nil {
+		return fontBinSegm{}
+	}
 	if l32.offset > uint32(len(l32.base)) {
 		trace().Debugf("base has size %d", len(l32.base))
 		trace().Debugf("link to %d", l32.offset)
@@ -329,6 +367,13 @@ func (l32 link32) Jump() Location {
 		return fontBinSegm{}
 	}
 	return l32.base[l32.offset:]
+}
+
+func (l32 link32) Navigate() Navigator {
+	if l32.err != nil {
+		return null(l32.err)
+	}
+	return nil
 }
 
 // --- Arrays ----------------------------------------------------------------
@@ -352,7 +397,7 @@ func parseArrary32(b fontBinSegm) array {
 	}
 }
 
-func parseArray16(b fontBinSegm) array {
+func viewArray16(b fontBinSegm) array {
 	if b.Size()&0x1 != 0 {
 		trace().Errorf("cannot create array16: size not aligned")
 		return array{}
@@ -365,7 +410,22 @@ func parseArray16(b fontBinSegm) array {
 	}
 }
 
-func parseArray(b fontBinSegm, recordSize int) array {
+func parseArray16(b fontBinSegm, offset int) (array, error) {
+	if len(b) < offset {
+		return array{}, errBufferBounds
+	}
+	n, err := b.u16(offset)
+	if err != nil {
+		return array{}, err
+	}
+	return array{
+		recordSize: 2,
+		length:     int(n),
+		loc:        b[offset+2:],
+	}, nil
+}
+
+func viewArray(b fontBinSegm, recordSize int) array {
 	return array{
 		recordSize: recordSize,
 		length:     b.Size() / recordSize,
@@ -392,28 +452,80 @@ func (a array) UnsafeGet(i int) Location {
 // instances, e.g.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
 type TagRecordMap interface {
-	Lookup(Tag) Link
+	Name() string    // OpenType specification name of this map
+	Lookup(Tag) Link // returns the link associated with a given tag
+	Tags() []Tag     // returns all the tags which the map uses as keys
+	Count() int      //
 }
 
-func parseTagRecordMap16(b fontBinSegm, offset, recsize int) TagRecordMap {
-	size, err := b.u16(offset)
+// recsize is the byte size of the record entry not including the Tag.
+func parseTagRecordMap16(b fontBinSegm, offset int, base fontBinSegm, name, target string) TagRecordMap {
+	N, err := b.u16(offset)
 	if err != nil {
 		return tagRecordMap16{}
 	}
-	m := tagRecordMap16{base: b[offset+2 : offset+2+int(size)], recordSize: recsize}
+	trace().Debugf("view on tag record map with %d entries", N)
+	// we add 4 (byte length of a Tag) transparently, having 4+2 record size
+	m := tagRecordMap16{
+		name:   name,
+		target: target,
+		base:   base,
+	}
+	arrBase := b[offset+2 : offset+2+int(N)*(4+2)]
+	m.records = viewArray(arrBase, 4+2)
 	return m
 }
 
 type tagRecordMap16 struct {
-	base       fontBinSegm
-	recordSize int
+	name    string
+	target  string
+	base    fontBinSegm
+	records array
 }
 
+// Lookup returns the link associated with a given tag.
+//
+// TODO binary search with |N| > ?
 func (m tagRecordMap16) Lookup(tag Tag) Link {
-	if m.recordSize <= 0 {
+	if len(m.base) == 0 {
+		trace().Debugf("tag record map has null-base")
 		return link16{}
 	}
-	// TODO
-	panic("TagRecordMap.Lookup() not yet implemented")
-	//return nil
+	trace().Debugf("tag record map has %d entries", m.records.length)
+	for i := 0; i < m.records.length; i++ {
+		b := m.records.UnsafeGet(i)
+		rtag := MakeTag(b.Bytes()[:4])
+		trace().Debugf("testing for tag = %s", rtag)
+		if tag == rtag {
+			trace().Debugf("tag record lookup found tag (%s)", rtag)
+			link, err := parseLink16(b.Bytes(), 4, m.base, m.target)
+			if err != nil {
+				return link16{}
+			}
+			trace().Debugf("    record links %s from %d", m.target, link.Base().U16())
+			return link
+		}
+	}
+	return link16{}
+}
+
+// Tags returns all the tags which the map uses as keys.
+func (m tagRecordMap16) Tags() []Tag {
+	trace().Debugf("tag record map has %d entries", m.records.length)
+	tags := make([]Tag, 0, 3)
+	for i := 0; i < m.records.length; i++ {
+		b := m.records.UnsafeGet(i)
+		tag := MakeTag(b.Bytes()[:4])
+		trace().Debugf("  Tag = (%s)", tag)
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+func (m tagRecordMap16) Name() string {
+	return m.name
+}
+
+func (m tagRecordMap16) Count() int {
+	return m.records.length
 }

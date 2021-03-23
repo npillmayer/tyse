@@ -117,8 +117,8 @@ func parseBase(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	// The BASE table begins with offsets to Axis tables that describe layout data for
 	// the horizontal and vertical layout directions of text. A font can provide layout
 	// data for both text directions or for only one text direction.
-	xaxis, errx := parseLink16(b, 4, b)
-	yaxis, erry := parseLink16(b, 6, b)
+	xaxis, errx := parseLink16(b, 4, b, "Axis")
+	yaxis, erry := parseLink16(b, 6, b, "Axis")
 	if errx != nil || erry != nil {
 		return nil, errFontFormat("BASE table axis-tables")
 	}
@@ -133,17 +133,21 @@ func parseBase(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 // An Axis table consists of offsets, measured from the beginning of the Axis table,
 // to a BaseTagList and a BaseScriptList.
+// link may be NULL.
 func parseBaseAxis(base *BaseTable, hOrV int, link Link, err error) error {
 	if err != nil {
 		return err
 	}
 	base.axisTables[hOrV] = AxisTable{}
+	if link.IsNull() {
+		return nil
+	}
 	axisHeader := link.Jump()
 	axisbase := axisHeader.Bytes()
 	// The BaseTagList enumerates all baselines used to render the scripts in the
 	// text layout direction. If no baseline data is available for a text direction,
 	// the offset to the corresponding BaseTagList may be set to NULL.
-	if basetags, err := parseLink16(axisbase, 0, axisbase); err == nil {
+	if basetags, err := parseLink16(axisbase, 0, axisbase, "BaseTagList"); err == nil {
 		b := basetags.Jump()
 		base.axisTables[hOrV].baselineTags = parseTagList(b.Bytes())
 		trace().Debugf("axis table %d has %d entries", hOrV,
@@ -153,9 +157,10 @@ func parseBaseAxis(base *BaseTable, hOrV int, link Link, err error) error {
 	// defined that identifies the script and references its layout data.
 	// BaseScriptRecords are stored in the baseScriptRecords array, ordered
 	// alphabetically by the baseScriptTag in each record.
-	if basescripts, err := parseLink16(axisbase, 2, axisbase); err == nil {
+	if basescripts, err := parseLink16(axisbase, 2, axisbase, "BaseScriptList"); err == nil {
 		b := basescripts.Jump()
-		base.axisTables[hOrV].baseScriptRecords = parseTagRecordMap16(b.Bytes(), 0, 2)
+		base.axisTables[hOrV].baseScriptRecords = parseTagRecordMap16(b.Bytes(),
+			0, b.Bytes(), "BaseScriptList", "BaseScript")
 
 		trace().Debugf("axis table %d has %d entries", hOrV,
 			base.axisTables[hOrV].baselineTags.Count)
@@ -213,7 +218,7 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		if width <= enc.width {
 			continue
 		}
-		link, err := parseLink32(rec, 4, b) // link to subtable
+		link, err := parseLink32(rec, 4, b, "Subtable") // link to subtable
 		if err != nil {
 			trace().Infof("cmap sub-table cannot be parsed")
 			continue
@@ -307,7 +312,7 @@ func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		// Testable with the Calibri font.
 		sz := kerncnt * 6 // kern pair is of size 6
 		if sz != h.length {
-			trace().Infof("kern sub-table size should be %d, but given as %d; fixing",
+			trace().Infof("kern sub-table size should be 0x%x, but given as 0x%x; fixing",
 				sz, h.length)
 		}
 		if uint32(suboffset)+sz >= size {
@@ -705,18 +710,48 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
-	floffset := lytt.header.OffsetFor(LayoutFeatureSection)
-	if floffset >= len(b) {
-		return io.ErrUnexpectedEOF
-	}
-	flist, n, err := lytt.data.varLenView(floffset, 2, 0, 6)
-	r := bytes.NewReader(flist[2:])
-	frecords := make([]featureRecord, n, n)
-	if err := binary.Read(r, binary.BigEndian, &frecords); err != nil {
-		return fmt.Errorf("reading feature records: %s", err)
-	}
-	lytt.features = frecords
+	// floffset := lytt.header.OffsetFor(LayoutFeatureSection)
+	// if floffset >= len(b) {
+	// 	return io.ErrUnexpectedEOF
+	// }
+	// flist, n, err := lytt.data.varLenView(floffset, 2, 0, 6)
+	// r := bytes.NewReader(flist[2:])
+	// frecords := make([]featureRecord, n, n)
+	// if err := binary.Read(r, binary.BigEndian, &frecords); err != nil {
+	// 	return fmt.Errorf("reading feature records: %s", err)
+	// }
+	// lytt.features = frecords
+	// return nil
+	lytt.Features = tagRecordMap16{}
+	link := link16{base: b, offset: uint16(lytt.header.OffsetFor(LayoutFeatureSection))}
+	features := link.Jump() // now we stand at the FeatureList table
+	featureRecords := parseTagRecordMap16(features.Bytes(), 0, features.Bytes(), "FeatureList", "Feature")
+	lytt.Features = featureRecords
 	return nil
+}
+
+// b+offset has to be positioned at the start of the feature index list block, e.g.,
+// the second uint16 of a LangSys table:
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#language-system-table
+//
+// uint16  requiredFeatureIndex               Index of a feature required for this language system
+// uint16  featureIndexCount                  Number of feature index values for this language system
+// uint16  featureIndices[featureIndexCount]  Array of indices into the FeatureList, in arbitrary order
+//
+func parseLangSys(b fontBinSegm, offset int, target string) (langSys, error) {
+	lsys := langSys{}
+	if len(b) < offset+4 {
+		return lsys, errBufferBounds
+	}
+	trace().Debugf("parsing LangSys (%s)", target)
+	b = b[offset:]
+	lsys.mandatory, _ = b.u16(0)
+	features, err := parseArray16(b, 2)
+	if err != nil {
+		return lsys, err
+	}
+	lsys.featureIndices = features
+	return lsys, nil
 }
 
 // --- Script list -----------------------------------------------------------
@@ -727,21 +762,15 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 // does not need a ScriptRecord). Each ScriptRecord consists of a ScriptTag that identifies
 // a script, and an offset to a Script table. The ScriptRecord array is stored in
 // alphabetic order of the script tags.
-func parseScriptList(lytt *LayoutTable, b []byte, err error) error {
+func parseScriptList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	sloffset := lytt.header.OffsetFor(LayoutScriptSection)
-	if sloffset >= len(b) {
-		return io.ErrUnexpectedEOF
-	}
-	slist, n, err := lytt.data.varLenView(sloffset, 2, 0, 6)
-	r := bytes.NewReader(slist[2:])
-	srecords := make([]scriptRecord, n, n)
-	if err := binary.Read(r, binary.BigEndian, &srecords); err != nil {
-		return fmt.Errorf("reading script records: %s", err)
-	}
-	lytt.scripts = srecords
+	lytt.Scripts = tagRecordMap16{}
+	link := link16{base: b, offset: uint16(lytt.header.OffsetFor(LayoutScriptSection))}
+	scripts := link.Jump() // now we stand at the ScriptList table
+	scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
+	lytt.Scripts = scriptRecords
 	return nil
 }
 

@@ -16,10 +16,10 @@ These tables use some of the same data formats.
 // structure. They are called "layout tables".
 type LayoutTable struct {
 	TableBase
-	header   *LayoutHeader
-	scripts  []scriptRecord
-	features []featureRecord
+	Scripts  TagRecordMap
+	Features TagRecordMap
 	lookups  []*lookupRecord
+	header   *LayoutHeader
 }
 
 // Header returns the layout table header for this GSUB table.
@@ -283,6 +283,50 @@ type ClassDefinitions struct {
 func (cdef *ClassDefinitions) calcSize(numEntries int) uint32 {
 	return 0
 }
+
+// --- LangSys table ---------------------------------------------------------
+
+type langSys struct {
+	err            error
+	mandatory      uint16 // 0xffff if unused
+	featureIndices array  // list of uint16 indices
+}
+
+func (lsys langSys) Link() Link {
+	return nullLink("LangSys records not linkable")
+}
+
+func (lsys langSys) Map() TagRecordMap {
+	return tagRecordMap16{}
+}
+
+// entry 0 will be the mandatory feature
+func (lsys langSys) List() []uint16 {
+	r := make([]uint16, lsys.featureIndices.length+1)
+	r[0] = lsys.mandatory
+	for i := 0; i < lsys.featureIndices.length; i++ {
+		if i < 0 || (i+1)*lsys.featureIndices.recordSize > len(lsys.featureIndices.loc.Bytes()) {
+			i = 0
+		}
+		b, _ := lsys.featureIndices.loc.view(i*lsys.featureIndices.recordSize, lsys.featureIndices.recordSize)
+		r[i+1] = u16(b)
+	}
+	return r
+}
+
+func (lsys langSys) IsVoid() bool {
+	return lsys.featureIndices.length == 0
+}
+
+func (lsys langSys) Error() error {
+	return lsys.err
+}
+
+func (lsys langSys) Name() string {
+	return "LangSys"
+}
+
+var _ Navigator = langSys{}
 
 // --- Attachment point list -------------------------------------------------
 
