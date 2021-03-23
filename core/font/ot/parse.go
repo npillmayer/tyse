@@ -224,7 +224,7 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 			continue
 		}
 		subtable := link.Jump()
-		format := subtable.U16()
+		format := subtable.U16(0)
 		trace().Debugf("cmap table contains subtable with format %d", format)
 		if supportedCmapFormat(format, pid, psid) {
 			enc.width = width
@@ -810,6 +810,25 @@ func parseCoverage(b fontBinSegm) GlyphRange {
 		return nil
 	}
 	return buildGlyphRangeFromCoverage(h, b)
+}
+
+// --- Names -----------------------------------------------------------------
+
+func parseNames(b fontBinSegm) (Names, error) {
+	if len(b) < 6 {
+		return Names{}, errFontFormat("name section corrupt")
+	}
+	N, _ := b.u16(2)
+	names := Names{}
+	strOffset, _ := b.u16(4)
+	names.strbuf = b[strOffset:]
+	trace().Debugf("name table has %d strings, starting at %d", N, strOffset)
+	if len(b) < 6+12*int(N) {
+		return Names{}, errFontFormat("name section corrupt")
+	}
+	recs := b[6 : 6+12*int(N)]
+	names.nameRecs = viewArray(recs, 12)
+	return names, nil
 }
 
 // ---------------------------------------------------------------------------

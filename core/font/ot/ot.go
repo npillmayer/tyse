@@ -78,65 +78,6 @@ type GlyphIndex uint16
 // 	return otf.glyphIndex(otf, codePoint)
 // }
 
-// --- Layout tables (GSUB & GPOS) -------------------------------------------
-
-// LayoutTableSectionName lists the sections of OT layout tables, i.e. GPOS and GSUB.
-type LayoutTableSectionName int
-
-const (
-	LayoutScriptSection LayoutTableSectionName = iota
-	LayoutFeatureSection
-	// Lookup records:
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
-	LayoutLookupSection
-	LayoutFeatureVariationsSection
-)
-
-// LayoutTableLookupFlag is a flag type for layout tables (GPOS and GSUB).
-type LayoutTableLookupFlag uint16
-
-// Lookup flags of layout tables (GPOS and GSUB)
-const ( // LookupFlag bit enumeration
-	// Note that the RIGHT_TO_LEFT flag is used only for GPOS type 3 lookups and is ignored
-	// otherwise. It is not used by client software in determining text direction.
-	LOOKUP_FLAG_RIGHT_TO_LEFT             LayoutTableLookupFlag = 0x0001
-	LOOKUP_FLAG_IGNORE_BASE_GLYPHS        LayoutTableLookupFlag = 0x0002 // If set, skips over base glyphs
-	LOOKUP_FLAG_IGNORE_LIGATURES          LayoutTableLookupFlag = 0x0004 // If set, skips over ligatures
-	LOOKUP_FLAG_IGNORE_MARKS              LayoutTableLookupFlag = 0x0008 // If set, skips over all combining marks
-	LOOKUP_FLAG_USE_MARK_FILTERING_SET    LayoutTableLookupFlag = 0x0010 // If set, indicates that the lookup table structure is followed by a MarkFilteringSet field.
-	LOOKUP_FLAG_reserved                  LayoutTableLookupFlag = 0x00E0 // For future use (Set to zero)
-	LOOKUP_FLAG_MARK_ATTACHMENT_TYPE_MASK LayoutTableLookupFlag = 0xFF00 // If not zero, skips over all marks of attachment type different from specified.
-)
-
-// LayoutTableLookupType is a type identifier for layout lookup records (GPOS and GSUB).
-// Enum values are different for GPOS and GSUB.
-type LayoutTableLookupType uint16
-
-// Layout table script record
-type scriptRecord struct {
-	Tag    Tag
-	Offset uint16
-}
-
-// Layout table feature record
-type featureRecord struct {
-	Tag    Tag
-	Offset uint16
-}
-
-// Layout table lookup list
-type lookupRecord struct {
-	lookupRecordInfo
-	subrecordOffsets []uint16 // Array of offsets to lookup subrecords, from beginning of Lookup table
-	// markFilteringSet uint16 // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
-}
-
-type lookupRecordInfo struct {
-	Type           LayoutTableLookupType
-	Flag           LayoutTableLookupFlag
-	SubRecordCount uint16 // Number of subrecords for this lookup
-}
-
 // --- Tag -------------------------------------------------------------------
 
 // Tag is defined by the spec as:
@@ -260,6 +201,11 @@ func (tb *TableBase) String() string {
 
 func (tb *TableBase) bytes() fontBinSegm {
 	return tb.data
+}
+
+func (tb *TableBase) Fields() Navigator {
+	tableTag := tb.name.String()
+	return navFactory(tableTag, tb.data, tb.data)
 }
 
 // AsGPos returns this table as a GPOS table, or nil.
@@ -564,4 +510,34 @@ func (t *HMtxTable) hMetrics(g GlyphIndex) (uint16, int16) {
 
 func (t *HMtxTable) Base() *TableBase {
 	return &t.TableBase
+}
+
+type Names struct {
+	navBase
+	strbuf   fontBinSegm
+	nameRecs array
+}
+
+func (n Names) Name() string {
+	return "name" // name of 'name' OT table
+}
+
+func (n Names) Map() TagRecordMap {
+	namesMap := make(map[Tag]link16)
+	for i := 0; i < n.nameRecs.length; i++ {
+		nameRecord := n.nameRecs.UnsafeGet(i)
+		pltf := nameRecord.U16(0)
+		//enc := nameRecord.U16(2)
+		id := nameRecord.U16(6)
+		strlen := nameRecord.U16(8)
+		offset := nameRecord.U16(10)
+		str := n.strbuf[offset : offset+strlen]
+		// u := binary.BigEndian.Uint16(numBytes)
+		//trace().Debugf("utf16 string = '%v'", utf16.Decode(str16))
+		link := makeLink16(0, str, "NameRecord")
+		tag := MakeTag([]byte{0, byte(pltf), 0, byte(id)})
+		//trace().Debugf("copying names[0x%x] = %d", tag, nameRecord)
+		namesMap[tag] = link.(link16)
+	}
+	return mapWrapper{m: namesMap, names: n, name: n.Name()}
 }

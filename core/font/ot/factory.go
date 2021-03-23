@@ -30,9 +30,50 @@ func navFactory(obj string, loc Location, base fontBinSegm) Navigator {
 			trace().Errorf(err.Error()) // TODO carry in navigator chain
 		}
 		return lsys
+	case "name":
+		names, err := parseNames(loc.Bytes())
+		if err != nil {
+			return null(err)
+		}
+		return names
+	case "NameRecord":
+		if len(loc.Bytes()) != 14 {
+			panic("should be 14 = Calibri")
+		}
 	}
 	trace().Debugf("no navigator found -> null navigator")
-	return null(errDanglingLink("obj"))
+	return null(errDanglingLink(obj))
+}
+
+type navBase struct {
+	err error
+}
+
+func (nbase navBase) Link() Link {
+	return nullLink("generic link class")
+}
+
+func (nbase navBase) Map() TagRecordMap {
+	return tagRecordMap16{}
+}
+
+func (nbase navBase) List() []uint16 {
+	return nullList
+}
+
+func (nbase navBase) IsVoid() bool {
+	return true
+}
+
+func (nbase navBase) Name() string {
+	if nbase.err != nil {
+		return nbase.err.Error()
+	}
+	return "base nav: should not be visible"
+}
+
+func (nbase navBase) Error() error {
+	return nbase.err
 }
 
 type linkAndMap struct {
@@ -65,8 +106,8 @@ func (lm linkAndMap) Error() error {
 	return lm.err
 }
 
-func null(err error) linkAndMap {
-	return linkAndMap{err: err}
+func null(err error) Navigator {
+	return navBase{err: err}
 }
 
 func nullLink(errmsg string) Link {

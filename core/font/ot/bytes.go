@@ -3,6 +3,7 @@ package ot
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -28,8 +29,8 @@ type Location interface {
 	Size() int     // size in bytes
 	Bytes() []byte // return as a byte slice
 	Reader() io.Reader
-	U16() uint16
-	U32() uint32
+	U16(int) uint16
+	U32(int) uint32
 }
 
 // fontBinSegm is a segment of byte data.
@@ -49,12 +50,20 @@ func (b fontBinSegm) Reader() io.Reader {
 	return bytes.NewReader(b)
 }
 
-func (b fontBinSegm) U16() uint16 {
-	return u16(b)
+func (b fontBinSegm) U16(i int) uint16 {
+	n, err := b.u16(i)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
-func (b fontBinSegm) U32() uint32 {
-	return u32(b)
+func (b fontBinSegm) U32(i int) uint32 {
+	n, err := b.u32(i)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // view returns n bytes at the given offset.
@@ -282,7 +291,8 @@ func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (Li
 	}, nil
 }
 
-func makeLink16(b fontBinSegm, offset uint16, base fontBinSegm, target string) Link {
+//func makeLink16(b fontBinSegm, offset uint16, base fontBinSegm, target string) Link {
+func makeLink16(offset uint16, base fontBinSegm, target string) Link {
 	return link16{
 		target: target,
 		base:   base,
@@ -426,9 +436,11 @@ func parseArray16(b fontBinSegm, offset int) (array, error) {
 }
 
 func viewArray(b fontBinSegm, recordSize int) array {
+	N := b.Size() / recordSize
+	trace().Debugf("view array[%d](%d)", N, recordSize)
 	return array{
 		recordSize: recordSize,
-		length:     b.Size() / recordSize,
+		length:     N,
 		loc:        b,
 	}
 }
@@ -447,7 +459,7 @@ func (a array) UnsafeGet(i int) Location {
 
 // --- Tag record map --------------------------------------------------------
 
-// A TagRecordMap is a dict-typ (map) to receive a data record (returned as a link)
+// A TagRecordMap is a dict-type (map) to receive a data record (returned as a link)
 // from a given tag. This kind of map is used within OpenType fonts in several
 // instances, e.g.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
@@ -502,7 +514,7 @@ func (m tagRecordMap16) Lookup(tag Tag) Link {
 			if err != nil {
 				return link16{}
 			}
-			trace().Debugf("    record links %s from %d", m.target, link.Base().U16())
+			trace().Debugf("    record links %s from %d", m.target, link.Base().U16(0))
 			return link
 		}
 	}
@@ -528,4 +540,34 @@ func (m tagRecordMap16) Name() string {
 
 func (m tagRecordMap16) Count() int {
 	return m.records.length
+}
+
+type mapWrapper struct {
+	names Names
+	m     map[Tag]link16
+	name  string
+}
+
+func (mw mapWrapper) Name() string {
+	return mw.name
+}
+
+func (mw mapWrapper) Count() int {
+	return len(mw.m)
+}
+
+func (mw mapWrapper) Lookup(tag Tag) Link {
+	if link, ok := mw.m[tag]; ok {
+		trace().Debugf("NameRecord link for %x = %v", tag, link)
+		return link
+	}
+	return nullLink(fmt.Sprintf("name for key %d", tag))
+}
+
+func (mw mapWrapper) Tags() []Tag {
+	tags := make([]Tag, 0, mw.names.nameRecs.length)
+	for k := range mw.m {
+		tags = append(tags, k)
+	}
+	return tags
 }

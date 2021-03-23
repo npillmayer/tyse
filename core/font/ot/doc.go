@@ -1,40 +1,44 @@
 /*
 Package ot provides access to OpenType font tables and features.
-The intended audience for this package are:
+Intended audience for this package are:
 
 ▪︎ text shapers, such as HarfBuzz (https://harfbuzz.github.io/what-does-harfbuzz-do.html)
 
 ▪︎ glyph rasterizers, such as FreeType (https://github.com/golang/freetype)
 
 ▪︎ any application needing to have the internal structure of an OpenType font file available,
-and possibly extending the methods of this module by handling additional font tables
+and possibly extending the methods of package `ot` by handling additional font tables
 
-OpenType fonts contain a whole lot of different tables and sub-tables. This package
-strives to make the semantics of the tables accessible, thus has a lot of different
-types for the different kinds of OT tables. This makes ot a shallow API,
-but it will nevertheless abstract away some implementation details of fonts:
-
-▪︎ Format versions: many OT tables may occur in a variety of formats. Tables in ot will
-hide the concrete format and structure of underlying OT tables.
-
-▪︎ Word size: offsets in OT may either be 2-byte or 4-byte values. Package ot will
-hide this detail.
-
-▪︎ Bugs in fonts: many fonts in the wild contain entries that—strictly speaking—infringe
-upon the OT specification (e.g., Calibri has an overflow in a 'kern' table variable),
-but an application using it should not fail because of recoverable errors.
-Package ot will try to circumvent known bugs in common fonts.
-
-Package ot will not provide functions to interpret any table of a font, but rather
+Package `ot` will not provide functions to interpret any table of a font, but rather
 just expose the tables to the client. For example, it is not possible to ask
-package ot for a kerning distance between two glyphs. Clients have to check
+package `ot` for a kerning distance between two glyphs. Clients have to check
 for the availability of kerning information and consult the appropriate table(s)
-themselves. From this point of view, ot is a low-level package.
+themselves. From this point of view, `ot` is a low-level package.
 Functions for getting kerning values and other layout directives from a font
 are homed in a sister package.
 
-This package is *not* intended for font manipulation applications. You may check out
+Likewise, this package is not intended for font manipulation applications. You may check out
 https://pkg.go.dev/github.com/ConradIrwin/font for this.
+
+OpenType fonts contain a whole lot of different tables and sub-tables. This package
+strives to make the semantics of the tables accessible, thus has a lot of different
+types for the different kinds of OT tables. This makes `ot` a shallow API,
+but it will nevertheless abstract away some implementation details of fonts:
+
+▪︎ Format versions: many OT tables may occur in a variety of formats. Tables in `ot` will
+hide the concrete format and structure of underlying OT tables.
+
+▪︎ Word size: offsets in OT may either be 2-byte or 4-byte values. Package `ot` will
+hide this detail (see section below).
+
+▪︎ Bugs in fonts: many fonts in the wild contain entries that—strictly speaking—infringe
+upon the OT specification (for example, Calibri has an overflow in a 'kern' table variable),
+but an application using it should not fail because of recoverable errors.
+Package `ot` will try to circumvent known bugs in common fonts.
+
+Schrödinger's Cat
+
+TODO
 
 Status
 

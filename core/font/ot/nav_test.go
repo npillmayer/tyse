@@ -30,6 +30,26 @@ func TestLink(t *testing.T) {
 	}
 }
 
+func TestTableNav(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := loadCalibri(t)
+	table := otf.Table(T("name"))
+	if table == nil {
+		t.Fatal("cannot locate table name in font")
+	}
+	name := table.Base().Fields().Name()
+	if name != "name" {
+		t.Errorf("expected table have name 'name', have %s", name)
+	}
+	key := MakeTag([]byte{0, 0, 0, 1})
+	x := table.Base().Fields().Map().Lookup(key).Navigate().Name()
+	t.Logf("x = %v", x)
+	t.Fail()
+}
+
 // ---------------------------------------------------------------------------
 
 func loadCalibri(t *testing.T) *Font {
