@@ -1,7 +1,10 @@
 package ot
 
 import (
+	"fmt"
+
 	"github.com/npillmayer/tyse/core/font"
+	"golang.org/x/text/encoding/unicode"
 )
 
 // Font represents the internal structure of an OpenType font.
@@ -527,17 +530,30 @@ func (n Names) Map() TagRecordMap {
 	for i := 0; i < n.nameRecs.length; i++ {
 		nameRecord := n.nameRecs.UnsafeGet(i)
 		pltf := nameRecord.U16(0)
-		//enc := nameRecord.U16(2)
+		enc := nameRecord.U16(2)
+		if !((pltf == 0 && enc == 3) || (pltf == 3 && enc == 1)) {
+			//trace().Debugf("unsupported platform/encoding combination for name-table")
+			continue
+		}
 		id := nameRecord.U16(6)
 		strlen := nameRecord.U16(8)
 		offset := nameRecord.U16(10)
 		str := n.strbuf[offset : offset+strlen]
-		// u := binary.BigEndian.Uint16(numBytes)
-		//trace().Debugf("utf16 string = '%v'", utf16.Decode(str16))
+		//trace().Debugf("utf16 string = '%v'", decodeUtf16(str))
 		link := makeLink16(0, str, "NameRecord")
-		tag := MakeTag([]byte{0, byte(pltf), 0, byte(id)})
+		tag := MakeTag([]byte{byte(pltf), byte(enc), 0, byte(id)})
 		//trace().Debugf("copying names[0x%x] = %d", tag, nameRecord)
 		namesMap[tag] = link.(link16)
 	}
 	return mapWrapper{m: namesMap, names: n, name: n.Name()}
+}
+
+func decodeUtf16(str []byte) (string, error) {
+	enc := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM)
+	decoder := enc.NewDecoder()
+	s, err := decoder.Bytes(str)
+	if err != nil {
+		return "", fmt.Errorf("decoding UTF-16 error: %v", err)
+	}
+	return string(s), nil
 }

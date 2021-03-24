@@ -561,7 +561,7 @@ func (mw mapWrapper) Lookup(tag Tag) Link {
 		trace().Debugf("NameRecord link for %x = %v", tag, link)
 		return link
 	}
-	return nullLink(fmt.Sprintf("name for key %d", tag))
+	return nullLink(fmt.Sprintf("no name for key %d", tag))
 }
 
 func (mw mapWrapper) Tags() []Tag {

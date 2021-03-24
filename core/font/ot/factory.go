@@ -37,9 +37,11 @@ func navFactory(obj string, loc Location, base fontBinSegm) Navigator {
 		}
 		return names
 	case "NameRecord":
-		if len(loc.Bytes()) != 14 {
-			panic("should be 14 = Calibri")
+		name, err := decodeUtf16(loc.Bytes())
+		if err != nil {
+			return null(err)
 		}
+		return navName{name: name}
 	}
 	trace().Debugf("no navigator found -> null navigator")
 	return null(errDanglingLink(obj))
@@ -120,3 +122,12 @@ func errDanglingLink(obj string) error {
 
 var nullNav = linkAndMap{}
 var nullList = []uint16{}
+
+type navName struct {
+	navBase
+	name string
+}
+
+func (nm navName) Name() string {
+	return nm.name
+}

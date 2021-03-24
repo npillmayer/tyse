@@ -42,12 +42,13 @@ func TestTableNav(t *testing.T) {
 	}
 	name := table.Base().Fields().Name()
 	if name != "name" {
-		t.Errorf("expected table have name 'name', have %s", name)
+		t.Errorf("expected table to have name 'name', have %s", name)
 	}
-	key := MakeTag([]byte{0, 0, 0, 1})
+	key := MakeTag([]byte{3, 1, 0, 1}) // Windows 1-encoded field 1 = Font Family Name
 	x := table.Base().Fields().Map().Lookup(key).Navigate().Name()
-	t.Logf("x = %v", x)
-	t.Fail()
+	if x != "Calibri" {
+		t.Errorf("expected Windows/1 encoded field 1 to be 'Calibri', is %s", x)
+	}
 }
 
 // ---------------------------------------------------------------------------
