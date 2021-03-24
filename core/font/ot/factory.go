@@ -6,7 +6,7 @@ type Navigator interface {
 	Name() string
 	Link() Link
 	Map() TagRecordMap
-	List() []uint16
+	List() List
 	IsVoid() bool
 	Error() error
 }
@@ -43,8 +43,18 @@ func navFactory(obj string, loc Location, base fontBinSegm) Navigator {
 		}
 		return navName{name: name}
 	}
+	if fields, ok := tableFields[obj]; ok {
+		trace().Debugf("object %s has fields %v", obj, fields)
+		f := otFields{pattern: fields, b: base}
+		trace().Debugf("b[0..10] = %v", base[:10])
+		return list{navName: navName{name: obj}, f: f}
+	}
 	trace().Debugf("no navigator found -> null navigator")
 	return null(errDanglingLink(obj))
+}
+
+var tableFields = map[string][]uint8{
+	"OS/2": {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10, 4, 1, 2, 2, 2},
 }
 
 type navBase struct {
@@ -59,7 +69,7 @@ func (nbase navBase) Map() TagRecordMap {
 	return tagRecordMap16{}
 }
 
-func (nbase navBase) List() []uint16 {
+func (nbase navBase) List() List {
 	return nullList
 }
 
@@ -92,7 +102,7 @@ func (lm linkAndMap) Map() TagRecordMap {
 	return lm.tmap
 }
 
-func (lm linkAndMap) List() []uint16 {
+func (lm linkAndMap) List() List {
 	return nullList
 }
 
@@ -121,7 +131,7 @@ func errDanglingLink(obj string) error {
 }
 
 var nullNav = linkAndMap{}
-var nullList = []uint16{}
+var nullList = u16List{}
 
 type navName struct {
 	navBase
@@ -130,4 +140,51 @@ type navName struct {
 
 func (nm navName) Name() string {
 	return nm.name
+}
+
+type list struct {
+	navName
+	f otFields
+}
+
+func (l list) List() List {
+	return l.f
+}
+
+type otFields struct {
+	pattern []uint8
+	b       fontBinSegm
+}
+
+func (f otFields) Len() int {
+	return len(f.pattern)
+}
+
+func (f otFields) Get(i int) []byte {
+	if i < 0 || i >= len(f.pattern) {
+		return []byte{}
+	}
+	offset := 0
+	for j, p := range f.pattern {
+		if j > i {
+			break
+		}
+		offset += int(p)
+	}
+	if r, err := f.b.view(offset, int(f.pattern[i])); err == nil {
+		return r
+	}
+	return []byte{}
+}
+
+func (f otFields) All() [][]byte {
+	r := make([][]byte, len(f.pattern))
+	offset := 0
+	for _, p := range f.pattern {
+		if x, err := f.b.view(offset, int(p)); err == nil {
+			r = append(r, x)
+		}
+		return [][]byte{}
+	}
+	return r
 }

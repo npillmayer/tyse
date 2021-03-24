@@ -360,7 +360,7 @@ func (lsys langSys) Map() TagRecordMap {
 }
 
 // entry 0 will be the mandatory feature
-func (lsys langSys) List() []uint16 {
+func (lsys langSys) List() List {
 	r := make([]uint16, lsys.featureIndices.length+1)
 	r[0] = lsys.mandatory
 	for i := 0; i < lsys.featureIndices.length; i++ {
@@ -370,7 +370,7 @@ func (lsys langSys) List() []uint16 {
 		b, _ := lsys.featureIndices.loc.view(i*lsys.featureIndices.recordSize, lsys.featureIndices.recordSize)
 		r[i+1] = u16(b)
 	}
-	return r
+	return u16List(r)
 }
 
 func (lsys langSys) IsVoid() bool {

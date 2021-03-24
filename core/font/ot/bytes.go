@@ -571,3 +571,30 @@ func (mw mapWrapper) Tags() []Tag {
 	}
 	return tags
 }
+
+type List interface {
+	Len() int
+	Get(int) []byte
+	All() [][]byte
+}
+
+type u16List []uint16
+
+func (u16l u16List) Len() int {
+	return len(u16l)
+}
+
+func (u16l u16List) Get(i int) []byte {
+	if i < 0 || i >= len(u16l) {
+		return []byte{}
+	}
+	return []byte{byte(u16l[i] >> 8 & 0xff), byte(u16l[i] & 0xff)}
+}
+
+func (u16l u16List) All() [][]byte {
+	r := make([][]byte, len(u16l))
+	for _, x := range u16l {
+		r = append(r, []byte{byte(x >> 8 & 0xff), byte(x & 0xff)})
+	}
+	return r
+}

@@ -24,9 +24,9 @@ func TestLink(t *testing.T) {
 	t.Logf("walked to %s", recname)
 	lang := gsub.Scripts.Lookup(T("latn")).Navigate().Map().Lookup(T("IPPH"))
 	langlist := lang.Navigate().List()
-	t.Logf("list is %s of length %v", lang.Name(), len(langlist))
-	if lang.Name() != "LangSys" || len(langlist) != 10 {
-		t.Errorf("expected LangSys[IPPH] to contain 10 feature entries, has %d", len(langlist))
+	t.Logf("list is %s of length %v", lang.Name(), langlist.Len())
+	if lang.Name() != "LangSys" || langlist.Len() != 10 {
+		t.Errorf("expected LangSys[IPPH] to contain 10 feature entries, has %d", langlist.Len())
 	}
 }
 
@@ -48,6 +48,27 @@ func TestTableNav(t *testing.T) {
 	x := table.Base().Fields().Map().Lookup(key).Navigate().Name()
 	if x != "Calibri" {
 		t.Errorf("expected Windows/1 encoded field 1 to be 'Calibri', is %s", x)
+	}
+}
+
+func TestTableOS2(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := loadCalibri(t)
+	table := otf.Table(T("OS/2"))
+	if table == nil {
+		t.Fatal("cannot locate table OS/2 in font")
+	}
+	name := table.Base().Fields().Name()
+	if name != "OS/2" {
+		t.Errorf(name)
+	}
+	x := table.Base().Fields().List().Get(1)
+	t.Logf("x = %v", u16(x))
+	if u16(x) != 400 {
+		t.Errorf("expected xAvgCharWidth to be 400, is %d", u16(x))
 	}
 }
 
