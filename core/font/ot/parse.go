@@ -134,7 +134,7 @@ func parseBase(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // An Axis table consists of offsets, measured from the beginning of the Axis table,
 // to a BaseTagList and a BaseScriptList.
 // link may be NULL.
-func parseBaseAxis(base *BaseTable, hOrV int, link Link, err error) error {
+func parseBaseAxis(base *BaseTable, hOrV int, link NavLink, err error) error {
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 type encodingRecord struct {
 	platformId uint16
 	encodingId uint16
-	link       Link
+	link       NavLink
 	format     uint16
 	size       int
 	width      int // encoding width in bytes
@@ -550,10 +550,10 @@ func parseMarkGlyphSets(gdef *GDefTable, b fontBinSegm, err error) error {
 func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	var err error
 	gpos := newGPosTable(tag, b, offset, size)
-	err = parseLayoutHeader(gpos.LayoutBase(), b, err)
-	err = parseLookupList(gpos.LayoutBase(), b, err)
-	err = parseFeatureList(gpos.LayoutBase(), b, err)
-	err = parseScriptList(gpos.LayoutBase(), b, err)
+	err = parseLayoutHeader(&gpos.LayoutTable, b, err)
+	err = parseLookupList(&gpos.LayoutTable, b, err)
+	err = parseFeatureList(&gpos.LayoutTable, b, err)
+	err = parseScriptList(&gpos.LayoutTable, b, err)
 	if err != nil {
 		trace().Errorf("error parsing GPOS table: %v", err)
 		return gpos, err
@@ -572,10 +572,10 @@ func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	var err error
 	gsub := newGSubTable(tag, b, offset, size)
-	err = parseLayoutHeader(gsub.LayoutBase(), b, err)
-	err = parseLookupList(gsub.LayoutBase(), b, err)
-	err = parseFeatureList(gsub.LayoutBase(), b, err)
-	err = parseScriptList(gsub.LayoutBase(), b, err)
+	err = parseLayoutHeader(&gsub.LayoutTable, b, err)
+	err = parseLookupList(&gsub.LayoutTable, b, err)
+	err = parseFeatureList(&gsub.LayoutTable, b, err)
+	err = parseScriptList(&gsub.LayoutTable, b, err)
 	if err != nil {
 		trace().Errorf("error parsing GSUB table: %v", err)
 		return gsub, err
@@ -814,17 +814,17 @@ func parseCoverage(b fontBinSegm) GlyphRange {
 
 // --- Names -----------------------------------------------------------------
 
-func parseNames(b fontBinSegm) (Names, error) {
+func parseNames(b fontBinSegm) (nameNames, error) {
 	if len(b) < 6 {
-		return Names{}, errFontFormat("name section corrupt")
+		return nameNames{}, errFontFormat("name section corrupt")
 	}
 	N, _ := b.u16(2)
-	names := Names{}
+	names := nameNames{}
 	strOffset, _ := b.u16(4)
 	names.strbuf = b[strOffset:]
 	trace().Debugf("name table has %d strings, starting at %d", N, strOffset)
 	if len(b) < 6+12*int(N) {
-		return Names{}, errFontFormat("name section corrupt")
+		return nameNames{}, errFontFormat("name section corrupt")
 	}
 	recs := b[6 : 6+12*int(N)]
 	names.nameRecs = viewArray(recs, 12)

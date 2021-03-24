@@ -23,25 +23,21 @@ this module.
 // more than one lookup table, but we will only instantiate the most appropriate one.
 // Clients who need access to all the lookup tables will have to parse them themselves.
 type CMapTable struct {
-	TableBase
+	tableBase
 	GlyphIndexMap CMapGlyphIndex
 }
 
 func newCMapTable(tag Tag, b fontBinSegm, offset, size uint32) *CMapTable {
 	t := &CMapTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
-}
-
-func (t *CMapTable) Base() *TableBase {
-	return &t.TableBase
 }
 
 const ( // taken from https://github.com/golang/image/tree/master/font/sfnt.

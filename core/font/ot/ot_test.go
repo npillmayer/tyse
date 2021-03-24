@@ -49,9 +49,9 @@ func TestTableName(t *testing.T) {
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	tb := TableBase{}
+	tb := tableBase{}
 	tb.name = 0x636d6170
-	s := tb.String()
+	s := tb.Self().NameTag().String()
 	if s != "cmap" {
 		t.Errorf("expected table name to be cmap, is %v", s)
 	}

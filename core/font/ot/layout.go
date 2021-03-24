@@ -12,10 +12,9 @@ These tables use some of the same data formats.
 // --- Layout tables ---------------------------------------------------------
 
 // LayoutTable is a base type for layout tables.
-// OpenType specifies two tables–GPOS and GSUB–which share some of their
-// structure. They are called "layout tables".
+// OpenType specifies two such tables–GPOS and GSUB–which share some of their
+// structure.
 type LayoutTable struct {
-	TableBase
 	Scripts  TagRecordMap
 	Features TagRecordMap
 	lookups  []*lookupRecord
@@ -154,7 +153,7 @@ type lookupRecordInfo struct {
 // See also
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
 type GDefTable struct {
-	TableBase
+	tableBase
 	header             GDefHeader
 	classDef           ClassDefinitions
 	attachPointList    AttachmentPointList
@@ -164,19 +163,15 @@ type GDefTable struct {
 
 func newGDefTable(tag Tag, b fontBinSegm, offset, size uint32) *GDefTable {
 	t := &GDefTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
-}
-
-func (t *GDefTable) Base() *TableBase {
-	return &t.TableBase
 }
 
 // Header returns the Glyph Definition header for t.
@@ -263,25 +258,21 @@ func (h GDefHeader) OffsetFor(which GDefTableSectionName) int {
 // See also
 // https://docs.microsoft.com/en-us/typography/opentype/spec/base
 type BaseTable struct {
-	TableBase
+	tableBase
 	axisTables [2]AxisTable
 }
 
 func newBaseTable(tag Tag, b fontBinSegm, offset, size uint32) *BaseTable {
 	t := &BaseTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
-}
-
-func (t *BaseTable) Base() *TableBase {
-	return &t.TableBase
 }
 
 type AxisTable struct {
@@ -322,7 +313,7 @@ func buildGlyphRangeFromCoverage(chead coverageHeader, b fontBinSegm) GlyphRange
 
 // --- Class definition tables -----------------------------------------------
 
-// GlyphClassDefEnum lists the glyph classes for the ClassDefinitions
+// GlyphClassDefEnum lists the glyph classes for ClassDefinitions
 // ('GlyphClassDef'-table).
 type GlyphClassDefEnum uint16
 
@@ -351,7 +342,7 @@ type langSys struct {
 	featureIndices array  // list of uint16 indices
 }
 
-func (lsys langSys) Link() Link {
+func (lsys langSys) Link() NavLink {
 	return nullLink("LangSys records not linkable")
 }
 
@@ -360,7 +351,7 @@ func (lsys langSys) Map() TagRecordMap {
 }
 
 // entry 0 will be the mandatory feature
-func (lsys langSys) List() List {
+func (lsys langSys) List() NavList {
 	r := make([]uint16, lsys.featureIndices.length+1)
 	r[0] = lsys.mandatory
 	for i := 0; i < lsys.featureIndices.length; i++ {

@@ -12,7 +12,7 @@ func SupportsScript(otf *ot.Font, scr language.Script) (string, string) {
 	if t == nil {
 		// do nothing
 	}
-	gsub := t.Base().AsGSub()
+	gsub := t.Self().AsGSub()
 	scrTag := ot.T(strings.ToLower(scr.String()))
 	rec := gsub.Scripts.Lookup(scrTag)
 	if rec.IsNull() {

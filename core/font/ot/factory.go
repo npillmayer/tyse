@@ -2,16 +2,25 @@ package ot
 
 import "fmt"
 
+// Navigator is an interface type to wrap various kinds of OpenType structure.
+// On any given Navigator item, not all of the functions may result in sensible
+// values returned. For example, OpenType map-like structures will return a tag
+// map with a call to `Map`, but will return an invalid `Link` and an empty
+// `List`.
+//
+// If a previous call in a navigation chain has caused an error, successing Navigator
+// items will remember that error (call to `Error`) and will wrap only void Navigators.
+//
 type Navigator interface {
 	Name() string
-	Link() Link
+	Link() NavLink
 	Map() TagRecordMap
-	List() List
+	List() NavList
 	IsVoid() bool
 	Error() error
 }
 
-func navFactory(obj string, loc Location, base fontBinSegm) Navigator {
+func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
 	trace().Debugf("navigator factory for %s", obj)
 	switch obj {
 	case "Script":
@@ -27,7 +36,7 @@ func navFactory(obj string, loc Location, base fontBinSegm) Navigator {
 		trace().Debugf("%s[0] = %x", obj, u16(loc.Bytes()))
 		lsys, err := parseLangSys(loc.Bytes(), 2, "int")
 		if err != nil {
-			trace().Errorf(err.Error()) // TODO carry in navigator chain
+			return null(err)
 		}
 		return lsys
 	case "name":
@@ -45,23 +54,37 @@ func navFactory(obj string, loc Location, base fontBinSegm) Navigator {
 	}
 	if fields, ok := tableFields[obj]; ok {
 		trace().Debugf("object %s has fields %v", obj, fields)
-		f := otFields{pattern: fields, b: base}
-		trace().Debugf("b[0..10] = %v", base[:10])
+		size := int(fields[0]) // total byte size of fields
+		f := otFields{pattern: fields[1:], b: base[:size]}
 		return list{navName: navName{name: obj}, f: f}
 	}
 	trace().Debugf("no navigator found -> null navigator")
 	return null(errDanglingLink(obj))
 }
 
+// The following code is work in progress -- expect it to change any second.
+
 var tableFields = map[string][]uint8{
-	"OS/2": {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10, 4, 1, 2, 2, 2},
+	// sum of fields is first entry
+	"head": {54, 2, 2, 4, 4, 4, 2, 2, 8, 8, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+	"bhea": {54, 2, 2, 4, 4, 4, 2, 2, 8, 8, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+	"OS/2": {53, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10, 4, 1, 2, 2, 2},
 }
+
+// var tableArrays = map[string]struct{
+
+// }
+// 	"tables": {
+// 		"OS/2": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10, 4, 1, 2, 2, 2]
+// 	}
+// }
+// `
 
 type navBase struct {
 	err error
 }
 
-func (nbase navBase) Link() Link {
+func (nbase navBase) Link() NavLink {
 	return nullLink("generic link class")
 }
 
@@ -69,7 +92,7 @@ func (nbase navBase) Map() TagRecordMap {
 	return tagRecordMap16{}
 }
 
-func (nbase navBase) List() List {
+func (nbase navBase) List() NavList {
 	return nullList
 }
 
@@ -90,11 +113,11 @@ func (nbase navBase) Error() error {
 
 type linkAndMap struct {
 	err  error
-	link Link
+	link NavLink
 	tmap TagRecordMap
 }
 
-func (lm linkAndMap) Link() Link {
+func (lm linkAndMap) Link() NavLink {
 	return lm.link
 }
 
@@ -102,7 +125,7 @@ func (lm linkAndMap) Map() TagRecordMap {
 	return lm.tmap
 }
 
-func (lm linkAndMap) List() List {
+func (lm linkAndMap) List() NavList {
 	return nullList
 }
 
@@ -122,7 +145,7 @@ func null(err error) Navigator {
 	return navBase{err: err}
 }
 
-func nullLink(errmsg string) Link {
+func nullLink(errmsg string) NavLink {
 	return link16{err: fmt.Errorf("link: %s", errmsg)}
 }
 
@@ -147,7 +170,7 @@ type list struct {
 	f otFields
 }
 
-func (l list) List() List {
+func (l list) List() NavList {
 	return l.f
 }
 
@@ -160,9 +183,9 @@ func (f otFields) Len() int {
 	return len(f.pattern)
 }
 
-func (f otFields) Get(i int) []byte {
+func (f otFields) Get(i int) NavLocation {
 	if i < 0 || i >= len(f.pattern) {
-		return []byte{}
+		return fontBinSegm{}
 	}
 	offset := 0
 	for j, p := range f.pattern {
@@ -174,17 +197,17 @@ func (f otFields) Get(i int) []byte {
 	if r, err := f.b.view(offset, int(f.pattern[i])); err == nil {
 		return r
 	}
-	return []byte{}
+	return fontBinSegm{}
 }
 
-func (f otFields) All() [][]byte {
-	r := make([][]byte, len(f.pattern))
+func (f otFields) All() []NavLocation {
+	r := make([]NavLocation, len(f.pattern))
 	offset := 0
 	for _, p := range f.pattern {
 		if x, err := f.b.view(offset, int(p)); err == nil {
 			r = append(r, x)
 		}
-		return [][]byte{}
+		return []NavLocation{fontBinSegm{}}
 	}
 	return r
 }

@@ -65,7 +65,7 @@ func TestParseGPos(t *testing.T) {
 		t.Fatalf("expected font to have GPOS table, hasn't")
 	}
 	gposTag := T("GPOS")
-	gpos := otf.tables[gposTag].Base().AsGPos()
+	gpos := otf.tables[gposTag].Self().AsGPos()
 	if gpos == nil {
 		t.Fatalf("cannot find a GPOS table")
 	}
@@ -86,7 +86,6 @@ func TestParseGPos(t *testing.T) {
 	// 	gpos.scripts[len(gpos.scripts)-1].Tag.String() != "latn" {
 	// 	t.Errorf("expected scripts[2] to be 'latn', isn't")
 	// }
-	t.Fail()
 }
 
 func TestParseGSub(t *testing.T) {
@@ -112,7 +111,7 @@ func TestParseGSub(t *testing.T) {
 		t.Fatalf("expected font to have GSUB table, hasn't")
 	}
 	gsubTag := T("GSUB")
-	gsub := otf.tables[gsubTag].Base().AsGSub()
+	gsub := otf.tables[gsubTag].Self().AsGSub()
 	if gsub == nil {
 		t.Fatalf("cannot find a GSUB table")
 	}
@@ -155,7 +154,7 @@ func TestParseKern(t *testing.T) {
 	if !hasKern {
 		t.Fatalf("expected font to have kern table, hasn't")
 	}
-	kern := otf.tables[T("kern")].Base().AsKern()
+	kern := otf.tables[T("kern")].Self().AsKern()
 	if kern == nil {
 		t.Fatalf("cannot find a kern table")
 	}
@@ -172,7 +171,7 @@ func TestParseOtherTables(t *testing.T) {
 		core.UserError(err)
 		t.Fatal(err)
 	}
-	maxp := otf.tables[T("maxp")].Base().AsMaxP()
+	maxp := otf.tables[T("maxp")].Self().AsMaxP()
 	if maxp == nil {
 		t.Fatalf("cannot find a maxp table")
 	}
@@ -180,11 +179,11 @@ func TestParseOtherTables(t *testing.T) {
 	if maxp.NumGlyphs != 3874 {
 		t.Errorf("expected Calibri to have 3874 glyphs, but %d indicated", maxp.NumGlyphs)
 	}
-	loca := otf.tables[T("loca")].Base().AsLoca()
+	loca := otf.tables[T("loca")].Self().AsLoca()
 	if loca == nil {
 		t.Fatalf("cannot find a maxp table")
 	}
-	hhea := otf.tables[T("hhea")].Base().AsHHea()
+	hhea := otf.tables[T("hhea")].Self().AsHHea()
 	if hhea == nil {
 		t.Fatalf("cannot find a hhea table")
 	}

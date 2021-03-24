@@ -7,30 +7,21 @@ import (
 // GSubTable is a type representing an OpenType GSUB table
 // (see https://docs.microsoft.com/en-us/typography/opentype/spec/gpos).
 type GSubTable struct {
+	tableBase
 	LayoutTable
 }
 
 func newGSubTable(tag Tag, b fontBinSegm, offset, size uint32) *GSubTable {
 	t := &GSubTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
-}
-
-// Base returns the enclosed LayoutTable type this table inherits from.
-func (g *GSubTable) LayoutBase() *LayoutTable {
-	return &g.LayoutTable
-}
-
-// Base returns the enclosed TableBase type this table inherits from.
-func (g *GSubTable) Base() *TableBase {
-	return &g.TableBase
 }
 
 var _ Table = &GSubTable{}

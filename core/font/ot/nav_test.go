@@ -9,7 +9,7 @@ import (
 	"github.com/npillmayer/tyse/core"
 )
 
-func TestLink(t *testing.T) {
+func TestNavLink(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
@@ -19,14 +19,14 @@ func TestLink(t *testing.T) {
 	if table == nil {
 		t.Fatal("cannot locate table GSUB in font")
 	}
-	gsub := table.Base().AsGSub()
+	gsub := table.Self().AsGSub()
 	recname := gsub.Scripts.Lookup(T("latn")).Navigate().Name()
 	t.Logf("walked to %s", recname)
-	lang := gsub.Scripts.Lookup(T("latn")).Navigate().Map().Lookup(T("IPPH"))
+	lang := gsub.Scripts.Lookup(T("latn")).Navigate().Map().Lookup(T("TRK"))
 	langlist := lang.Navigate().List()
 	t.Logf("list is %s of length %v", lang.Name(), langlist.Len())
-	if lang.Name() != "LangSys" || langlist.Len() != 10 {
-		t.Errorf("expected LangSys[IPPH] to contain 10 feature entries, has %d", langlist.Len())
+	if lang.Name() != "LangSys" || langlist.Len() != 24 {
+		t.Errorf("expected LangSys[IPPH] to contain 24 feature entries, has %d", langlist.Len())
 	}
 }
 
@@ -40,18 +40,18 @@ func TestTableNav(t *testing.T) {
 	if table == nil {
 		t.Fatal("cannot locate table name in font")
 	}
-	name := table.Base().Fields().Name()
+	name := table.Fields().Name()
 	if name != "name" {
 		t.Errorf("expected table to have name 'name', have %s", name)
 	}
 	key := MakeTag([]byte{3, 1, 0, 1}) // Windows 1-encoded field 1 = Font Family Name
-	x := table.Base().Fields().Map().Lookup(key).Navigate().Name()
+	x := table.Fields().Map().Lookup(key).Navigate().Name()
 	if x != "Calibri" {
 		t.Errorf("expected Windows/1 encoded field 1 to be 'Calibri', is %s", x)
 	}
 }
 
-func TestTableOS2(t *testing.T) {
+func TestTableNavOS2(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
@@ -61,14 +61,13 @@ func TestTableOS2(t *testing.T) {
 	if table == nil {
 		t.Fatal("cannot locate table OS/2 in font")
 	}
-	name := table.Base().Fields().Name()
+	name := table.Fields().Name()
 	if name != "OS/2" {
 		t.Errorf(name)
 	}
-	x := table.Base().Fields().List().Get(1)
-	t.Logf("x = %v", u16(x))
-	if u16(x) != 400 {
-		t.Errorf("expected xAvgCharWidth to be 400, is %d", u16(x))
+	loc := table.Fields().List().Get(1)
+	if loc.U16(0) != 400 {
+		t.Errorf("expected xAvgCharWidth (size %d) to be 400, is %d", loc.Size(), loc.U16(0))
 	}
 }
 

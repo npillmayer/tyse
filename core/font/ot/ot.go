@@ -107,7 +107,7 @@ func MakeTag(b []byte) Tag {
 // T returns a Tag from a (4-letter) string.
 // If t is shorter or longer, it will be silently extended or cut as appropriate
 func T(t string) Tag {
-	t = "    "[:4-len(t)] + t
+	t = (t + "    ")[:4]
 	return Tag(u32([]byte(t)))
 }
 
@@ -145,15 +145,14 @@ func (t Tag) String() string {
 // SVG font table, bitmap glyph tables, color font tables, font variations.
 //
 type Table interface {
-	Offset() uint32   // offset within the font's binary data
-	Len() uint32      // byte size of table
-	Binary() []byte   // the bytes of this table; should be treatet as read-only by clients
-	String() string   // 4-letter table name, e.g., "cmap"
-	Base() *TableBase // every table we use will be derived from TableBase
+	Extent() (uint32, uint32) // offset and byte size within the font's binary data
+	Binary() []byte           // the bytes of this table; should be treatet as read-only by clients
+	Fields() Navigator        // start for navigation calls
+	Self() TableSelf          // reference to itself
 }
 
 func newTable(tag Tag, b fontBinSegm, offset, size uint32) *genericTable {
-	t := &genericTable{TableBase{
+	t := &genericTable{tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
@@ -165,15 +164,11 @@ func newTable(tag Tag, b fontBinSegm, offset, size uint32) *genericTable {
 }
 
 type genericTable struct {
-	TableBase
+	tableBase
 }
 
-func (t *genericTable) Base() *TableBase {
-	return &t.TableBase
-}
-
-// TableBase is a common parent for all kinds of OpenType tables.
-type TableBase struct {
+// tableBase is a common parent for all kinds of OpenType tables.
+type tableBase struct {
 	data   fontBinSegm // a table is a slice of font data
 	name   Tag         // 4-byte name as an integer
 	offset uint32      // from offset
@@ -181,108 +176,125 @@ type TableBase struct {
 	self   interface{}
 }
 
-// Offset returns the offset of this table within the OpenType font.
-func (tb *TableBase) Offset() uint32 {
-	return tb.offset
-}
-
-// Len returns the size of this table in bytes.
-func (tb *TableBase) Len() uint32 {
-	return tb.length
+// Offset returns offset and byte size of this table within the OpenType font.
+func (tb *tableBase) Extent() (uint32, uint32) {
+	return tb.offset, tb.length
 }
 
 // Binary returns the bytes of this table. Should be treatet as read-only by
 // clients, as it is a view into the original data.
-func (tb *TableBase) Binary() []byte {
+func (tb *tableBase) Binary() []byte {
 	return tb.data
 }
 
-// String returns the 4-letter name of a table.
-func (tb *TableBase) String() string {
-	return tb.name.String()
-}
-
-func (tb *TableBase) bytes() fontBinSegm {
+func (tb *tableBase) bytes() fontBinSegm {
 	return tb.data
 }
 
-func (tb *TableBase) Fields() Navigator {
+func (tb *tableBase) Self() TableSelf {
+	return TableSelf{tableBase: tb}
+}
+
+func (tb *tableBase) Fields() Navigator {
 	tableTag := tb.name.String()
 	return navFactory(tableTag, tb.data, tb.data)
 }
 
+// TableSelf is a reference to a table. Its primary use is for converting
+// a generic table to a concrete table flavour, and for reproducing the
+// name tag of a table.
+type TableSelf struct {
+	tableBase *tableBase
+}
+
+// NameTag returns the 4-letter name of a table.
+func (self TableSelf) NameTag() Tag {
+	return self.tableBase.name
+}
+
 // AsGPos returns this table as a GPOS table, or nil.
-func (tb *TableBase) AsGPos() *GPosTable {
-	if tb == nil || tb.self == nil {
+func (self TableSelf) AsGPos() *GPosTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
 		return nil
 	}
-	if g, ok := tb.self.(*GPosTable); ok {
+	if g, ok := self.tableBase.self.(*GPosTable); ok {
 		return g
 	}
 	return nil
 }
 
 // AsGSub returns this table as a GSUB table, or nil.
-func (tb *TableBase) AsGSub() *GSubTable {
-	if tb == nil || tb.self == nil {
+func (self TableSelf) AsGSub() *GSubTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
 		return nil
 	}
-	if g, ok := tb.self.(*GSubTable); ok {
+	if g, ok := self.tableBase.self.(*GSubTable); ok {
 		return g
 	}
 	return nil
 }
 
 // AsLoca returns this table as a kern table, or nil.
-func (tb *TableBase) AsLoca() *LocaTable {
-	if tb == nil || tb.self == nil {
+func (self TableSelf) AsLoca() *LocaTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
 		return nil
 	}
-	if k, ok := tb.self.(*LocaTable); ok {
+	if k, ok := self.tableBase.self.(*LocaTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsMaxP returns this table as a kern table, or nil.
-func (tb *TableBase) AsMaxP() *MaxPTable {
-	if tb == nil || tb.self == nil {
+func (self TableSelf) AsMaxP() *MaxPTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
 		return nil
 	}
-	if k, ok := tb.self.(*MaxPTable); ok {
+	if k, ok := self.tableBase.self.(*MaxPTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsKern returns this table as a kern table, or nil.
-func (tb *TableBase) AsKern() *KernTable {
-	if tb == nil || tb.self == nil {
+func (self TableSelf) AsKern() *KernTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
 		return nil
 	}
-	if k, ok := tb.self.(*KernTable); ok {
+	if k, ok := self.tableBase.self.(*KernTable); ok {
+		return k
+	}
+	return nil
+}
+
+// AsHead returns this table as a hhea table, or nil.
+func (self TableSelf) AsHead() *HeadTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
+		return nil
+	}
+	if k, ok := self.tableBase.self.(*HeadTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsHHea returns this table as a hhea table, or nil.
-func (tb *TableBase) AsHHea() *HHeaTable {
-	if tb == nil || tb.self == nil {
+func (self TableSelf) AsHHea() *HHeaTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
 		return nil
 	}
-	if k, ok := tb.self.(*HHeaTable); ok {
+	if k, ok := self.tableBase.self.(*HHeaTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsHMtx returns this table as a hhea table, or nil.
-func (tb *TableBase) AsHMtx() *HMtxTable {
-	if tb == nil || tb.self == nil {
+func (self TableSelf) AsHMtx() *HMtxTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
 		return nil
 	}
-	if k, ok := tb.self.(*HMtxTable); ok {
+	if k, ok := self.tableBase.self.(*HMtxTable); ok {
 		return k
 	}
 	return nil
@@ -291,28 +303,33 @@ func (tb *TableBase) AsHMtx() *HMtxTable {
 // --- Concrete table implementations ----------------------------------------
 
 // HeadTable gives global information about the font.
+// Only a small subset of fields are made public by HeadTable, as they are
+// needed for consistency-checks. To read any of the other fields of table 'head' use:
+//
+//     head   := otf.Table[T["head"]]
+//     fields := head.Fields().Get(n)     // get nth field value
+//     fields := head.Fields().All()      // get a slice with all field values
+//
+// See also type `Navigator`.
+//
 type HeadTable struct {
-	TableBase
-	Flags            uint16
-	UnitsPerEm       uint16
-	IndexToLocFormat uint16 // needed to read loca table
+	tableBase
+	Flags            uint16 // see https://docs.microsoft.com/en-us/typography/opentype/spec/head
+	UnitsPerEm       uint16 // values 16 … 16384 are valid
+	IndexToLocFormat uint16 // needed to interpret loca table
 }
 
 func newHeadTable(tag Tag, b fontBinSegm, offset, size uint32) *HeadTable {
 	t := &HeadTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
-}
-
-func (t *HeadTable) Base() *TableBase {
-	return &t.TableBase
 }
 
 // KernTable gives information about kerning and kern pairs.
@@ -320,19 +337,19 @@ func (t *HeadTable) Base() *TableBase {
 // the glyphs in a font. OpenType™ fonts containing CFF outlines are not supported
 // by the 'kern' table and must use the GPOS OpenType Layout table.
 type KernTable struct {
-	TableBase
+	tableBase
 	headers []kernSubTableHeader
 }
 
 func newKernTable(tag Tag, b fontBinSegm, offset, size uint32) *KernTable {
 	t := &KernTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
 }
@@ -370,29 +387,25 @@ func (t *KernTable) SubTableInfo(n int) KernSubTableInfo {
 	return info
 }
 
-func (t *KernTable) Base() *TableBase {
-	return &t.TableBase
-}
-
 // LocaTable stores the offsets to the locations of the glyphs in the font,
 // relative to the beginning of the glyph data table.
 // By definition, index zero points to the “missing character”, which is the character
 // that appears if a character is not found in the font. The missing character is
 // commonly represented by a blank box or a space.
 type LocaTable struct {
-	TableBase
+	tableBase
 	loca func(t *LocaTable, n int) uint32 // returns glyph location for glyph n
 }
 
 func newLocaTable(tag Tag, b fontBinSegm, offset, size uint32) *LocaTable {
 	t := &LocaTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.loca = shortLocaVersion // may get changed by font consistency check
 	t.self = t
 	return t
@@ -416,56 +429,44 @@ func longLocaVersion(t *LocaTable, n int) uint32 {
 	return loc
 }
 
-func (t *LocaTable) Base() *TableBase {
-	return &t.TableBase
-}
-
 // MaxPTable establishes the memory requirements for this font.
 // The 'maxp' table contains a count for the number of glyphs in the font.
 // Whenever this value changes, other tables which depend on it should also be updated.
 type MaxPTable struct {
-	TableBase
+	tableBase
 	NumGlyphs int
 }
 
 func newMaxPTable(tag Tag, b fontBinSegm, offset, size uint32) *MaxPTable {
 	t := &MaxPTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
 }
 
-func (t *MaxPTable) Base() *TableBase {
-	return &t.TableBase
-}
-
 // HHeaTable contains information for horizontal layout.
 type HHeaTable struct {
-	TableBase
+	tableBase
 	NumberOfHMetrics int
 }
 
 func newHHeaTable(tag Tag, b fontBinSegm, offset, size uint32) *HHeaTable {
 	t := &HHeaTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
-}
-
-func (t *HHeaTable) Base() *TableBase {
-	return &t.TableBase
 }
 
 // HMtxTable contains metric information for the horizontal layout each of the glyphs in
@@ -480,19 +481,19 @@ func (t *HHeaTable) Base() *TableBase {
 // font minus the value `HHea.NumberOfHMetrics`, which is copied into the
 // HMtxTable for easier access.
 type HMtxTable struct {
-	TableBase
+	tableBase
 	NumberOfHMetrics int
 }
 
 func newHMtxTable(tag Tag, b fontBinSegm, offset, size uint32) *HMtxTable {
 	t := &HMtxTable{}
-	base := TableBase{
+	base := tableBase{
 		data:   b,
 		name:   tag,
 		offset: offset,
 		length: size,
 	}
-	t.TableBase = base
+	t.tableBase = base
 	t.self = t
 	return t
 }
@@ -511,21 +512,18 @@ func (t *HMtxTable) hMetrics(g GlyphIndex) (uint16, int16) {
 	return a, int16(lsb)
 }
 
-func (t *HMtxTable) Base() *TableBase {
-	return &t.TableBase
-}
-
-type Names struct {
+// Names struct for table 'name'
+type nameNames struct {
 	navBase
 	strbuf   fontBinSegm
 	nameRecs array
 }
 
-func (n Names) Name() string {
+func (n nameNames) Name() string {
 	return "name" // name of 'name' OT table
 }
 
-func (n Names) Map() TagRecordMap {
+func (n nameNames) Map() TagRecordMap {
 	namesMap := make(map[Tag]link16)
 	for i := 0; i < n.nameRecs.length; i++ {
 		nameRecord := n.nameRecs.UnsafeGet(i)
@@ -538,7 +536,7 @@ func (n Names) Map() TagRecordMap {
 		id := nameRecord.U16(6)
 		strlen := nameRecord.U16(8)
 		offset := nameRecord.U16(10)
-		str := n.strbuf[offset : offset+strlen]
+		str := n.strbuf[offset : offset+strlen] // UTF-16 encoded string
 		//trace().Debugf("utf16 string = '%v'", decodeUtf16(str))
 		link := makeLink16(0, str, "NameRecord")
 		tag := MakeTag([]byte{byte(pltf), byte(enc), 0, byte(id)})

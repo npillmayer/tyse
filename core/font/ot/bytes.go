@@ -23,9 +23,9 @@ func u32(b []byte) uint32 {
 
 // ---Locations, i.e. byte segments/slices -----------------------------------
 
-// Location is a position at a byte within a font's binary data.
+// NavLocation is a position at a byte within a font's binary data.
 // It represents the start of a segment/slice of binary data.
-type Location interface {
+type NavLocation interface {
 	Size() int     // size in bytes
 	Bytes() []byte // return as a byte slice
 	Reader() io.Reader
@@ -229,7 +229,7 @@ func (r *glyphRangeRecords) ByteSize() int {
 
 type tagList struct {
 	Count int
-	link  Link
+	link  NavLink
 }
 
 func parseTagList(b fontBinSegm) tagList {
@@ -253,15 +253,22 @@ func (l tagList) Tag(i int) Tag {
 
 // --- Link ------------------------------------------------------------------
 
-type Link interface {
-	Base() Location
-	Jump() Location
+// NavLink is a type to represent the transfer between one Navigator item and
+// another. Clients may use it to either arrive at the binary segment of the
+// destination (call Jump) or receiving the destination as a Navigator item
+// (call Navigate).
+//
+// Name returns the class name of the link's destination. IsNull is used to check
+// if this NavLink represents a link to a valid destination.
+type NavLink interface {
+	Base() NavLocation
+	Jump() NavLocation
 	IsNull() bool
 	Navigate() Navigator
 	Name() string
 }
 
-func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (Link, error) {
+func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (NavLink, error) {
 	if len(b) < offset {
 		return link32{}, errBufferBounds
 	}
@@ -276,7 +283,7 @@ func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (Li
 	}, nil
 }
 
-func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (Link, error) {
+func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (NavLink, error) {
 	if len(b) < offset {
 		return link16{}, errBufferBounds
 	}
@@ -292,7 +299,7 @@ func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (Li
 }
 
 //func makeLink16(b fontBinSegm, offset uint16, base fontBinSegm, target string) Link {
-func makeLink16(offset uint16, base fontBinSegm, target string) Link {
+func makeLink16(offset uint16, base fontBinSegm, target string) NavLink {
 	return link16{
 		target: target,
 		base:   base,
@@ -318,11 +325,11 @@ func (l16 link16) Name() string {
 	return l16.target
 }
 
-func (l16 link16) Base() Location {
+func (l16 link16) Base() NavLocation {
 	return l16.base
 }
 
-func (l16 link16) Jump() Location {
+func (l16 link16) Jump() NavLocation {
 	trace().Debugf("jump to %s", l16.target)
 	if l16.err != nil {
 		return fontBinSegm{}
@@ -361,11 +368,11 @@ func (l32 link32) Name() string {
 	return l32.target
 }
 
-func (l32 link32) Base() Location {
+func (l32 link32) Base() NavLocation {
 	return l32.base
 }
 
-func (l32 link32) Jump() Location {
+func (l32 link32) Jump() NavLocation {
 	trace().Debugf("jump to %s", l32.target)
 	if l32.err != nil {
 		return fontBinSegm{}
@@ -449,7 +456,7 @@ func (a array) Size() int {
 	return a.length * a.recordSize
 }
 
-func (a array) UnsafeGet(i int) Location {
+func (a array) UnsafeGet(i int) NavLocation {
 	if i < 0 || (i+1)*a.recordSize > len(a.loc.Bytes()) {
 		i = 0
 	}
@@ -464,10 +471,10 @@ func (a array) UnsafeGet(i int) Location {
 // instances, e.g.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
 type TagRecordMap interface {
-	Name() string    // OpenType specification name of this map
-	Lookup(Tag) Link // returns the link associated with a given tag
-	Tags() []Tag     // returns all the tags which the map uses as keys
-	Count() int      //
+	Name() string       // OpenType specification name of this map
+	Lookup(Tag) NavLink // returns the link associated with a given tag
+	Tags() []Tag        // returns all the tags which the map uses as keys
+	Count() int         //
 }
 
 // recsize is the byte size of the record entry not including the Tag.
@@ -498,7 +505,7 @@ type tagRecordMap16 struct {
 // Lookup returns the link associated with a given tag.
 //
 // TODO binary search with |N| > ?
-func (m tagRecordMap16) Lookup(tag Tag) Link {
+func (m tagRecordMap16) Lookup(tag Tag) NavLink {
 	if len(m.base) == 0 {
 		trace().Debugf("tag record map has null-base")
 		return link16{}
@@ -543,7 +550,7 @@ func (m tagRecordMap16) Count() int {
 }
 
 type mapWrapper struct {
-	names Names
+	names nameNames // TODO de-couple from  table 'name'
 	m     map[Tag]link16
 	name  string
 }
@@ -556,7 +563,7 @@ func (mw mapWrapper) Count() int {
 	return len(mw.m)
 }
 
-func (mw mapWrapper) Lookup(tag Tag) Link {
+func (mw mapWrapper) Lookup(tag Tag) NavLink {
 	if link, ok := mw.m[tag]; ok {
 		trace().Debugf("NameRecord link for %x = %v", tag, link)
 		return link
@@ -572,10 +579,12 @@ func (mw mapWrapper) Tags() []Tag {
 	return tags
 }
 
-type List interface {
-	Len() int
-	Get(int) []byte
-	All() [][]byte
+// NavList represents a sequence of—possibly unequal sized—items, addressable by
+// position.
+type NavList interface {
+	Len() int            // number of items in the list
+	Get(int) NavLocation // bytes of entry #n
+	All() []NavLocation  // all entries as (possibly variable sized) byte segments
 }
 
 type u16List []uint16
@@ -584,17 +593,17 @@ func (u16l u16List) Len() int {
 	return len(u16l)
 }
 
-func (u16l u16List) Get(i int) []byte {
+func (u16l u16List) Get(i int) NavLocation {
 	if i < 0 || i >= len(u16l) {
-		return []byte{}
+		return fontBinSegm{}
 	}
-	return []byte{byte(u16l[i] >> 8 & 0xff), byte(u16l[i] & 0xff)}
+	return fontBinSegm{byte(u16l[i] >> 8 & 0xff), byte(u16l[i] & 0xff)}
 }
 
-func (u16l u16List) All() [][]byte {
-	r := make([][]byte, len(u16l))
+func (u16l u16List) All() []NavLocation {
+	r := make([]NavLocation, len(u16l))
 	for _, x := range u16l {
-		r = append(r, []byte{byte(x >> 8 & 0xff), byte(x & 0xff)})
+		r = append(r, fontBinSegm([]byte{byte(x >> 8 & 0xff), byte(x & 0xff)}))
 	}
 	return r
 }
