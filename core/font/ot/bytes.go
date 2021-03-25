@@ -278,6 +278,7 @@ func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (Na
 	}
 	//trace().Debugf("link has offset %d", n)
 	return link32{
+		target: target,
 		base:   base,
 		offset: n,
 	}, nil
@@ -474,7 +475,7 @@ type TagRecordMap interface {
 	Name() string       // OpenType specification name of this map
 	Lookup(Tag) NavLink // returns the link associated with a given tag
 	Tags() []Tag        // returns all the tags which the map uses as keys
-	Count() int         //
+	Count() int         // number of entries in the map
 }
 
 // recsize is the byte size of the record entry not including the Tag.

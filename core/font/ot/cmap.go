@@ -158,6 +158,7 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 	}
 	c := uint16(r)
 	N := len(f4.entries)
+	//trace().Debugf("lookup codepoint %d in %d cmap-ranges", r, N)
 	for i, j := 0, N; i < j; {
 		h := i + (j-i)/2 // do a binary search on f4.entries (which may get large)
 		entry := &f4.entries[h]
@@ -166,6 +167,7 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 		} else if entry.end < c {
 			i = h + 1
 		} else if entry.offset == 0 {
+			trace().Debugf("direct access of glyph ID as delta = %d", c+entry.delta)
 			return GlyphIndex(c + entry.delta)
 		} else {
 			// The spec describes the calculation the find the link into the glyph ID array
@@ -183,16 +185,36 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 			//
 			// First cut off the part off the trailing part of offset which results from
 			// skipping over to the start of the glyph ID array:
-			deltaToEndOfEntries := (N - h) * 8 // 8 = byte size of cmapEntry16
+			//
+			// --- for now leave traces in as next bug will surely wait...
+			// eprev := &f4.entries[h-1]
+			// trace().Debugf("segment #%d = { start=%d, end=%d, delta=%d, offset=%d }",
+			// 	h-1, eprev.start, eprev.end, eprev.delta, eprev.offset)
+			// enext := &f4.entries[h+1]
+			// trace().Debugf("segment #%d = { start=%d, end=%d, delta=%d, offset=%d }",
+			// 	h+1, enext.start, enext.end, enext.delta, enext.offset)
+			deltaToEndOfEntries := (N - h) * 2 // 2 = byte size of offset array entry
+			//trace().Debugf("N = %d, N*2 = %d, h = %d, h*2=%d", N, N*2, h, h*2)
 			offset := int(entry.offset) - deltaToEndOfEntries
 			// Now normalize the index into the glyph ID array
 			index := offset / 2 // offset is in bytes, we need an array index
+			index += int(c - entry.start)
 			glyphInx := f4.glyphIds.UnsafeGet(index).U16(0)
+			// trace().Debugf("segment #%d = { start=%d, end=%d, delta=%d, offset=%d }",
+			// 	h, entry.start, entry.end, entry.delta, entry.offset)
+			// trace().Debugf("skip = %d, offset = %d, rest = %d", deltaToEndOfEntries, offset, index)
+			// trace().Debugf("looking up code-point in segment %d, is %d", h, glyphInx)
 			if glyphInx > 0 {
 				// If the value obtained from the indexing operation is not 0 (which indicates
 				// missingGlyph), idDelta[i] is added to it to get the glyph index
 				glyphInx += entry.delta
 			}
+			// g2 := f4.glyphIds.UnsafeGet(index + 1).U16(0)
+			// trace().Debugf("next glyph ID = %d", g2)
+			// g2 = f4.glyphIds.UnsafeGet(index + 2).U16(0)
+			// trace().Debugf("next glyph ID = %d", g2)
+			// g2 = f4.glyphIds.UnsafeGet(index + 3).U16(0)
+			// trace().Debugf("next glyph ID = %d", g2)
 			return GlyphIndex(glyphInx) // will be 0 in case of indexing error
 		}
 	}
@@ -243,6 +265,7 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 		}
 	}
 	glyphTable := viewArray16(b[next:])
+	trace().Debugf("cmap format 4 glyph table starts at offset %d", next)
 	return format4GlyphIndex{
 		segCnt:   int(segCount),
 		entries:  entries,

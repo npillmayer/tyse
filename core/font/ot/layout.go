@@ -154,11 +154,11 @@ type lookupRecordInfo struct {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
 type GDefTable struct {
 	tableBase
-	header             GDefHeader
-	classDef           ClassDefinitions
-	attachPointList    AttachmentPointList
-	markAttachClassDef ClassDefinitions
-	markGlyphSets      []GlyphRange
+	header                 GDefHeader
+	GlyphClassDef          ClassDefinitions
+	AttachmentPointList    AttachmentPointList
+	MarkAttachmentClassDef ClassDefinitions
+	MarkGlyphSets          []GlyphRange
 }
 
 func newGDefTable(tag Tag, b fontBinSegm, offset, size uint32) *GDefTable {
@@ -207,18 +207,26 @@ type gDefHeaderV1_0 struct {
 }
 
 // GDefTableSectionName lists the sections of a GDEF table.
-type GDefTableSectionName int
+//type GDefTableSectionName int
 
+// GDefGlyphClassDefSection GDefTableSectionName = iota
+// GDefAttachListSection
+// GDefLigCaretListSection
+// GDefMarkAttachClassSection
+// GDefMarkGlyphSetsDefSection
+// GDefItemVarStoreSection
+
+// Sections of a GDEF table.
 const (
-	GDefGlyphClassDefSection GDefTableSectionName = iota
-	GDefAttachListSection
-	GDefLigCaretListSection
-	GDefMarkAttachClassSection
-	GDefMarkGlyphSetsDefSection
-	GDefItemVarStoreSection
+	GDefGlyphClassDefSection    = "GlyphClassDef"
+	GDefAttachListSection       = "AttachList"
+	GDefLigCaretListSection     = "LigCaretList"
+	GDefMarkAttachClassSection  = "MarkAttachClassDef"
+	GDefMarkGlyphSetsDefSection = "MarkGlyphSetsDef"
+	GDefItemVarStoreSection     = "ItemVarStore"
 )
 
-// OffsetFor returns an offset for a table section within the GDEF table.
+// offsetFor returns an offset for a table section within the GDEF table.
 // A GDEF table contains six sections:
 // ▪︎ glyph class definitions,
 // ▪︎ attachment list definitions,
@@ -226,9 +234,9 @@ const (
 // ▪︎ mark attachment class definitions,
 // ▪︎ mark glyph sets definitions,
 // ▪︎ item variant section.
-// (see type GDefTableSectionName)
+// (see https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-header)
 //
-func (h GDefHeader) OffsetFor(which GDefTableSectionName) int {
+func (h GDefHeader) offsetFor(which string) int {
 	switch which {
 	case GDefGlyphClassDefSection: // Candidate for a RangeTable
 		return int(h.GlyphClassDefOffset)
@@ -324,14 +332,91 @@ const (
 	ComponentGlyph                          //part of single character, spacing glyph
 )
 
+// ClassDefinitions groups glyphs into classes, denoted as integer values.
+//
+// From the spec:
+// For efficiency and ease of representation, a font developer can group glyph indices
+// to form glyph classes. Class assignments vary in meaning from one lookup subtable
+// to another. For example, in the GSUB and GPOS tables, classes are used to describe
+// glyph contexts. GDEF tables also use the idea of glyph classes.
+// (see https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table)
 type ClassDefinitions struct {
-	format uint16 // format version 1 or 2
-	count  int    // number of entries
-	size   uint32 // size in bytes, including header
+	format  uint16          // format version 1 or 2
+	records classDefVariant // either format 1 or 2
 }
 
-func (cdef *ClassDefinitions) calcSize(numEntries int) uint32 {
+func (cdef *ClassDefinitions) setRecords(recs array, startGlyphID GlyphIndex) {
+	if cdef.format == 1 {
+		cdef.records = &classDefinitionsFormat1{
+			count:      recs.length,
+			start:      startGlyphID,
+			valueArray: recs,
+		}
+	} else if cdef.format == 2 {
+		cdef.records = &classDefinitionsFormat2{
+			count:       recs.length,
+			classRanges: recs,
+		}
+	}
+}
+
+type classDefVariant interface {
+	Lookup(GlyphIndex) int
+}
+
+type classDefinitionsFormat1 struct {
+	count      int        // number of entries
+	start      GlyphIndex // glyph ID of the first entry in a format-1 table
+	valueArray array      // array of Class Values — one per glyph ID
+}
+
+func (cdf *classDefinitionsFormat1) Lookup(glyph GlyphIndex) int {
+	if glyph < cdf.start || glyph >= cdf.start+GlyphIndex(cdf.count) {
+		return 0
+	}
+	clz := cdf.valueArray.UnsafeGet(int(glyph - cdf.start)).U16(0)
+	return int(clz)
+}
+
+type classDefinitionsFormat2 struct {
+	count       int   // number of records
+	classRanges array // array of ClassRangeRecords — ordered by startGlyphID
+}
+
+func (cdf *classDefinitionsFormat2) Lookup(glyph GlyphIndex) int {
+	for i := 0; i < cdf.count; i++ {
+		rec := cdf.classRanges.UnsafeGet(i)
+		if glyph < GlyphIndex(rec.U16(0)) {
+			return 0
+		}
+		if glyph < GlyphIndex(rec.U16(2)) {
+			return int(rec.U16(4))
+		}
+	}
 	return 0
+}
+
+func (cdef *ClassDefinitions) makeArray(b fontBinSegm, numEntries int, format uint16) array {
+	var size, recsize int
+	switch format {
+	case 1:
+		recsize = 2
+		size = 6 + numEntries*recsize
+		b = b[6:size]
+	case 2:
+		recsize = 6
+		size = 4 + numEntries*recsize
+		b = b[4:size]
+	default:
+		trace().Errorf("illegal format %d of class definition table", format)
+		return array{}
+	}
+	return array{recordSize: recsize, length: numEntries, loc: b}
+}
+
+// Lookup returns the class defined for a glyph, or 0 (= default class).
+func (cdef *ClassDefinitions) Lookup(glyph GlyphIndex) int {
+	return cdef.records.Lookup(glyph)
 }
 
 // --- LangSys table ---------------------------------------------------------

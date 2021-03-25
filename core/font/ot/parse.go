@@ -218,7 +218,7 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		if width <= enc.width {
 			continue
 		}
-		link, err := parseLink32(rec, 4, b, "Subtable") // link to subtable
+		link, err := parseLink32(rec, 4, b, "cmap.Subtable")
 		if err != nil {
 			trace().Infof("cmap sub-table cannot be parsed")
 			continue
@@ -267,7 +267,7 @@ type kernSubTableHeader struct {
 // parseKern parses the kern table. There is significant confusion with this table
 // concerning format differences between OpenType, TrueType, and fonts in the wild.
 // We currently only support kern table format 0, which should be supported on any
-// platform. In the real world, fonts usually have just on kern sub-table, and
+// platform. In the real world, fonts usually have just one kern sub-table, and
 // older Windows versions cannot handle more than one.
 func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	if size <= 4 {
@@ -443,13 +443,13 @@ func parseGDefHeader(gdef *GDefTable, b fontBinSegm, err error) error {
 	return err
 }
 
-// Thise table uses the same format as the Class Definition table (defined in the
+// This table uses the same format as the Class Definition table (defined in the
 // OpenType Layout Common Table Formats chapter).
 func parseGlyphClassDefinitions(gdef *GDefTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	offset := gdef.Header().OffsetFor(GDefGlyphClassDefSection)
+	offset := gdef.Header().offsetFor(GDefGlyphClassDefSection)
 	if offset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -458,7 +458,7 @@ func parseGlyphClassDefinitions(gdef *GDefTable, b fontBinSegm, err error) error
 	if err != nil {
 		return err
 	}
-	gdef.classDef = cdef
+	gdef.GlyphClassDef = cdef
 	return nil
 }
 
@@ -475,7 +475,7 @@ func parseAttachmentPointList(gdef *GDefTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	offset := gdef.Header().OffsetFor(GDefAttachListSection)
+	offset := gdef.Header().offsetFor(GDefAttachListSection)
 	if offset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -492,7 +492,7 @@ func parseAttachmentPointList(gdef *GDefTable, b fontBinSegm, err error) error {
 		return errFontFormat("GDEF attachement point coverage table unreadable")
 	}
 	count, _ := b.u16(2)
-	gdef.attachPointList = AttachmentPointList{
+	gdef.AttachmentPointList = AttachmentPointList{
 		Count:              int(count),
 		Coverage:           coverage,
 		attachPointOffsets: b[4:],
@@ -506,7 +506,7 @@ func parseMarkAttachmentClassDef(gdef *GDefTable, b fontBinSegm, err error) erro
 	if err != nil {
 		return err
 	}
-	offset := gdef.Header().OffsetFor(GDefMarkAttachClassSection)
+	offset := gdef.Header().offsetFor(GDefMarkAttachClassSection)
 	if offset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -515,7 +515,7 @@ func parseMarkAttachmentClassDef(gdef *GDefTable, b fontBinSegm, err error) erro
 	if err != nil {
 		return err
 	}
-	gdef.markAttachClassDef = cdef
+	gdef.MarkAttachmentClassDef = cdef
 	return nil
 }
 
@@ -525,7 +525,7 @@ func parseMarkGlyphSets(gdef *GDefTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	offset := gdef.Header().OffsetFor(GDefMarkGlyphSetsDefSection)
+	offset := gdef.Header().offsetFor(GDefMarkGlyphSetsDefSection)
 	if offset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -537,7 +537,7 @@ func parseMarkGlyphSets(gdef *GDefTable, b fontBinSegm, err error) error {
 		if coverage == nil {
 			return errFontFormat("GDEF mark glyph set coverage table unreadable")
 		}
-		gdef.markGlyphSets = append(gdef.markGlyphSets, coverage)
+		gdef.MarkGlyphSets = append(gdef.MarkGlyphSets, coverage)
 	}
 	return nil
 }
@@ -785,16 +785,17 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
 	if err := binary.Read(r, binary.BigEndian, &cdef.format); err != nil {
 		return cdef, err
 	}
-	var n uint16
+	var n, g uint16
 	if cdef.format == 1 {
-		n, _ = b.u16(4)
+		n, _ = b.u16(4) // number of glyph IDs in table
+		g, _ = b.u16(2) // start glyph ID
 	} else if cdef.format == 2 {
-		n, _ = b.u16(2)
+		n, _ = b.u16(2) // number of glyph ID ranges in table
 	} else {
 		return cdef, errFontFormat(fmt.Sprintf("unknown ClassDef format %d", n))
 	}
-	cdef.count = int(n)
-	cdef.size = cdef.calcSize(int(n))
+	records := cdef.makeArray(b, int(n), cdef.format)
+	cdef.setRecords(records, GlyphIndex(g))
 	return cdef, nil
 }
 

@@ -32,14 +32,22 @@ func TestCMapTableGlyphIndex(t *testing.T) {
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	f := loadTestFont(t, "gentiumplus")
-	otf, err := Parse(f.F.Binary)
-	if err != nil {
-		core.UserError(err)
-		t.Fatal(err)
-	}
+	otf := parseFont(t, "calibri")
 	t.Logf("otf.header.tag = %x", otf.Header.FontType)
-	t.Error("TODO CMap Test check")
+	table := getTable(otf, "cmap", t)
+	cmap := table.Self().AsCMap()
+	if cmap == nil {
+		t.Fatal("cannot convert cmap table")
+	}
+	r := rune('A')
+	glyph := cmap.GlyphIndexMap.Lookup(r)
+	if glyph == 0 {
+		t.Error("expected glyph position for 'A', got 0")
+	}
+	t.Logf("glyph ID = %d | 0x%x", glyph, glyph)
+	if glyph != 4 {
+		t.Errorf("expected glyph position for 'A' to be 4, got %d", glyph)
+	}
 }
 
 func TestParseGPos(t *testing.T) {
@@ -191,4 +199,49 @@ func TestParseOtherTables(t *testing.T) {
 	if hhea.NumberOfHMetrics != 3843 {
 		t.Errorf("expected Calibri to have 3843 metrics, but %d indicated", hhea.NumberOfHMetrics)
 	}
+}
+
+func TestParseGDef(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := parseFont(t, "calibri")
+	table := getTable(otf, "GDEF", t)
+	gdef := table.Self().AsGDef()
+	if gdef.GlyphClassDef.format == 0 {
+		t.Fatalf("GDEF table has not GlyphClassDef section")
+	}
+	// Calibri uses glyph class def format 2
+	t.Logf("GDEF.GlyphClassDef.Format = %d", gdef.GlyphClassDef.format)
+	glyph := GlyphIndex(1380) // ID of uni0336 in Calibri
+	clz := gdef.GlyphClassDef.Lookup(glyph)
+	t.Logf("gylph class for uni0336|1280 is %d", clz)
+	if clz != 3 {
+		t.Errorf("expected to be uni0336 of class 3 (mark), is %d", clz)
+	}
+}
+
+// ---------------------------------------------------------------------------
+
+func getTable(otf *Font, name string, t *testing.T) Table {
+	table := otf.tables[T(name)]
+	if table == nil {
+		t.Fatalf("table %s not found in font", name)
+	}
+	return table
+}
+
+func parseFont(t *testing.T, pattern string) *Font {
+	otf := loadTestFont(t, pattern)
+	if otf == nil {
+		return nil
+	}
+	otf, err := Parse(otf.F.Binary)
+	if err != nil {
+		core.UserError(err)
+		t.Fatal(err)
+	}
+	t.Logf("--- font parsed ---")
+	return otf
 }

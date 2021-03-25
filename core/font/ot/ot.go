@@ -212,6 +212,17 @@ func (self TableSelf) NameTag() Tag {
 	return self.tableBase.name
 }
 
+// AsCMap returns this table as a cmap table, or nil.
+func (self TableSelf) AsCMap() *CMapTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
+		return nil
+	}
+	if k, ok := self.tableBase.self.(*CMapTable); ok {
+		return k
+	}
+	return nil
+}
+
 // AsGPos returns this table as a GPOS table, or nil.
 func (self TableSelf) AsGPos() *GPosTable {
 	if self.tableBase == nil || self.tableBase.self == nil {
@@ -229,6 +240,17 @@ func (self TableSelf) AsGSub() *GSubTable {
 		return nil
 	}
 	if g, ok := self.tableBase.self.(*GSubTable); ok {
+		return g
+	}
+	return nil
+}
+
+// AsGDef returns this table as a GDEF table, or nil.
+func (self TableSelf) AsGDef() *GDefTable {
+	if self.tableBase == nil || self.tableBase.self == nil {
+		return nil
+	}
+	if g, ok := self.tableBase.self.(*GDefTable); ok {
 		return g
 	}
 	return nil
