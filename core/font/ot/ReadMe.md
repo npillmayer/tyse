@@ -55,3 +55,37 @@ A better suited blueprint of what we're trying to accomplish is this implementat
 in Rust:
 
 * https://github.com/bodoni/opentype
+
+### Abstractions
+
+Package `ot` will not provide functions to interpret any table of a font, but rather
+just expose the tables to the client. For example, it is not possible to ask
+package `ot` for a kerning distance between two glyphs. Clients have to check
+for the availability of kerning information and consult the appropriate table(s)
+themselves. From this point of view, `ot` is a low-level package.
+
+The binary data of a font can be thought of as a bunch of structures
+connected by links. The linking is done by offsets (u16 or u32) from link anchors
+defined by the spec. Data-structures may be categorized into fields-like,
+list-like and map-like. The implementation details of these structures vary
+heavily, and many internal tables combine more than one category, but conceptually it
+should be possible to navigate the graph, spanned by links and structures,
+without caring about implementation details.
+Consider this overview of OpenType Layout tables (GSUB and GPOS):
+
+<div style="width:580px;padding:5px;padding-bottom:10px">
+<img alt="OpenType structure for layout tables"
+ src="http://npillmayer.github.io/img/OpenType-layout-table.svg"
+ width="580px">
+</div>
+
+GSUB is an important table for text shaping, so package `ot` offers a special type.
+However, this type is not exposing GSUB in full depth.
+To find out if the current font contains features applicable for Latin script with
+Turkish language flavour, type:
+
+    list := gsub.Scripts.Lookup(T("latn")).Navigate().Map().Lookup(T("TRK")).Navigate().List()
+    fmt.Println("list of length %d for Turkish", list.Len())
+    // => yields 24
+
+This is an early draft, not suited to be used by other programs.
