@@ -555,10 +555,49 @@ func viewLookup(b NavLocation) Lookup {
 	return lookup
 }
 
+// Each LookupType has one or more subtable formats. The “best” format depends on the
+// type of substitution and the resulting storage efficiency. When glyph information
+// is best presented in more than one format, a single lookup may define more than
+// one subtable, as long as all the subtables are for the same LookupType.
 type LookupSubtable struct {
-	format   uint16
-	coverage Coverage
-	index    varArray
+	lookupType LayoutTableLookupType // GPOS types are shifted to the high byte
+	format     uint16
+	coverage   Coverage
+	index      varArray
 }
 
-//var _ NavMap = LookupSubtable{}
+// Lookup returns a byte segment as output of applying lookup lksub to input glyph g.
+// g is shortened from 32-bit to 16-bit by using the low bits.
+//
+// If g is not identified as applicable for the lookup feature, an emtpy byte segment
+// is returned.
+//
+func (lksub LookupSubtable) Lookup(g uint32) NavLocation {
+	inx, ok := lksub.coverage.GlyphRange.Lookup(GlyphIndex(g >> 16))
+	if !ok {
+		return fontBinSegm{}
+	}
+	trace().Debugf("lookup of 0x%x -> %d", g, inx)
+	return fontBinSegm{} // TODO
+}
+
+func (lksub LookupSubtable) Name() string {
+	return "LookupSubtable"
+}
+
+// LookupTag is not defined for LookupSubtable and will return a void link.
+func (lksub LookupSubtable) LookupTag(tag Tag) NavLink {
+	return nullLink("cannot lookup tag in LookupSubtable")
+}
+
+// IsTagRecordMap returns false
+func (lksub LookupSubtable) IsTagRecordMap() bool {
+	return false
+}
+
+// AsTagRecordMap returns an empty TagRecordMap
+func (lksub LookupSubtable) AsTagRecordMap() TagRecordMap {
+	return tagRecordMap16{}
+}
+
+var _ NavMap = LookupSubtable{}

@@ -128,8 +128,11 @@ func (b fontBinSegm) u32(i int) (uint32, error) {
 
 // --- Ranges of glyphs ------------------------------------------------------
 
+// GlyphRange is a type frequently used by sub-tables of layout tables (GPOS and GSUB).
+// If an input glyph g is contained in the range, and index and true is returned,
+// false otherwise.
 type GlyphRange interface {
-	Lookup(g rune) (int, bool)
+	Lookup(g GlyphIndex) (int, bool) // is glyph ID g
 	ByteSize() int
 }
 
@@ -143,7 +146,7 @@ type glyphRangeArray struct {
 // glyphRangeArrays have entries stored as a block of consecutive keys.
 // glyphRangeArrays return the index of the key in the range table.
 // 0 is a valid return value.
-func (r *glyphRangeArray) Lookup(g rune) (int, bool) {
+func (r *glyphRangeArray) Lookup(g GlyphIndex) (int, bool) {
 	if r.count <= 0 {
 		return 0, false
 	}
@@ -152,7 +155,7 @@ func (r *glyphRangeArray) Lookup(g rune) (int, bool) {
 			k, err := r.data.u32(i * 4)
 			if err != nil {
 				return 0, false
-			} else if rune(k) == g {
+			} else if GlyphIndex(k) == g {
 				return i, true
 			}
 		}
@@ -161,7 +164,7 @@ func (r *glyphRangeArray) Lookup(g rune) (int, bool) {
 			k, err := r.data.u16(i * 2)
 			if err != nil {
 				return 0, false
-			} else if rune(k) == g {
+			} else if GlyphIndex(k) == g {
 				return i, true
 			}
 		}
@@ -188,7 +191,7 @@ type glyphRangeRecords struct {
 // glyphRangeRecords have entries stored as range records.
 // glyphRangeRecords return the index of the key in the range table.
 // 0 is a valid return value.
-func (r *glyphRangeRecords) Lookup(g rune) (int, bool) {
+func (r *glyphRangeRecords) Lookup(g GlyphIndex) (int, bool) {
 	if r.count <= 0 {
 		return 0, false
 	}
