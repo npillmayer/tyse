@@ -87,8 +87,8 @@ glyphs themselves, include the so-called “layout-tables”.
 GSUB is an important table for text shaping, so package `ot` offers a special type.
 However, this type is not exposing GSUB in full depth! Thus we type:
 
-    list := gsub.Scripts.Lookup(T("latn")).Navigate().Map().Lookup(T("TRK")).Navigate().List()
-    fmt.Println("list of length %d for Turkish", list.Len())
+    feats := gsub.ScriptList.LookupTag(T("latn")).Navigate().Map().LookupTag(T("TRK")).Navigate().List()
+    fmt.Println("%d features for Turkish", feats.Len())
     // => yields 24
 
 If you happen to not know the OpenType specification by heart, I'll help you out:

@@ -30,6 +30,7 @@ type Navigator interface {
 //
 type NavMap interface {
 	Lookup(uint32) NavLocation
+	LookupTag(Tag) NavLink
 	Name() string
 	IsTagRecordMap() bool
 	AsTagRecordMap() TagRecordMap
