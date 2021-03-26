@@ -77,15 +77,15 @@ func TestParseGPos(t *testing.T) {
 	if gpos == nil {
 		t.Fatalf("cannot find a GPOS table")
 	}
-	t.Logf("otf.GPOS: %d features:", gpos.Features.Count())
-	for i, ft := range gpos.Features.Tags() {
+	t.Logf("otf.GPOS: %d features:", gpos.FeatureList.Count())
+	for i, ft := range gpos.FeatureList.Tags() {
 		t.Logf("[%d] feature '%s'", i, ft)
 	}
-	if gpos.Features.Count() != 27 {
-		t.Errorf("expected 41 features, have %d", gpos.Features.Count())
+	if gpos.FeatureList.Count() != 27 {
+		t.Errorf("expected 41 features, have %d", gpos.FeatureList.Count())
 	}
-	t.Logf("otf.GPOS: %d scripts:", gpos.Scripts.Count())
-	_ = gpos.Scripts.Tags()
+	t.Logf("otf.GPOS: %d scripts:", gpos.ScriptList.Count())
+	_ = gpos.ScriptList.Tags()
 	// t.Logf("otf.GPOS: %d scripts:", len(gpos.scripts))
 	// for i, sc := range gpos.scripts {
 	// 	t.Logf("[%d] script '%s'", i, sc.Tag)
@@ -123,12 +123,12 @@ func TestParseGSub(t *testing.T) {
 	if gsub == nil {
 		t.Fatalf("cannot find a GSUB table")
 	}
-	t.Logf("otf.GSUB: %d features:", gsub.Features.Count())
-	for i, ft := range gsub.Features.Tags() {
+	t.Logf("otf.GSUB: %d features:", gsub.FeatureList.Count())
+	for i, ft := range gsub.FeatureList.Tags() {
 		t.Logf("[%d] feature '%s'", i, ft)
 	}
-	if gsub.Features.Count() != 41 {
-		t.Errorf("expected 41 features, have %d", gsub.Features.Count())
+	if gsub.FeatureList.Count() != 41 {
+		t.Errorf("expected 41 features, have %d", gsub.FeatureList.Count())
 	}
 	// t.Logf("otf.GSUB: %d scripts:", len(gsub.scripts))
 	// for i, sc := range gsub.scripts {

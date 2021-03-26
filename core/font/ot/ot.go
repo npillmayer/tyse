@@ -42,7 +42,7 @@ type FontHeader struct {
 // For example to receive the `OS/2` and the `loca` table, clients may call
 //
 //    os2  := otf.Table(ot.T("OS/2"))
-//    loca := otf.Table(ot.T("loca")).Base().AsLoca()
+//    loca := otf.Table(ot.T("loca")).Self().AsLoca()
 //
 // Table tag names are case-sensitive, following the names in the OpenType specification,
 // i.e., one of:
@@ -545,7 +545,7 @@ func (n nameNames) Name() string {
 	return "name" // name of 'name' OT table
 }
 
-func (n nameNames) Map() TagRecordMap {
+func (n nameNames) Map() NavMap {
 	namesMap := make(map[Tag]link16)
 	for i := 0; i < n.nameRecs.length; i++ {
 		nameRecord := n.nameRecs.UnsafeGet(i)

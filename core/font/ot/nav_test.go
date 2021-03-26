@@ -20,9 +20,9 @@ func TestNavLink(t *testing.T) {
 		t.Fatal("cannot locate table GSUB in font")
 	}
 	gsub := table.Self().AsGSub()
-	recname := gsub.Scripts.Lookup(T("latn")).Navigate().Name()
+	recname := gsub.ScriptList.LookupTag(T("latn")).Navigate().Name()
 	t.Logf("walked to %s", recname)
-	lang := gsub.Scripts.Lookup(T("latn")).Navigate().Map().Lookup(T("TRK"))
+	lang := gsub.ScriptList.LookupTag(T("latn")).Navigate().Map().AsTagRecordMap().LookupTag(T("TRK"))
 	langlist := lang.Navigate().List()
 	t.Logf("list is %s of length %v", lang.Name(), langlist.Len())
 	if lang.Name() != "LangSys" || langlist.Len() != 24 {
@@ -45,7 +45,7 @@ func TestTableNav(t *testing.T) {
 		t.Errorf("expected table to have name 'name', have %s", name)
 	}
 	key := MakeTag([]byte{3, 1, 0, 1}) // Windows 1-encoded field 1 = Font Family Name
-	x := table.Fields().Map().Lookup(key).Navigate().Name()
+	x := table.Fields().Map().AsTagRecordMap().LookupTag(key).Navigate().Name()
 	if x != "Calibri" {
 		t.Errorf("expected Windows/1 encoded field 1 to be 'Calibri', is %s", x)
 	}

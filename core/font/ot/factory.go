@@ -4,20 +4,35 @@ import "fmt"
 
 // Navigator is an interface type to wrap various kinds of OpenType structure.
 // On any given Navigator item, not all of the functions may result in sensible
-// values returned. For example, OpenType map-like structures will return a tag
+// values returned. For example, OpenType map-like structures will return a
 // map with a call to `Map`, but will return an invalid `Link` and an empty
-// `List`.
+// `List`. A Navigator may contain more than one OT structure, thus more than
+// one such call may return a valid non-void entry.
 //
 // If a previous call in a navigation chain has caused an error, successing Navigator
-// items will remember that error (call to `Error`) and will wrap only void Navigators.
+// items will remember that error (call to `Error`) and will wrap only void Navigators
+// (nil-safe).
 //
 type Navigator interface {
+	Name() string  // returns the name of the underlying OpenType table
+	Link() NavLink // non-void if Navigator contains a link
+	Map() NavMap   // non-void if Navigator contains a map-like
+	List() NavList // non-void if Navigator contains a list-like
+	IsVoid() bool  // may be true if a previous error in the call chain occured
+	Error() error  // previous error in call chain, if any
+}
+
+// NavMap wraps OpenType structures which are map-like. Lookup is always done on
+// 32-bit values, even if the map's keys are 16-bit (will be shortened to low
+// bytes in such cases).
+//
+// TagRecordMap is a special kind of NavMap.
+//
+type NavMap interface {
+	Lookup(uint32) NavLocation
 	Name() string
-	Link() NavLink
-	Map() TagRecordMap
-	List() NavList
-	IsVoid() bool
-	Error() error
+	IsTagRecordMap() bool
+	AsTagRecordMap() TagRecordMap
 }
 
 func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
@@ -88,7 +103,7 @@ func (nbase navBase) Link() NavLink {
 	return nullLink("generic link class")
 }
 
-func (nbase navBase) Map() TagRecordMap {
+func (nbase navBase) Map() NavMap {
 	return tagRecordMap16{}
 }
 
@@ -114,14 +129,14 @@ func (nbase navBase) Error() error {
 type linkAndMap struct {
 	err  error
 	link NavLink
-	tmap TagRecordMap
+	tmap NavMap
 }
 
 func (lm linkAndMap) Link() NavLink {
 	return lm.link
 }
 
-func (lm linkAndMap) Map() TagRecordMap {
+func (lm linkAndMap) Map() NavMap {
 	return lm.tmap
 }
 
@@ -130,7 +145,7 @@ func (lm linkAndMap) List() NavList {
 }
 
 func (lm linkAndMap) IsVoid() bool {
-	return lm.tmap.Count() == 0
+	return lm.tmap == nil
 }
 
 func (lm linkAndMap) Name() string {

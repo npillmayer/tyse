@@ -59,9 +59,9 @@ in Rust:
 ### Abstractions
 
 Package `ot` will not provide functions to interpret any table of a font, but rather
-just expose the tables to the client. For example, it is not possible to ask
-package `ot` for a kerning distance between two glyphs. Clients have to check
-for the availability of kerning information and consult the appropriate table(s)
+expose the tables to the client in a semantic way. It is not possible to, for example, ask
+package `ot` for a kerning distance between two glyphs. Instead, clients have to check
+for the availability of kerning tables and consult the appropriate table(s)
 themselves. From this point of view, `ot` is a low-level package.
 
 The binary data of a font can be thought of as a bunch of structures
@@ -79,13 +79,13 @@ Consider this overview of OpenType Layout tables (GSUB and GPOS):
  width="580px">
 </div>
 
-GSUB is an important table for text shaping, so package `ot` offers a special type.
+GSUB is an important table for text shaping, so package `ot` offers a special semantic type.
 However, this type is not exposing GSUB in full depth.
 To find out if the current font contains features applicable for Latin script with
 Turkish language flavour, type:
 
     list := gsub.Scripts.Lookup(T("latn")).Navigate().Map().Lookup(T("TRK")).Navigate().List()
     fmt.Println("list of length %d for Turkish", list.Len())
-    // => yields 24
+    // => yields 24 with font 'Calibri'
 
 This is an early draft, not suited to be used by other programs.

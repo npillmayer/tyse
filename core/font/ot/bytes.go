@@ -391,7 +391,8 @@ func (l32 link32) Navigate() Navigator {
 	if l32.err != nil {
 		return null(l32.err)
 	}
-	return nil
+	panic("link32 navigation not yet implemented")
+	//return nil
 }
 
 // --- Arrays ----------------------------------------------------------------
@@ -402,18 +403,18 @@ type array struct {
 	loc        fontBinSegm
 }
 
-func parseArrary32(b fontBinSegm) array {
-	if b.Size()&0x11 != 0 {
-		trace().Errorf("cannot create array32: size not aligned")
-		return array{}
-	}
-	n := b.Size() / 4
-	return array{
-		recordSize: 4,
-		length:     n,
-		loc:        b,
-	}
-}
+// func parseArray32(b fontBinSegm) array {
+// 	if b.Size()&0x11 != 0 {
+// 		trace().Errorf("cannot create array32: size not aligned")
+// 		return array{}
+// 	}
+// 	n := b.Size() / 4
+// 	return array{
+// 		recordSize: 4,
+// 		length:     n,
+// 		loc:        b,
+// 	}
+// }
 
 func viewArray16(b fontBinSegm) array {
 	if b.Size()&0x1 != 0 {
@@ -453,6 +454,7 @@ func viewArray(b fontBinSegm, recordSize int) array {
 	}
 }
 
+// Size of array a in bytes.
 func (a array) Size() int {
 	return a.length * a.recordSize
 }
@@ -465,6 +467,46 @@ func (a array) UnsafeGet(i int) NavLocation {
 	return b
 }
 
+func (a array) All() []NavLocation {
+	r := make([]NavLocation, a.length)
+	for i := 0; i < a.length; i++ {
+		x := a.UnsafeGet(i)
+		r = append(r, x)
+	}
+	return r
+}
+
+type varArray struct {
+	name         string
+	ptrs         array
+	indirections int
+	base         fontBinSegm
+}
+
+func parseVarArrary16(b fontBinSegm, szOffset, indirections int, name string) varArray {
+	if len(b) < 6 {
+		trace().Errorf("byte segment too small to parse variable array")
+		return varArray{}
+	}
+	cnt, _ := b.u16(szOffset)
+	va := varArray{name: name, indirections: indirections, base: b}
+	va.ptrs = array{recordSize: 2, length: int(cnt), loc: b[szOffset+2:]}
+	return va
+}
+
+func (va varArray) Get(i int) (NavLocation, error) {
+	var err error
+	var a array = va.ptrs
+	var b NavLocation
+	for i := 0; i < va.indirections; i++ {
+		b := a.UnsafeGet(i) // TODO will this create an infinite loop in case of error?
+		if i+1 < va.indirections {
+			a, err = parseArray16(b.Bytes(), 0)
+		}
+	}
+	return b, err
+}
+
 // --- Tag record map --------------------------------------------------------
 
 // A TagRecordMap is a dict-type (map) to receive a data record (returned as a link)
@@ -472,14 +514,14 @@ func (a array) UnsafeGet(i int) NavLocation {
 // instances, e.g.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
 type TagRecordMap interface {
-	Name() string       // OpenType specification name of this map
-	Lookup(Tag) NavLink // returns the link associated with a given tag
-	Tags() []Tag        // returns all the tags which the map uses as keys
-	Count() int         // number of entries in the map
+	Name() string          // OpenType specification name of this map
+	LookupTag(Tag) NavLink // returns the link associated with a given tag
+	Tags() []Tag           // returns all the tags which the map uses as keys
+	Count() int            // number of entries in the map
 }
 
 // recsize is the byte size of the record entry not including the Tag.
-func parseTagRecordMap16(b fontBinSegm, offset int, base fontBinSegm, name, target string) TagRecordMap {
+func parseTagRecordMap16(b fontBinSegm, offset int, base fontBinSegm, name, target string) tagRecordMap16 {
 	N, err := b.u16(offset)
 	if err != nil {
 		return tagRecordMap16{}
@@ -503,10 +545,16 @@ type tagRecordMap16 struct {
 	records array
 }
 
+// Lookup returns the bytes referenced by m[Tag(n)]
+func (m tagRecordMap16) Lookup(n uint32) NavLocation {
+	tag := Tag(n)
+	return m.LookupTag(tag).Jump()
+}
+
 // Lookup returns the link associated with a given tag.
 //
 // TODO binary search with |N| > ?
-func (m tagRecordMap16) Lookup(tag Tag) NavLink {
+func (m tagRecordMap16) LookupTag(tag Tag) NavLink {
 	if len(m.base) == 0 {
 		trace().Debugf("tag record map has null-base")
 		return link16{}
@@ -550,6 +598,14 @@ func (m tagRecordMap16) Count() int {
 	return m.records.length
 }
 
+func (m tagRecordMap16) IsTagRecordMap() bool {
+	return true
+}
+
+func (m tagRecordMap16) AsTagRecordMap() TagRecordMap {
+	return m
+}
+
 type mapWrapper struct {
 	names nameNames // TODO de-couple from  table 'name'
 	m     map[Tag]link16
@@ -564,12 +620,18 @@ func (mw mapWrapper) Count() int {
 	return len(mw.m)
 }
 
-func (mw mapWrapper) Lookup(tag Tag) NavLink {
+func (mw mapWrapper) LookupTag(tag Tag) NavLink {
 	if link, ok := mw.m[tag]; ok {
 		trace().Debugf("NameRecord link for %x = %v", tag, link)
 		return link
 	}
 	return nullLink(fmt.Sprintf("no name for key %d", tag))
+}
+
+// Lookup returns the bytes referenced by m[Tag(n)]
+func (mw mapWrapper) Lookup(n uint32) NavLocation {
+	tag := Tag(n)
+	return mw.LookupTag(tag).Jump()
 }
 
 func (mw mapWrapper) Tags() []Tag {
@@ -578,6 +640,14 @@ func (mw mapWrapper) Tags() []Tag {
 		tags = append(tags, k)
 	}
 	return tags
+}
+
+func (mw mapWrapper) IsTagRecordMap() bool {
+	return true
+}
+
+func (mw mapWrapper) AsTagRecordMap() TagRecordMap {
+	return mw
 }
 
 // NavList represents a sequence of—possibly unequal sized—items, addressable by

@@ -560,7 +560,7 @@ func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	}
 	mj, mn := gpos.header.Version()
 	trace().Debugf("GPOS table has version %d.%d", mj, mn)
-	trace().Debugf("GPOS table has %d lookup list entries", len(gpos.lookups))
+	trace().Debugf("GPOS table has %d lookup list entries", gpos.LookupList.length)
 	return gpos, err
 }
 
@@ -582,7 +582,7 @@ func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	}
 	mj, mn := gsub.header.Version()
 	trace().Debugf("GSUB table has version %d.%d", mj, mn)
-	trace().Debugf("GSUB table has %d lookup list entries", len(gsub.lookups))
+	trace().Debugf("GSUB table has %d lookup list entries", gsub.LookupList.length)
 	return gsub, err
 }
 
@@ -591,7 +591,7 @@ func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // parseLayoutHeader parses a layout table header, i.e. reads version information
 // and header information (containing offsets).
 // Supports header versions 1.0 and 1.1
-func parseLayoutHeader(lytt *LayoutTable, b []byte, err error) error {
+func parseLayoutHeader(lytt *LayoutTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -620,82 +620,88 @@ func parseLayoutHeader(lytt *LayoutTable, b []byte, err error) error {
 
 // --- Layout table lookup list ----------------------------------------------
 
+// No longer used.
+//
 // parseLookup parses a single Lookup record. b expected to be the beginning of LookupList.
 // See https://www.microsoft.com/typography/otspec/chapter2.htm#featTbl
 //
 // A lookup record starts with type and flag fields, followed by a count of
 // sub-tables.
-func parseLookup(b []byte, offset uint16) (*lookupRecord, error) {
+func parseLookup(b fontBinSegm, offset uint16) (*Lookup, error) {
 	if int(offset) >= len(b) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	r := bytes.NewReader(b[offset:])
-	var lookup lookupRecord
-	if err := binary.Read(r, binary.BigEndian, &lookup.lookupRecordInfo); err != nil {
+	var lookup Lookup
+	if err := binary.Read(r, binary.BigEndian, &lookup.lookupInfo); err != nil {
 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
 	}
 	//trace().Debugf("lookup table (%d) has %d subtables", lookup.Type, lookup.SubRecordCount)
-	subs := make([]uint16, lookup.SubRecordCount, lookup.SubRecordCount)
+	subs := make([]uint16, lookup.SubTableCount, lookup.SubTableCount)
 	if err := binary.Read(r, binary.BigEndian, &subs); err != nil {
 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
 	}
-	lookup.subrecordOffsets = subs
-	if lookup.Type != GSUB_LUTYPE_Single {
-		return &lookup, nil
-	}
-	for i := 0; i < len(subs); i++ {
-		off := subs[i]
-		//trace().Debugf("offset of sub-table[%d] = %d", i, subs[i])
-		r = bytes.NewReader(b[offset+off:])
-		subst := lookupSubstFormat1{}
-		if err := binary.Read(r, binary.BigEndian, &subst); err != nil {
-			return nil, fmt.Errorf("reading lookupRecord: %s", err)
-		}
-		//trace().Debugf("   format spec = %d", subst.Format)
-		if subst.Format == 2 {
-			subst2 := lookupSubstFormat2{}
-			subst2.lookupSubstFormat1 = subst
-			if err := read16arr(r, &subst2.SubstituteGlyphIDs, int(subst.Glyphs)); err != nil {
-				return nil, err
-			}
-		}
-	}
+	// lookup.subrecordOffsets = subs
+	// if lookup.Type != GSUB_LUTYPE_Single {
+	// 	return &lookup, nil
+	// }
+	// for i := 0; i < len(subs); i++ {
+	// 	off := subs[i]
+	// 	//trace().Debugf("offset of sub-table[%d] = %d", i, subs[i])
+	// 	r = bytes.NewReader(b[offset+off:])
+	// 	subst := lookupSubstFormat1{}
+	// 	if err := binary.Read(r, binary.BigEndian, &subst); err != nil {
+	// 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
+	// 	}
+	// 	//trace().Debugf("   format spec = %d", subst.Format)
+	// 	if subst.Format == 2 {
+	// 		subst2 := lookupSubstFormat2{}
+	// 		subst2.lookupSubstFormat1 = subst
+	// 		if err := read16arr(r, &subst2.SubstituteGlyphIDs, int(subst.Glyphs)); err != nil {
+	// 			return nil, err
+	// 		}
+	// 	}
+	// }
 	// TODO Read lookup.MarkFilteringSet  ?
 	return &lookup, nil
 }
 
 // parseLookupList parses the LookupList.
 // See https://www.microsoft.com/typography/otspec/chapter2.htm#lulTbl
-func parseLookupList(lytt *LayoutTable, b []byte, err error) error {
+func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	lloffset := lytt.header.OffsetFor(LayoutLookupSection)
+	lloffset := lytt.header.offsetFor(LayoutLookupSection)
 	if lloffset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
 	b = b[lloffset:]
-	r := bytes.NewReader(b)
-	var count uint16
-	if err := binary.Read(r, binary.BigEndian, &count); err != nil {
-		return fmt.Errorf("reading lookup count: %s", err)
-	}
-	trace().Debugf("font has %d lookup list entries", count)
-	if count > 0 {
-		lookupOffsets := make([]uint16, count, count)
-		if err := binary.Read(r, binary.BigEndian, &lookupOffsets); err != nil {
-			return fmt.Errorf("reading lookup offsets: %s", err)
-		}
-		lytt.lookups = nil
-		for i := 0; i < int(count); i++ {
-			//trace().Debugf("lookup offset #%d = %d", i, lookupOffsets[i])
-			lookup, err := parseLookup(b, lookupOffsets[i])
-			if err != nil {
-				return err
-			}
-			lytt.lookups = append(lytt.lookups, lookup)
-		}
-	}
+	//
+	ll := LookupList{}
+	ll.array, ll.err = parseArray16(b, 0)
+	lytt.LookupList = ll
+	// r := bytes.NewReader(b)
+	// var count uint16
+	// if err := binary.Read(r, binary.BigEndian, &count); err != nil {
+	// 	return fmt.Errorf("reading lookup count: %s", err)
+	// }
+	// trace().Debugf("font has %d lookup list entries", count)
+	// if count > 0 {
+	// 	lookupOffsets := make([]uint16, count, count)
+	// 	if err := binary.Read(r, binary.BigEndian, &lookupOffsets); err != nil {
+	// 		return fmt.Errorf("reading lookup offsets: %s", err)
+	// 	}
+	// 	lytt.LookupList = nil
+	// 	for i := 0; i < int(count); i++ {
+	// 		//trace().Debugf("lookup offset #%d = %d", i, lookupOffsets[i])
+	// 		lookup, err := parseLookup(b, lookupOffsets[i])
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		lytt.LookupList = append(lytt.LookupList, lookup)
+	// 	}
+	// }
 	return nil
 }
 
@@ -722,11 +728,11 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 	// }
 	// lytt.features = frecords
 	// return nil
-	lytt.Features = tagRecordMap16{}
-	link := link16{base: b, offset: uint16(lytt.header.OffsetFor(LayoutFeatureSection))}
+	lytt.FeatureList = tagRecordMap16{}
+	link := link16{base: b, offset: uint16(lytt.header.offsetFor(LayoutFeatureSection))}
 	features := link.Jump() // now we stand at the FeatureList table
 	featureRecords := parseTagRecordMap16(features.Bytes(), 0, features.Bytes(), "FeatureList", "Feature")
-	lytt.Features = featureRecords
+	lytt.FeatureList = featureRecords
 	return nil
 }
 
@@ -766,11 +772,11 @@ func parseScriptList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	lytt.Scripts = tagRecordMap16{}
-	link := link16{base: b, offset: uint16(lytt.header.OffsetFor(LayoutScriptSection))}
+	lytt.ScriptList = tagRecordMap16{}
+	link := link16{base: b, offset: uint16(lytt.header.offsetFor(LayoutScriptSection))}
 	scripts := link.Jump() // now we stand at the ScriptList table
 	scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
-	lytt.Scripts = scriptRecords
+	lytt.ScriptList = scriptRecords
 	return nil
 }
 

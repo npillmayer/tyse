@@ -1,5 +1,9 @@
 package ot
 
+import (
+	"encoding/binary"
+)
+
 /*
 From https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2:
 
@@ -15,10 +19,10 @@ These tables use some of the same data formats.
 // OpenType specifies two such tables–GPOS and GSUB–which share some of their
 // structure.
 type LayoutTable struct {
-	Scripts  TagRecordMap
-	Features TagRecordMap
-	lookups  []*lookupRecord
-	header   *LayoutHeader
+	ScriptList  TagRecordMap
+	FeatureList TagRecordMap
+	LookupList  LookupList
+	header      *LayoutHeader
 }
 
 // Header returns the layout table header for this GSUB table.
@@ -37,7 +41,7 @@ func (h LayoutHeader) Version() (int, int) {
 	return int(h.Major), int(h.Minor)
 }
 
-// OffsetFor returns an offset for a layout table section within the layout table
+// offsetFor returns an offset for a layout table section within the layout table
 // (GPOS or GSUB).
 // A layout table contains four sections:
 // ▪︎ Script Section,
@@ -46,7 +50,7 @@ func (h LayoutHeader) Version() (int, int) {
 // ▪︎ Feature Variations Section.
 // (see type LayoutTableSectionName)
 //
-func (h *LayoutHeader) OffsetFor(which LayoutTableSectionName) int {
+func (h *LayoutHeader) offsetFor(which LayoutTableSectionName) int {
 	switch which {
 	case LayoutScriptSection:
 		return int(h.offsets.ScriptListOffset)
@@ -130,19 +134,6 @@ type scriptRecord struct {
 type featureRecord struct {
 	Tag    Tag
 	Offset uint16
-}
-
-// Layout table lookup list
-type lookupRecord struct {
-	lookupRecordInfo
-	subrecordOffsets []uint16 // Array of offsets to lookup subrecords, from beginning of Lookup table
-	// markFilteringSet uint16 // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
-}
-
-type lookupRecordInfo struct {
-	Type           LayoutTableLookupType
-	Flag           LayoutTableLookupFlag
-	SubRecordCount uint16 // Number of subrecords for this lookup
 }
 
 // --- GDEF table ------------------------------------------------------------
@@ -290,12 +281,18 @@ type AxisTable struct {
 
 // --- Coverage table module -------------------------------------------------
 
-// Each subtable (except an Extension LookupType subtable) in a lookup references
+// Covarage denotes an indexed set of glyphs.
+// Each LookupSubtable (except an Extension LookupType subtable) in a lookup references
 // a Coverage table (Coverage), which specifies all the glyphs affected by a
 // substitution or positioning operation described in the subtable.
 // The GSUB, GPOS, and GDEF tables rely on this notion of coverage. If a glyph does
 // not appear in a Coverage table, the client can skip that subtable and move
 // immediately to the next subtable.
+//
+type Coverage struct {
+	coverageHeader
+	GlyphRange GlyphRange
+}
 
 type coverageHeader struct {
 	CoverageFormat uint16
@@ -431,7 +428,7 @@ func (lsys langSys) Link() NavLink {
 	return nullLink("LangSys records not linkable")
 }
 
-func (lsys langSys) Map() TagRecordMap {
+func (lsys langSys) Map() NavMap {
 	return tagRecordMap16{}
 }
 
@@ -473,3 +470,95 @@ type AttachmentPointList struct {
 	Count              int
 	attachPointOffsets fontBinSegm
 }
+
+// --- Lookup tables ---------------------------------------------------------
+
+// A LookupList table contains an array of offsets to Lookup tables (lookupOffsets).
+// The font developer defines the Lookup sequence in the Lookup array to control the order
+// in which a text-processing client applies lookup data to glyph substitution or
+// positioning operations.
+type LookupList struct {
+	array
+	err error
+}
+
+func (ll LookupList) Len() int {
+	return ll.length
+}
+
+func (ll LookupList) Get(i int) NavLocation {
+	if i < 0 || i >= ll.length {
+		return fontBinSegm{}
+	}
+	return ll.UnsafeGet(i)
+}
+
+// Navigate will navigate to Lookup i in the list.
+func (ll LookupList) Navigate(i int) Lookup {
+	// acts like NavLink
+	if ll.err != nil {
+		return Lookup{}
+	}
+	lookup := ll.Get(i)
+	return viewLookup(lookup)
+}
+
+var _ NavList = LookupList{}
+
+// Lookup tables are contained in a LookupList.
+// A Lookup table defines the specific conditions, type, and results of a substitution or
+// positioning action that is used to implement a feature. For example, a substitution
+// operation requires a list of target glyph indices to be replaced, a list of replacement
+// glyph indices, and a description of the type of substitution action.
+//
+// Each Lookup table may contain only one type of information (LookupType), determined by
+// whether the lookup is part of a GSUB or GPOS table. GSUB supports eight LookupTypes,
+// and GPOS supports nine LookupTypes
+//
+type Lookup struct {
+	lookupInfo
+	err              error
+	subTables        array  // Array of offsets to lookup subrecords, from beginning of Lookup table
+	markFilteringSet uint16 // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
+}
+
+// header information for Lookup table
+type lookupInfo struct {
+	Type          LayoutTableLookupType
+	Flag          LayoutTableLookupFlag
+	SubTableCount uint16 // Number of subtables for this lookup
+}
+
+// viewLookup reads a Lookup from the bytes of a NavLocation. It first parses the
+// lookupInfo and after that parses the subtable record list.
+func viewLookup(b NavLocation) Lookup {
+	if b.Size() < 10 {
+		return Lookup{}
+	}
+	r := b.Reader()
+	lookup := Lookup{}
+	if err := binary.Read(r, binary.BigEndian, &lookup.lookupInfo); err != nil {
+		trace().Errorf("corrupt Lookup table")
+		return Lookup{} // nothing sensible to to except to return empty table
+	}
+	trace().Debugf("Lookup has %d sub-tables", lookup.SubTableCount)
+	//
+	var err error
+	lookup.subTables, err = parseArray16(b.Bytes(), 4)
+	if err != nil {
+		trace().Errorf("corrupt Lookup table")
+		return Lookup{} // nothing sensible to to except to return empty table
+	}
+	if b.Size() >= 4+lookup.subTables.Size()+2 {
+		lookup.markFilteringSet = b.U16(4 + lookup.subTables.Size())
+	}
+	return lookup
+}
+
+type LookupSubtable struct {
+	format   uint16
+	coverage Coverage
+	index    varArray
+}
+
+//var _ NavMap = LookupSubtable{}
