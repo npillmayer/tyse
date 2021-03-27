@@ -477,6 +477,21 @@ type AttachmentPointList struct {
 // The font developer defines the Lookup sequence in the Lookup array to control the order
 // in which a text-processing client applies lookup data to glyph substitution or
 // positioning operations.
+//
+// Lookup tables are essential for implementing the various OpenType font features.
+// The details are sometimes tricky and it's often hard to remember how a lookup type
+// works, if you're not doing it on a daily basis. As this is a low-level package,
+// we focus on decoding the sub-tables for lookups and on abstracting the details
+// of the specific variants of GSUB- and GPOS-lookup away, offering a map-like behaviour.
+//
+// Lookups depend on sub-tables to do the actual work, which in turn may occur in
+// various format versions. This package implements all table/sub-table variants defined by
+// the OT spec, together with the algorithms to access their functionality.
+//
+// Other packages working on top of `ot` should abstract this further and operate
+// in terms of OT features, hiding altogether the existence of lookup lists and lookups from
+// clients.
+//
 type LookupList struct {
 	array
 	err error
@@ -518,8 +533,9 @@ var _ NavList = LookupList{}
 type Lookup struct {
 	lookupInfo
 	err              error
-	subTables        array  // Array of offsets to lookup subrecords, from beginning of Lookup table
-	markFilteringSet uint16 // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
+	subTables        array            // Array of offsets to lookup subrecords, from beginning of Lookup table
+	markFilteringSet uint16           // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
+	subTablesCache   []LookupSubtable // cache for sub-tables already parsed and called
 }
 
 // header information for Lookup table
@@ -555,49 +571,209 @@ func viewLookup(b NavLocation) Lookup {
 	return lookup
 }
 
-// Each LookupType has one or more subtable formats. The “best” format depends on the
-// type of substitution and the resulting storage efficiency. When glyph information
-// is best presented in more than one format, a single lookup may define more than
-// one subtable, as long as all the subtables are for the same LookupType.
-type LookupSubtable struct {
-	lookupType LayoutTableLookupType // GPOS types are shifted to the high byte
-	format     uint16
-	coverage   Coverage
-	index      varArray
-}
-
-// Lookup returns a byte segment as output of applying lookup lksub to input glyph g.
+// Lookup returns a byte segment as output of applying lookup l to input glyph g.
 // g is shortened from 32-bit to 16-bit by using the low bits.
 //
 // If g is not identified as applicable for the lookup feature, an emtpy byte segment
 // is returned.
 //
-func (lksub LookupSubtable) Lookup(g uint32) NavLocation {
-	inx, ok := lksub.coverage.GlyphRange.Lookup(GlyphIndex(g >> 16))
-	if !ok {
-		return fontBinSegm{}
-	}
-	trace().Debugf("lookup of 0x%x -> %d", g, inx)
+func (l Lookup) Lookup(g uint32) NavLocation {
+	// inx, ok := l.coverage.GlyphRange.Lookup(GlyphIndex(g >> 16))
+	// if !ok {
+	// 	return fontBinSegm{}
+	// }
+	// trace().Debugf("lookup of 0x%x -> %d", g, inx)
 	return fontBinSegm{} // TODO
 }
 
-func (lksub LookupSubtable) Name() string {
-	return "LookupSubtable"
+func (l Lookup) Name() string {
+	return "Lookup"
 }
 
-// LookupTag is not defined for LookupSubtable and will return a void link.
-func (lksub LookupSubtable) LookupTag(tag Tag) NavLink {
-	return nullLink("cannot lookup tag in LookupSubtable")
+// LookupTag is not defined for Lookup and will return a void link.
+func (l Lookup) LookupTag(tag Tag) NavLink {
+	return nullLink("cannot lookup tag in Lookup")
 }
 
 // IsTagRecordMap returns false
-func (lksub LookupSubtable) IsTagRecordMap() bool {
+func (l Lookup) IsTagRecordMap() bool {
 	return false
 }
 
 // AsTagRecordMap returns an empty TagRecordMap
-func (lksub LookupSubtable) AsTagRecordMap() TagRecordMap {
+func (l Lookup) AsTagRecordMap() TagRecordMap {
 	return tagRecordMap16{}
 }
 
-var _ NavMap = LookupSubtable{}
+var _ NavMap = Lookup{}
+
+// Each LookupType may occur in one or more subtable formats. The “best” format depends on
+// the type of substitution and the resulting storage efficiency. When glyph information
+// is best presented in more than one format, a single lookup may define more than
+// one subtable, as long as all the subtables are for the same LookupType.
+type LookupSubtable struct {
+	format   uint16
+	coverage Coverage
+	index    varArray
+	support  interface{} // TODO make this a more specific interface
+}
+
+// GSUB LookupType 1: Single Substitution Subtable
+//
+// Single substitution (SingleSubst) subtables tell a client to replace a single glyph
+// with another glyph. The subtables can be either of two formats. Both formats require
+// two distinct sets of glyph indices: one that defines input glyphs (specified in the
+// Coverage table), and one that defines the output glyphs.
+
+// GSUB LookupSubtable Type 1 Format 1 calculates the indices of the output glyphs, which
+// are not explicitly defined in the subtable. To calculate an output glyph index,
+// Format 1 adds a constant delta value to the input glyph index. For the substitutions to
+// occur properly, the glyph indices in the input and output ranges must be in the same order.
+// This format does not use the Coverage index that is returned from the Coverage table.
+//
+func gsubLookupType1Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
+	_, ok := lksub.coverage.GlyphRange.Lookup(g)
+	if !ok {
+		return fontBinSegm{}
+	}
+	// support is deltaGlyphID: add to original glyph ID to get substitute glyph ID
+	delta := lksub.support.(GlyphIndex)
+	return uintBytes(uint16(g + delta))
+}
+
+// GSUB LookupSubtable Type 1 Format 2 provides an array of output glyph indices
+// (substituteGlyphIDs) explicitly matched to the input glyph indices specified in the
+// Coverage table.
+//
+// The substituteGlyphIDs array must contain the same number of glyph indices as the
+// Coverage table. To locate the corresponding output glyph index in the substituteGlyphIDs
+// array, this format uses the Coverage index returned from the Coverage table.
+//
+func gsubLookupType1Fmt2(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
+	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	if !ok {
+		return fontBinSegm{}
+	}
+	return lookupAndReturn(&lksub.index, inx, true)
+}
+
+// LookupType 2: Multiple Substitution Subtable
+//
+// A Multiple Substitution (MultipleSubst) subtable replaces a single glyph with more
+// than one glyph, as when multiple glyphs replace a single ligature.
+
+// GSUB LookupSubtable Type 2 Format 1 defines a count of offsets in the sequenceOffsets
+// array (sequenceCount), and an array of offsets to Sequence tables that define the output
+// glyph indices (sequenceOffsets). The Sequence table offsets are ordered by the Coverage
+// index of the input glyphs.
+// For each input glyph listed in the Coverage table, a Sequence table defines the output
+// glyphs. Each Sequence table contains a count of the glyphs in the output glyph sequence
+// (glyphCount) and an array of output glyph indices (substituteGlyphIDs).
+func gsubLookupType2Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
+	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	if !ok {
+		return fontBinSegm{}
+	}
+	return lookupAndReturn(&lksub.index, inx, true)
+}
+
+// LookupType 3: Alternate Substitution Subtable
+//
+// An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic
+// alternatives from which a user can choose a glyph variant to replace the input glyph.
+// For example, if a font contains four variants of the ampersand symbol, the 'cmap' table
+// will specify the index of one of the four glyphs as the default glyph index, and an
+// AlternateSubst subtable will list the indices of the other three glyphs as alternatives.
+// A text-processing client would then have the option of replacing the default glyph with
+// any of the three alternatives.
+
+// GSUB LookupSubtable Type 3 Format 1: For each glyph, an AlternateSet subtable contains a
+// count of the alternative glyphs (glyphCount) and an array of their glyph indices
+// (alternateGlyphIDs).
+func gsubLookupType3Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
+	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	if !ok {
+		return fontBinSegm{}
+	}
+	return lookupAndReturn(&lksub.index, inx, true)
+}
+
+// LookupType 4: Ligature Substitution Subtable
+//
+// A Ligature Substitution (LigatureSubst) subtable identifies ligature substitutions where
+// a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any number
+// of ligature substitutions.
+
+// GSUB LookupSubtable Type 4 Format 1 receives a sequence of glyphs and outputs a
+// single glyph replacing the sequence. The Coverage table specifies only the index of the
+// first glyph component of each ligature set.
+//
+// As this is a multi-lookup algorithm, calling gsubLookupType4Fmt1 will return a
+// NavLocation which is a LigatureSet, i.e. a list of records of unequal lengths.
+//
+func gsubLookupType4Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
+	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	if !ok {
+		return fontBinSegm{}
+	}
+	return lookupAndReturn(&lksub.index, inx, true) // returns a LigatureSet
+}
+
+// LigatureSetLookup trys to match a sequence of glyph IDs to the pattern portions
+// ('components') of every Ligature of a LigatureSet, and if a match is found,
+// returns the ligature glyph for the pattern.
+//
+// loc is a byte segment usually returned from a call to a type 4 (Ligature Substitution)
+// GSUB lookup.
+//
+// The resulting glyph should replace a sequence of glyphs from the input code-points
+// including the initial glyph input to the type 4 Ligature Substitution, continued
+// with the glyphs provided to LigatureSetLookup.
+//
+func LigatureSetLookup(loc NavLocation, glyphs []GlyphIndex) GlyphIndex {
+	// loc shoud be at a LigatureSet
+	ligset, err := parseArray16(loc.Bytes(), 0)
+	if err != nil {
+		return 0
+	}
+	// iterate over all Ligature entries, pointed to by an offset16
+	for i := 0; i < ligset.length; i++ {
+		ptr := ligset.UnsafeGet(i).U16(0)
+		// Ligature table (glyph components for one ligature):
+		// uint16  ligatureGlyph     glyph ID of ligature to substitute
+		// uint16  componentCount    Number of components in the ligature
+		// uint16  componentGlyphIDs[componentCount-1]    Array of component glyph IDs
+		ligglyph := GlyphIndex(loc.U16(int(ptr)))
+		compCount := loc.U16(int(ptr) + 2)
+		comps := array{
+			recordSize: 6, // 3 * sizeof(uint16)
+			length:     int(compCount) - 1,
+			loc:        loc.Bytes()[ptr:],
+		}
+		if len(glyphs) != comps.length {
+			break
+		}
+		match := true
+		for i, g := range glyphs {
+			if g != GlyphIndex(comps.UnsafeGet(i).U16(0)) {
+				match = false
+				break
+			}
+		}
+		if match {
+			return ligglyph
+		}
+	}
+	return 0
+}
+
+// lookupAndReturn is a small helper which looks up an index for a glyph (previously
+// returned from a coverage table), checks for errors, and returns the resulting bytes.
+// TODO check that this is inlined by the compiler.
+func lookupAndReturn(index *varArray, ginx int, deep bool) NavLocation {
+	outglyph, err := index.Get(ginx, deep)
+	if err != nil {
+		return fontBinSegm{}
+	}
+	return outglyph
+}

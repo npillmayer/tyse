@@ -66,6 +66,11 @@ func (b fontBinSegm) U32(i int) uint32 {
 	return n
 }
 
+// return an unsigned integer as an array of two bytes.
+func uintBytes(n uint16) fontBinSegm {
+	return fontBinSegm{byte(n >> 8 & 0xff), byte(n & 0xff)}
+}
+
 // view returns n bytes at the given offset.
 // The byte segment returned is a sub-slice of b.
 func (b fontBinSegm) view(offset, n int) (fontBinSegm, error) {
@@ -497,11 +502,15 @@ func parseVarArrary16(b fontBinSegm, szOffset, indirections int, name string) va
 	return va
 }
 
-func (va varArray) Get(i int) (NavLocation, error) {
-	var err error
+// Get looks up index i within the cascading arrays of va. If deep is false, only
+// the top-level array will be queried.
+func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 	var a array = va.ptrs
-	var b NavLocation
-	for i := 0; i < va.indirections; i++ {
+	var indirect = va.indirections
+	if !deep {
+		indirect = 1
+	}
+	for i := 0; i < indirect; i++ {
 		b := a.UnsafeGet(i) // TODO will this create an infinite loop in case of error?
 		if i+1 < va.indirections {
 			a, err = parseArray16(b.Bytes(), 0)
