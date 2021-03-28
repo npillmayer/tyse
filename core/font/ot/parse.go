@@ -819,6 +819,143 @@ func parseCoverage(b fontBinSegm) GlyphRange {
 	return buildGlyphRangeFromCoverage(h, b)
 }
 
+// --- Sequence context ------------------------------------------------------
+
+// The contextual lookup types support specifying input glyph sequences that will can be
+// acted upon, as well as a list of actions to be taken on any glyph within the sequence.
+// Actions are specified as references to separate nested lookups (an index into the
+// LookupList). The actions are specified for each glyph position, but the entire sequence
+// must be matched, and so the actions are specified in a context-sensitive manner.
+
+// Three subtable formats are defined, which describe the input sequences in different ways.
+func parseSequenceContext(b fontBinSegm) (sequenceContext, error) {
+	if len(b) <= 2 {
+		return sequenceContext{}, errFontFormat("corrupt sequence context")
+	}
+	format := b.U16(0)
+	switch format {
+	case 1:
+		parseSequenceContextFormat1(format, b)
+	case 2:
+		parseSequenceContextFormat2(format, b)
+	case 3:
+		parseSequenceContextFormat3(format, b)
+	}
+	return sequenceContext{}, errFontFormat(
+		fmt.Sprintf("unknown sequence context format %d", format))
+}
+
+// SequenceContextFormat1: simple glyph contexts
+// Type 	Name 	Description
+// uint16 	format 	Format identifier: format = 1
+// Offset16 	coverageOffset 	Offset to Coverage table, from beginning of SequenceContextFormat1 table
+// uint16 	seqRuleSetCount 	Number of SequenceRuleSet tables
+// Offset16 	seqRuleSetOffsets[seqRuleSetCount] 	Array of offsets to SequenceRuleSet tables, from beginning of SequenceContextFormat1 table (offsets may be NULL)
+func parseSequenceContextFormat1(fmtno uint16, b fontBinSegm) (sequenceContext, error) {
+	if len(b) <= 6 {
+		return sequenceContext{}, errFontFormat("corrupt sequence context")
+	}
+	seqctx := sequenceContext{format: fmtno, coverage: make([]GlyphRange, 1)}
+	link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
+	if err != nil {
+		return sequenceContext{}, errFontFormat("corrupt sequence context")
+	}
+	cov := link.Jump()
+	seqctx.coverage[0] = parseCoverage(cov.Bytes())
+	seqctx.rules = parseVarArrary16(b, 4, 2, "SequenceContext")
+	return seqctx, nil
+}
+
+// SequenceContextFormat2 table:
+// Type 	Name 	Description
+// uint16 	format 	Format identifier: format = 2
+// Offset16 	coverageOffset 	Offset to Coverage table, from beginning of SequenceContextFormat2 table
+// Offset16 	classDefOffset 	Offset to ClassDef table, from beginning of SequenceContextFormat2 table
+// uint16 	classSeqRuleSetCount 	Number of ClassSequenceRuleSet tables
+// Offset16 	classSeqRuleSetOffsets[classSeqRuleSetCount] 	Array of offsets to ClassSequenceRuleSet tables, from beginning of SequenceContextFormat2 table (may be NULL)
+func parseSequenceContextFormat2(fmtno uint16, b fontBinSegm) (sequenceContext, error) {
+	if len(b) <= 8 {
+		return sequenceContext{}, errFontFormat("corrupt sequence context")
+	}
+	seqctx := sequenceContext{format: fmtno, coverage: make([]GlyphRange, 1)}
+	link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
+	if err != nil {
+		return sequenceContext{}, errFontFormat("corrupt sequence context")
+	}
+	cov := link.Jump()
+	seqctx.coverage[0] = parseCoverage(cov.Bytes())
+	link, err = parseLink16(b, 2, b, "SequenceContext Coverage")
+	if err != nil {
+		return sequenceContext{}, errFontFormat("corrupt sequence context")
+	}
+	classdef := link.Jump()
+	seqctx.classDef, err = parseClassDefinitions(classdef.Bytes())
+	seqctx.rules = parseVarArrary16(b, 6, 2, "SequenceContext")
+	return seqctx, nil
+}
+
+// The SequenceContextFormat3 table specifies exactly one input sequence pattern. It has an
+// array of offsets to coverage tables. These correspond, in order, to the positions in the
+// input sequence pattern.
+//
+// SequenceContextFormat3 table:
+// Type 	Name 	Description
+// uint16 	format 	Format identifier: format = 3
+// uint16 	glyphCount 	Number of glyphs in the input sequence
+// uint16 	seqLookupCount 	Number of SequenceLookupRecords
+// Offset16 	coverageOffsets[glyphCount] 	Array of offsets to Coverage tables, from beginning of SequenceContextFormat3 subtable
+// SequenceLookupRecord 	seqLookupRecords[seqLookupCount] 	Array of SequenceLookupRecords
+func parseSequenceContextFormat3(fmtno uint16, b fontBinSegm) (sequenceContext, error) {
+	if len(b) <= 8 {
+		return sequenceContext{}, errFontFormat("corrupt sequence context")
+	}
+	count := b.U16(2)
+	seqctx := sequenceContext{format: fmtno}
+	seqctx.coverage = make([]GlyphRange, count)
+	for i := 0; i < int(count); i++ {
+		link, err := parseLink16(b, 6+i*2, b, "SequenceContext Coverage")
+		if err != nil {
+			return sequenceContext{}, errFontFormat("corrupt sequence context")
+		}
+		cov := link.Jump()
+		seqctx.coverage[i] = parseCoverage(cov.Bytes())
+	}
+	count = b.U16(6 + int(count)*2)
+	seqctx.lookupRecords = array{
+		recordSize: 4, // 2* sizeof(uint16)
+		length:     int(count),
+		loc:        b[4+count*2:],
+	}
+	return seqctx, nil
+}
+
+// ClassSequenceRule table:
+// Type     Name                          Description
+// uint16   glyphCount                    Number of glyphs to be matched
+// uint16   seqLookupCount                Number of SequenceLookupRecords
+// uint16   inputSequence[glyphCount-1]   Sequence of classes to be matched to the input glyph sequence, beginning with the second glyph position
+// SequenceLookupRecord seqLookupRecords[seqLookupCount]   Array of SequenceLookupRecords
+func parseSequenceRule(b fontBinSegm) sequenceRule {
+	seqrule := sequenceRule{}
+	seqrule.glyphCount = b.U16(0)
+	seqrule.inputSequence = array{
+		recordSize: 2, // sizeof(uint16)
+		length:     int(seqrule.glyphCount) - 1,
+	}
+	seqrule.inputSequence.loc = b[4 : 4+seqrule.inputSequence.length*2]
+	// SequenceLookupRecord:
+	// Type     Name             Description
+	// uint16   sequenceIndex    Index (zero-based) into the input glyph sequence
+	// uint16   lookupListIndex  Index (zero-based) into the LookupList
+	cnt := b.U16(2)
+	seqrule.lookupRecords = array{
+		recordSize: 4, // 2* sizeof(uint16)
+		length:     int(cnt),
+		loc:        b[4+seqrule.inputSequence.length*2:],
+	}
+	return seqrule
+}
+
 // --- Names -----------------------------------------------------------------
 
 func parseNames(b fontBinSegm) (nameNames, error) {
@@ -836,12 +973,4 @@ func parseNames(b fontBinSegm) (nameNames, error) {
 	recs := b[6 : 6+12*int(N)]
 	names.nameRecs = viewArray(recs, 12)
 	return names, nil
-}
-
-// ---------------------------------------------------------------------------
-
-func read16arr(r *bytes.Reader, arr *[]uint16, size int) error {
-	*arr = make([]uint16, size, size)
-	//r := bytes.NewReader(b[offset:])
-	return binary.Read(r, binary.BigEndian, arr)
 }

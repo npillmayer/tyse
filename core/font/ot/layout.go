@@ -777,3 +777,29 @@ func lookupAndReturn(index *varArray, ginx int, deep bool) NavLocation {
 	}
 	return outglyph
 }
+
+// sequenceContext is a type for identifying the input sequence context for
+// contextual lookups.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-1-simple-glyph-contexts
+type sequenceContext struct {
+	format        uint16           // 1, 2 or 3
+	coverage      []GlyphRange     // for all formats
+	classDef      ClassDefinitions // for format 2
+	rules         varArray         // for format 1 and 2
+	lookupRecords array            // for format 3
+}
+
+// The glyphCount value is the total number of glyphs in the input sequence, including the
+// first glyph. The inputSequence array specifies the remaining glyphs in the input sequence,
+// in order. (The glyph at inputSequence index 0 corresponds to glyph sequence index 1.)
+//
+// The seqLookupRecords array lists the sequence lookup records that specify actions to be
+// taken on glyphs at various positions within the input sequence. These do not have to be
+// ordered in sequence position order; they are ordered according to the desired result.
+// All of the sequence lookup records are processed in order, and each applies to the
+// results of the actions indicated by the preceding record.
+type sequenceRule struct {
+	glyphCount    uint16
+	inputSequence array
+	lookupRecords array
+}
