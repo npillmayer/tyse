@@ -488,13 +488,13 @@ func parseAttachmentPointList(gdef *GDefTable, b fontBinSegm, err error) error {
 	}
 	covOffset := u16(b)
 	coverage := parseCoverage(b[covOffset:])
-	if coverage == nil {
+	if coverage.GlyphRange == nil {
 		return errFontFormat("GDEF attachement point coverage table unreadable")
 	}
 	count, _ := b.u16(2)
 	gdef.AttachmentPointList = AttachmentPointList{
 		Count:              int(count),
-		Coverage:           coverage,
+		Coverage:           coverage.GlyphRange,
 		attachPointOffsets: b[4:],
 	}
 	return nil
@@ -534,10 +534,10 @@ func parseMarkGlyphSets(gdef *GDefTable, b fontBinSegm, err error) error {
 	for i := 0; i < int(count); i++ {
 		covOffset, _ := b.u32(i * 4)
 		coverage := parseCoverage(b[covOffset:])
-		if coverage == nil {
+		if coverage.GlyphRange == nil {
 			return errFontFormat("GDEF mark glyph set coverage table unreadable")
 		}
-		gdef.MarkGlyphSets = append(gdef.MarkGlyphSets, coverage)
+		gdef.MarkGlyphSets = append(gdef.MarkGlyphSets, coverage.GlyphRange)
 	}
 	return nil
 }
@@ -678,7 +678,7 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	}
 	b = b[lloffset:]
 	//
-	ll := LookupList{}
+	ll := LookupList{base: b}
 	ll.array, ll.err = parseArray16(b, 0)
 	lytt.LookupList = ll
 	// r := bytes.NewReader(b)
@@ -703,6 +703,74 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	// 	}
 	// }
 	return nil
+}
+
+func parseLookupSubtable(b fontBinSegm, lookupType uint16, isGSub bool) LookupSubtable {
+	if len(b) < 4 {
+		return LookupSubtable{}
+	}
+	if isGSub {
+		return parseGSubLookupSubtable(b, lookupType)
+	}
+	return parseGPosLookupSubtable(b, lookupType)
+}
+
+func parseGSubLookupSubtable(b fontBinSegm, lookupType uint16) LookupSubtable {
+	format := b.U16(0)
+	sub := LookupSubtable{typ: lookupType, format: format}
+	if lookupType != 7 {
+		sub.coverage = parseCoverage(b)
+	}
+	switch lookupType {
+	case 1:
+		return parseGSubLookupSubtableType1(b, sub)
+	case 2, 3:
+		return parseGSubLookupSubtableType2or3(b, sub)
+	case 4:
+		return parseGSubLookupSubtableType4(b, sub)
+	}
+	return LookupSubtable{} // TODO
+}
+
+// LookupType 1: Single Substitution Subtable
+// Single substitution (SingleSubst) subtables tell a client to replace a single glyph with
+// another glyph.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-1-single-substitution-subtable
+func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	if sub.format == 1 {
+		sub.support = int16(b.U16(4))
+	} else {
+		sub.index = parseVarArrary16(b, 4, 1, "LookupSubtable")
+	}
+	return sub
+}
+
+// LookupType 2: Multiple Substitution Subtable
+// A Multiple Substitution (MultipleSubst) subtable replaces a single glyph with more than
+// one glyph, as when multiple glyphs replace a single ligature.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-2-multiple-substitution-subtable
+// LookupType 3: Alternate Substitution Subtable
+// An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic
+// alternatives from which a user can choose a glyph variant to replace the input glyph.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-3-alternate-substitution-subtable
+func parseGSubLookupSubtableType2or3(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	sub.index = parseVarArrary16(b, 4, 2, "LookupSubtable")
+	return sub
+}
+
+// LookupType 4: Ligature Substitution Subtable
+// A Ligature Substitution (LigatureSubst) subtable identifies ligature substitutions where
+// a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any
+// number of ligature substitutions.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-4-ligature-substitution-subtable
+func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	sub.index = parseVarArrary16(b, 4, 2, "LookupSubtable")
+	return sub
+}
+
+func parseGPosLookupSubtable(b fontBinSegm, lookupType uint16) LookupSubtable {
+	panic("TODO GPOS Lookup Subtable")
+	//return LookupSubtable{}
 }
 
 // --- Feature list ----------------------------------------------------------
@@ -810,13 +878,16 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
 // Read a coverage table-module, which comes in two formats (1 and 2).
 // A Coverage table defines a unique index value, the Coverage Index, for each
 // covered glyph.
-func parseCoverage(b fontBinSegm) GlyphRange {
+func parseCoverage(b fontBinSegm) Coverage {
 	h := coverageHeader{}
 	r := bytes.NewReader(b)
 	if err := binary.Read(r, binary.BigEndian, &h); err != nil {
-		return nil
+		return Coverage{}
 	}
-	return buildGlyphRangeFromCoverage(h, b)
+	return Coverage{
+		coverageHeader: h,
+		GlyphRange:     buildGlyphRangeFromCoverage(h, b),
+	}
 }
 
 // --- Sequence context ------------------------------------------------------
@@ -855,7 +926,7 @@ func parseSequenceContextFormat1(fmtno uint16, b fontBinSegm) (sequenceContext, 
 	if len(b) <= 6 {
 		return sequenceContext{}, errFontFormat("corrupt sequence context")
 	}
-	seqctx := sequenceContext{format: fmtno, coverage: make([]GlyphRange, 1)}
+	seqctx := sequenceContext{format: fmtno, coverage: make([]Coverage, 1)}
 	link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
 	if err != nil {
 		return sequenceContext{}, errFontFormat("corrupt sequence context")
@@ -877,7 +948,7 @@ func parseSequenceContextFormat2(fmtno uint16, b fontBinSegm) (sequenceContext, 
 	if len(b) <= 8 {
 		return sequenceContext{}, errFontFormat("corrupt sequence context")
 	}
-	seqctx := sequenceContext{format: fmtno, coverage: make([]GlyphRange, 1)}
+	seqctx := sequenceContext{format: fmtno, coverage: make([]Coverage, 1)}
 	link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
 	if err != nil {
 		return sequenceContext{}, errFontFormat("corrupt sequence context")
@@ -911,7 +982,7 @@ func parseSequenceContextFormat3(fmtno uint16, b fontBinSegm) (sequenceContext, 
 	}
 	count := b.U16(2)
 	seqctx := sequenceContext{format: fmtno}
-	seqctx.coverage = make([]GlyphRange, count)
+	seqctx.coverage = make([]Coverage, count)
 	for i := 0; i < int(count); i++ {
 		link, err := parseLink16(b, 6+i*2, b, "SequenceContext Coverage")
 		if err != nil {

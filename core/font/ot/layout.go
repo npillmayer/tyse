@@ -494,7 +494,8 @@ type AttachmentPointList struct {
 //
 type LookupList struct {
 	array
-	err error
+	base fontBinSegm
+	err  error
 }
 
 func (ll LookupList) Len() int {
@@ -514,7 +515,8 @@ func (ll LookupList) Navigate(i int) Lookup {
 	if ll.err != nil {
 		return Lookup{}
 	}
-	lookup := ll.Get(i)
+	lookupPtr := ll.Get(i)
+	lookup := ll.base[lookupPtr.U16(0):]
 	return viewLookup(lookup)
 }
 
@@ -548,6 +550,7 @@ type lookupInfo struct {
 // viewLookup reads a Lookup from the bytes of a NavLocation. It first parses the
 // lookupInfo and after that parses the subtable record list.
 func viewLookup(b NavLocation) Lookup {
+	trace().Debugf("lookup location has size %d", b.Size())
 	if b.Size() < 10 {
 		return Lookup{}
 	}
@@ -569,6 +572,16 @@ func viewLookup(b NavLocation) Lookup {
 		lookup.markFilteringSet = b.U16(4 + lookup.subTables.Size())
 	}
 	return lookup
+}
+
+func (l Lookup) Subtable(i int) *LookupSubtable {
+	if i >= l.subTables.length {
+		return nil
+	}
+	if l.subTablesCache == nil {
+		// TODO
+	}
+	return &l.subTablesCache[i]
 }
 
 // Lookup returns a byte segment as output of applying lookup l to input glyph g.
@@ -612,6 +625,7 @@ var _ NavMap = Lookup{}
 // is best presented in more than one format, a single lookup may define more than
 // one subtable, as long as all the subtables are for the same LookupType.
 type LookupSubtable struct {
+	typ      uint16
 	format   uint16
 	coverage Coverage
 	index    varArray
@@ -767,6 +781,24 @@ func LigatureSetLookup(loc NavLocation, glyphs []GlyphIndex) GlyphIndex {
 	return 0
 }
 
+// LookupType 5: Contextual Substitution Subtable
+//
+// A Contextual Substitution subtable describes glyph substitutions in context that replace one
+// or more glyphs within a certain pattern of glyphs.
+// Contextual substitution subtables can use any of three formats that are common to the GSUB
+// and GPOS tables. These define input sequence patterns to be matched against the text glyphs
+// sequence, and then actions to be applied to glyphs within the input sequence. The actions
+// are specified as “nested” lookups, and each is applied to a particular sequence positions
+// within the input sequence.
+// Each sequence position + nested lookup combination is specified in a SequenceLookupRecord.
+func gsubLookupType5Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
+	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	if !ok {
+		return fontBinSegm{}
+	}
+	return lookupAndReturn(&lksub.index, inx, true) // returns a LigatureSet
+}
+
 // lookupAndReturn is a small helper which looks up an index for a glyph (previously
 // returned from a coverage table), checks for errors, and returns the resulting bytes.
 // TODO check that this is inlined by the compiler.
@@ -783,7 +815,7 @@ func lookupAndReturn(index *varArray, ginx int, deep bool) NavLocation {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-1-simple-glyph-contexts
 type sequenceContext struct {
 	format        uint16           // 1, 2 or 3
-	coverage      []GlyphRange     // for all formats
+	coverage      []Coverage       // for all formats
 	classDef      ClassDefinitions // for format 2
 	rules         varArray         // for format 1 and 2
 	lookupRecords array            // for format 3

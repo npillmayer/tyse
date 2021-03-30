@@ -222,6 +222,31 @@ func TestParseGDef(t *testing.T) {
 	}
 }
 
+func TestParseGSUBLookups(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := parseFont(t, "calibri")
+	table := getTable(otf, "GSUB", t)
+	gsub := table.Self().AsGSub()
+	ll := gsub.LookupList
+	if ll.err != nil {
+		t.Fatal(ll.err)
+	} else if ll.array.length == 0 {
+		t.Fatalf("GSUB table has no LookupList section")
+	}
+	t.Logf("font Calibri has %d lookups", ll.array.length)
+	lookup := gsub.LookupList.Navigate(0)
+	t.Logf("lookup[0].subTables count is %d", lookup.subTables.length)
+	if lookup.subTablesCache == nil {
+		t.Logf("no cached sub-tables")
+	}
+	st := lookup.subTables.UnsafeGet(0)
+	t.Logf("size of sub-table is %d", st.Size())
+	t.Fail()
+}
+
 // ---------------------------------------------------------------------------
 
 func getTable(otf *Font, name string, t *testing.T) Table {
