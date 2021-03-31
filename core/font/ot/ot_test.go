@@ -11,17 +11,17 @@ import (
 )
 
 func TestLookupRecordTypeString(t *testing.T) {
-	if GSUB_LUTYPE_Chaining_Context.GSubString() != "Chaining" {
+	if GSubLookupTypeChainingContext.GSubString() != "Chaining" {
 		t.Errorf("expected GSUB_LUTYPE_Reverse_chaining to have string 'Chaining', has %s",
-			GSUB_LUTYPE_Chaining_Context.GSubString())
+			GSubLookupTypeChainingContext.GSubString())
 	}
-	if GSUB_LUTYPE_Reverse_Chaining.GSubString() != "Reverse" {
+	if GSubLookupTypeReverseChaining.GSubString() != "Reverse" {
 		t.Errorf("expected GSUB_LUTYPE_Reverse_chaining to have string 'Reverse', has %s",
-			GSUB_LUTYPE_Reverse_Chaining.GSubString())
+			GSubLookupTypeReverseChaining.GSubString())
 	}
-	if GPOS_LUTYPE_MarkToLigature.GPosString() != "MarkToLigature" {
+	if GPosLookupTypeMarkToLigature.GPosString() != "MarkToLigature" {
 		t.Errorf("expected GPOS_LUTYPE_MarkToLigature to have string 'MarkToLigature', has %s",
-			GPOS_LUTYPE_MarkToLigature.GPosString())
+			GPosLookupTypeMarkToLigature.GPosString())
 	}
 }
 

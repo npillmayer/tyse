@@ -705,19 +705,19 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	return nil
 }
 
-func parseLookupSubtable(b fontBinSegm, lookupType uint16, isGSub bool) LookupSubtable {
+func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
 	if len(b) < 4 {
 		return LookupSubtable{}
 	}
-	if isGSub {
-		return parseGSubLookupSubtable(b, lookupType)
+	if IsGPosLookupType(lookupType) {
+		return parseGPosLookupSubtable(b, GPosLookupType(lookupType))
 	}
-	return parseGPosLookupSubtable(b, lookupType)
+	return parseGSubLookupSubtable(b, GSubLookupType(lookupType))
 }
 
-func parseGSubLookupSubtable(b fontBinSegm, lookupType uint16) LookupSubtable {
+func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
 	format := b.U16(0)
-	sub := LookupSubtable{typ: lookupType, format: format}
+	sub := LookupSubtable{lookupType: lookupType, format: format}
 	if lookupType != 7 {
 		sub.coverage = parseCoverage(b)
 	}
@@ -768,7 +768,7 @@ func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubta
 	return sub
 }
 
-func parseGPosLookupSubtable(b fontBinSegm, lookupType uint16) LookupSubtable {
+func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
 	panic("TODO GPOS Lookup Subtable")
 	//return LookupSubtable{}
 }

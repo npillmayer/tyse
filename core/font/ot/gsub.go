@@ -44,14 +44,14 @@ type lookupSubstFormat2 struct {
 
 // GSUB Lookup Type Enumeration
 const (
-	GSUB_LUTYPE_Single           LayoutTableLookupType = 1 // Replace one glyph with one glyph
-	GSUB_LUTYPE_Multiple         LayoutTableLookupType = 2 // Replace one glyph with more than one glyph
-	GSUB_LUTYPE_Alternate        LayoutTableLookupType = 3 // Replace one glyph with one of many glyphs
-	GSUB_LUTYPE_Ligature         LayoutTableLookupType = 4 // Replace multiple glyphs with one glyph
-	GSUB_LUTYPE_Context          LayoutTableLookupType = 5 // Replace one or more glyphs in context
-	GSUB_LUTYPE_Chaining_Context LayoutTableLookupType = 6 // Replace one or more glyphs in chained context
-	GSUB_LUTYPE_Extension_Subs   LayoutTableLookupType = 7 // Extension mechanism for other substitutions
-	GSUB_LUTYPE_Reverse_Chaining LayoutTableLookupType = 8 // Applied in reverse order, replace single glyph in chaining context
+	GSubLookupTypeSingle          LayoutTableLookupType = 1 // Replace one glyph with one glyph
+	GSubLookupTypeMultiple        LayoutTableLookupType = 2 // Replace one glyph with more than one glyph
+	GSubLookupTypeAlternate       LayoutTableLookupType = 3 // Replace one glyph with one of many glyphs
+	GSubLookupTypeLigature        LayoutTableLookupType = 4 // Replace multiple glyphs with one glyph
+	GSubLookupTypeContext         LayoutTableLookupType = 5 // Replace one or more glyphs in context
+	GSubLookupTypeChainingContext LayoutTableLookupType = 6 // Replace one or more glyphs in chained context
+	GSubLookupTypeExtensionSubs   LayoutTableLookupType = 7 // Extension mechanism for other substitutions
+	GSubLookupTypeReverseChaining LayoutTableLookupType = 8 // Applied in reverse order, replace single glyph in chaining context
 )
 
 const gsubLookupTypeNames = "Single|Multiple|Ligature|Alternate|Context|Chaining|Extension|Reverse"
@@ -61,7 +61,7 @@ var gsubLookupTypeInx = [...]int{0, 7, 16, 25, 35, 43, 52, 62, 70}
 // GSubString interprets a layout table lookup type as a GSUB table type.
 func (lt LayoutTableLookupType) GSubString() string {
 	lt -= 1
-	if lt >= 0 && lt < GSUB_LUTYPE_Reverse_Chaining {
+	if lt >= 0 && lt < GSubLookupTypeReverseChaining {
 		return gsubLookupTypeNames[gsubLookupTypeInx[lt] : gsubLookupTypeInx[lt+1]-1]
 	}
 	return strconv.Itoa(int(lt))

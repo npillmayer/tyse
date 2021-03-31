@@ -522,6 +522,22 @@ func (ll LookupList) Navigate(i int) Lookup {
 
 var _ NavList = LookupList{}
 
+func GSubLookupType(ltype LayoutTableLookupType) LayoutTableLookupType {
+	return ltype & 0x00ff
+}
+
+func GPosLookupType(ltype LayoutTableLookupType) LayoutTableLookupType {
+	return (ltype & 0xff00) >> 8
+}
+
+func MaskGPosLookupType(ltype LayoutTableLookupType) LayoutTableLookupType {
+	return ltype << 8
+}
+
+func IsGPosLookupType(ltype LayoutTableLookupType) bool {
+	return ltype&0xff00 > 0
+}
+
 // Lookup tables are contained in a LookupList.
 // A Lookup table defines the specific conditions, type, and results of a substitution or
 // positioning action that is used to implement a feature. For example, a substitution
@@ -579,7 +595,13 @@ func (l Lookup) Subtable(i int) *LookupSubtable {
 		return nil
 	}
 	if l.subTablesCache == nil {
-		// TODO
+		for i := 0; i < l.subTables.length; i++ {
+			n := l.subTables.UnsafeGet(i).U16(0)                     // offset to subtable[i]
+			link := makeLink16(n, l.subTables.loc, "LookupSubtable") // wrap offset into link
+			loc := link.Jump()
+			b := fontBinSegm(loc.Bytes())
+			l.subTablesCache[i] = parseLookupSubtable(b, l.Type)
+		}
 	}
 	return &l.subTablesCache[i]
 }
@@ -625,11 +647,11 @@ var _ NavMap = Lookup{}
 // is best presented in more than one format, a single lookup may define more than
 // one subtable, as long as all the subtables are for the same LookupType.
 type LookupSubtable struct {
-	typ      uint16
-	format   uint16
-	coverage Coverage
-	index    varArray
-	support  interface{} // TODO make this a more specific interface
+	lookupType LayoutTableLookupType
+	format     uint16
+	coverage   Coverage
+	index      varArray
+	support    interface{} // TODO make this a more specific interface
 }
 
 // GSUB LookupType 1: Single Substitution Subtable
