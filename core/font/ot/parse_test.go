@@ -222,7 +222,7 @@ func TestParseGDef(t *testing.T) {
 	}
 }
 
-func TestParseGSUBLookups(t *testing.T) {
+func TestParseGSubLookups(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
@@ -242,8 +242,8 @@ func TestParseGSUBLookups(t *testing.T) {
 	if lookup.subTablesCache == nil {
 		t.Logf("no cached sub-tables")
 	}
-	st := lookup.subTables.UnsafeGet(0)
-	t.Logf("size of sub-table is %d", st.Size())
+	st := lookup.Subtable(0)
+	t.Logf("type of sub-table is %d", st.lookupType)
 	t.Fail()
 }
 

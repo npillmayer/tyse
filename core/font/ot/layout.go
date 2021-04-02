@@ -587,14 +587,16 @@ func viewLookup(b NavLocation) Lookup {
 	if b.Size() >= 4+lookup.subTables.Size()+2 {
 		lookup.markFilteringSet = b.U16(4 + lookup.subTables.Size())
 	}
+	trace().Debugf("lookup has type %s", lookup.Type.GSubString())
 	return lookup
 }
 
 func (l Lookup) Subtable(i int) *LookupSubtable {
-	if i >= l.subTables.length {
+	if i >= int(l.SubTableCount) {
 		return nil
 	}
 	if l.subTablesCache == nil {
+		l.subTablesCache = make([]LookupSubtable, l.SubTableCount)
 		for i := 0; i < l.subTables.length; i++ {
 			n := l.subTables.UnsafeGet(i).U16(0)                     // offset to subtable[i]
 			link := makeLink16(n, l.subTables.loc, "LookupSubtable") // wrap offset into link
