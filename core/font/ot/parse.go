@@ -717,8 +717,9 @@ func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lookup
 
 func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
 	format := b.U16(0)
+	trace().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
 	sub := LookupSubtable{lookupType: lookupType, format: format}
-	if lookupType != 7 {
+	if lookupType != 7 { // GSUB type Extension has not coverage table
 		sub.coverage = parseCoverage(b)
 	}
 	switch lookupType {
@@ -728,6 +729,8 @@ func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 		return parseGSubLookupSubtableType2or3(b, sub)
 	case 4:
 		return parseGSubLookupSubtableType4(b, sub)
+	case 7:
+		return parseGSubLookupSubtableType7(b, sub)
 	}
 	return LookupSubtable{} // TODO
 }
@@ -768,7 +771,28 @@ func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubta
 	return sub
 }
 
+// LookupType 7: Extension Substitution
+// This lookup provides a mechanism whereby any other lookup type’s subtables are stored at
+// a 32-bit offset location in the GSUB table.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-7-extension-substitution
+func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	if b.Size() < 8 {
+		trace().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.lookupType)
+		return LookupSubtable{}
+	}
+	if sub.lookupType = LayoutTableLookupType(b.U16(2)); sub.lookupType == GSubLookupTypeExtensionSubs {
+		trace().Errorf("OpenType GSUB lookup subtable type 7 recursion detected")
+		return LookupSubtable{}
+	}
+	trace().Debugf("OpenType GSUB extension subtable is of type %s", sub.lookupType.GSubString())
+	link, _ := parseLink32(b, 4, b, "ext.LookupSubtable")
+	loc := link.Jump()
+	return parseGSubLookupSubtable(loc.Bytes(), sub.lookupType)
+}
+
 func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+	format := b.U16(0)
+	trace().Debugf("parsing GPOS sub-table type %s, format %d", lookupType.GPosString(), format)
 	panic("TODO GPOS Lookup Subtable")
 	//return LookupSubtable{}
 }

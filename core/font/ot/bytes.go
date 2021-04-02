@@ -277,14 +277,10 @@ type NavLink interface {
 }
 
 func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (NavLink, error) {
-	if len(b) < offset {
+	if len(b) < offset+4 {
 		return link32{}, errBufferBounds
 	}
-	n, err := b.u32(offset)
-	if err != nil {
-		return link32{}, errBufferBounds
-	}
-	//trace().Debugf("link has offset %d", n)
+	n, _ := b.u32(offset)
 	return link32{
 		target: target,
 		base:   base,
@@ -293,13 +289,10 @@ func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (Na
 }
 
 func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (NavLink, error) {
-	if len(b) < offset {
+	if len(b) < offset+2 {
 		return link16{}, errBufferBounds
 	}
-	n, err := b.u16(offset)
-	if err != nil {
-		return link16{}, errBufferBounds
-	}
+	n, _ := b.u16(offset)
 	return link16{
 		target: target,
 		base:   base,
@@ -379,6 +372,14 @@ func (l32 link32) Name() string {
 
 func (l32 link32) Base() NavLocation {
 	return l32.base
+}
+
+func makeLink32(offset uint32, base fontBinSegm, target string) NavLink {
+	return link32{
+		target: target,
+		base:   base,
+		offset: offset,
+	}
 }
 
 func (l32 link32) Jump() NavLocation {

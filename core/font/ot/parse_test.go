@@ -236,6 +236,24 @@ func TestParseGSubLookups(t *testing.T) {
 	} else if ll.array.length == 0 {
 		t.Fatalf("GSUB table has no LookupList section")
 	}
+	/*
+	   <LookupList>
+	     <!-- LookupCount=49 -->      Calibri has 49 lookup entries
+	     <Lookup index="0">           Lookup #0 is of type 7, extending to type 1
+	       <LookupType value="7"/>
+	       <LookupFlag value="0"/>
+	       <!-- SubTableCount=1 -->
+	       <ExtensionSubst index="0" Format="1">
+	         <ExtensionLookupType value="1"/>
+	         <SingleSubst Format="2">
+	           <Substitution in="Scedilla" out="uni0218"/>
+	           <Substitution in="scedilla" out="uni0219"/>
+	           <Substitution in="uni0162" out="uni021A"/>
+	           <Substitution in="uni0163" out="uni021B"/>
+	         </SingleSubst>
+	       </ExtensionSubst>
+	     </Lookup>
+	*/
 	t.Logf("font Calibri has %d lookups", ll.array.length)
 	lookup := gsub.LookupList.Navigate(0)
 	t.Logf("lookup[0].subTables count is %d", lookup.subTables.length)
@@ -243,8 +261,10 @@ func TestParseGSubLookups(t *testing.T) {
 		t.Logf("no cached sub-tables")
 	}
 	st := lookup.Subtable(0)
-	t.Logf("type of sub-table is %d", st.lookupType)
-	t.Fail()
+	t.Logf("type of sub-table is %s", st.lookupType.GSubString())
+	if st.lookupType != 1 {
+		t.Errorf("expected first lookup to be of type 7 -> 1, is %d", st.lookupType)
+	}
 }
 
 // ---------------------------------------------------------------------------

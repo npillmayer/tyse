@@ -494,8 +494,9 @@ type AttachmentPointList struct {
 //
 type LookupList struct {
 	array
-	base fontBinSegm
-	err  error
+	base         fontBinSegm
+	lookupsCache []Lookup
+	err          error
 }
 
 func (ll LookupList) Len() int {
@@ -515,9 +516,16 @@ func (ll LookupList) Navigate(i int) Lookup {
 	if ll.err != nil {
 		return Lookup{}
 	}
+	if ll.lookupsCache == nil {
+		ll.lookupsCache = make([]Lookup, ll.length, ll.length)
+	} else if ll.lookupsCache[i].Type != 0 { // type 0 is illegal, i.e. uninitialized
+		return ll.lookupsCache[i]
+	}
 	lookupPtr := ll.Get(i)
 	lookup := ll.base[lookupPtr.U16(0):]
-	return viewLookup(lookup)
+	ll.lookupsCache[i] = viewLookup(lookup)
+	trace().Debugf("cached new lookup #%d of type %d", i, ll.lookupsCache[i].Type)
+	return ll.lookupsCache[i]
 }
 
 var _ NavList = LookupList{}
@@ -551,6 +559,7 @@ func IsGPosLookupType(ltype LayoutTableLookupType) bool {
 type Lookup struct {
 	lookupInfo
 	err              error
+	loc              NavLocation      // offset start for sub-tables
 	subTables        array            // Array of offsets to lookup subrecords, from beginning of Lookup table
 	markFilteringSet uint16           // Index (base 0) into GDEF mark glyph sets structure. This field is only present if bit useMarkFilteringSet of lookup flags is set.
 	subTablesCache   []LookupSubtable // cache for sub-tables already parsed and called
@@ -571,7 +580,7 @@ func viewLookup(b NavLocation) Lookup {
 		return Lookup{}
 	}
 	r := b.Reader()
-	lookup := Lookup{}
+	lookup := Lookup{loc: b}
 	if err := binary.Read(r, binary.BigEndian, &lookup.lookupInfo); err != nil {
 		trace().Errorf("corrupt Lookup table")
 		return Lookup{} // nothing sensible to to except to return empty table
@@ -587,7 +596,7 @@ func viewLookup(b NavLocation) Lookup {
 	if b.Size() >= 4+lookup.subTables.Size()+2 {
 		lookup.markFilteringSet = b.U16(4 + lookup.subTables.Size())
 	}
-	trace().Debugf("lookup has type %s", lookup.Type.GSubString())
+	//trace().Debugf("lookup has type %s", lookup.Type.GSubString())
 	return lookup
 }
 
@@ -598,8 +607,9 @@ func (l Lookup) Subtable(i int) *LookupSubtable {
 	if l.subTablesCache == nil {
 		l.subTablesCache = make([]LookupSubtable, l.SubTableCount)
 		for i := 0; i < l.subTables.length; i++ {
-			n := l.subTables.UnsafeGet(i).U16(0)                     // offset to subtable[i]
-			link := makeLink16(n, l.subTables.loc, "LookupSubtable") // wrap offset into link
+			n := l.subTables.UnsafeGet(i).U16(0) // offset to subtable[i]
+			trace().Debugf("lookup subtable at offset %d", n)
+			link := makeLink16(n, l.loc.Bytes(), "LookupSubtable") // wrap offset into link
 			loc := link.Jump()
 			b := fontBinSegm(loc.Bytes())
 			l.subTablesCache[i] = parseLookupSubtable(b, l.Type)
@@ -649,7 +659,7 @@ var _ NavMap = Lookup{}
 // is best presented in more than one format, a single lookup may define more than
 // one subtable, as long as all the subtables are for the same LookupType.
 type LookupSubtable struct {
-	lookupType LayoutTableLookupType
+	lookupType LayoutTableLookupType // may differ from Lookup.Type for Type=Extension
 	format     uint16
 	coverage   Coverage
 	index      varArray
