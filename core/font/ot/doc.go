@@ -226,6 +226,9 @@ import (
 	"github.com/npillmayer/tyse/core"
 )
 
+// Valuable resource:
+// http://opentypecookbook.com/
+
 // trace traces to a global core-tracer.
 func trace() tracing.Trace {
 	return gtrace.CoreTracer
