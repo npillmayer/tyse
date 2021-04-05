@@ -50,11 +50,24 @@ func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
 		}
 	case "LangSys":
 		trace().Debugf("%s[0] = %x", obj, u16(loc.Bytes()))
-		lsys, err := parseLangSys(loc.Bytes(), 2, "int")
+		lsys, err := parseLangSys(loc.Bytes(), 2, "Feature-Index")
 		if err != nil {
 			return null(err)
 		}
 		return lsys
+	case "Feature":
+		l, err := parseLink16(loc.Bytes(), 0, loc.Bytes(), "Feature-Params")
+		if err != nil {
+			return null(err)
+		}
+		lookups, err := parseArray16(loc.Bytes(), 2)
+		if err != nil {
+			return null(err)
+		}
+		return feature{
+			params:  l,
+			lookups: lookups,
+		}
 	case "name":
 		names, err := parseNames(loc.Bytes())
 		if err != nil {

@@ -199,7 +199,7 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 			// Now normalize the index into the glyph ID array
 			index := offset / 2 // offset is in bytes, we need an array index
 			index += int(c - entry.start)
-			glyphInx := f4.glyphIds.UnsafeGet(index).U16(0)
+			glyphInx := f4.glyphIds.Get(index).U16(0)
 			// trace().Debugf("segment #%d = { start=%d, end=%d, delta=%d, offset=%d }",
 			// 	h, entry.start, entry.end, entry.delta, entry.offset)
 			// trace().Debugf("skip = %d, offset = %d, rest = %d", deltaToEndOfEntries, offset, index)
@@ -255,10 +255,10 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 	entries := make([]cmapEntry16, segCount)
 	for i := range entries {
 		entries[i] = cmapEntry16{
-			end:    endCodes.UnsafeGet(i).U16(0),
-			start:  startCodes.UnsafeGet(i).U16(0),
-			delta:  deltas.UnsafeGet(i).U16(0),
-			offset: offsets.UnsafeGet(i).U16(0),
+			end:    endCodes.Get(i).U16(0),
+			start:  startCodes.Get(i).U16(0),
+			delta:  deltas.Get(i).U16(0),
+			offset: offsets.Get(i).U16(0),
 		}
 		if entries[i].offset > 0 && entries[i].delta > 0 {
 			panic("Hurray! Font with cmap format 4, offset > 0 and delta > 0, detected!")
@@ -329,9 +329,9 @@ func makeGlyphIndexFormat12(b fontBinSegm) (CMapGlyphIndex, error) {
 	entries := make([]cmapEntry32, grpCount)
 	for i := range entries {
 		entries[i] = cmapEntry32{
-			start: groups.UnsafeGet(i).U32(0),
-			end:   u32(groups.UnsafeGet(i).Bytes()[4:]),
-			delta: u32(groups.UnsafeGet(i).Bytes()[8:]),
+			start: groups.Get(i).U32(0),
+			end:   u32(groups.Get(i).Bytes()[4:]),
+			delta: u32(groups.Get(i).Bytes()[8:]),
 		}
 	}
 	return format12GlyphIndex{

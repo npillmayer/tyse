@@ -548,7 +548,7 @@ func (n nameNames) Name() string {
 func (n nameNames) Map() NavMap {
 	namesMap := make(map[Tag]link16)
 	for i := 0; i < n.nameRecs.length; i++ {
-		nameRecord := n.nameRecs.UnsafeGet(i)
+		nameRecord := n.nameRecs.Get(i)
 		pltf := nameRecord.U16(0)
 		enc := nameRecord.U16(2)
 		if !((pltf == 0 && enc == 3) || (pltf == 3 && enc == 1)) {

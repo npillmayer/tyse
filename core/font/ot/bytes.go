@@ -468,7 +468,13 @@ func (a array) Size() int {
 	return a.length * a.recordSize
 }
 
-func (a array) UnsafeGet(i int) NavLocation {
+// Len returns the number of entries in the list.
+func (a array) Len() int {
+	return a.length
+}
+
+// Get returns item #i as a byte location.
+func (a array) Get(i int) NavLocation {
 	if i < 0 || (i+1)*a.recordSize > len(a.loc.Bytes()) {
 		i = 0
 	}
@@ -479,7 +485,7 @@ func (a array) UnsafeGet(i int) NavLocation {
 func (a array) All() []NavLocation {
 	r := make([]NavLocation, a.length)
 	for i := 0; i < a.length; i++ {
-		x := a.UnsafeGet(i)
+		x := a.Get(i)
 		r = append(r, x)
 	}
 	return r
@@ -512,7 +518,7 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 		indirect = 1
 	}
 	for i := 0; i < indirect; i++ {
-		b := a.UnsafeGet(i) // TODO will this create an infinite loop in case of error?
+		b := a.Get(i) // TODO will this create an infinite loop in case of error?
 		if i+1 < va.indirections {
 			a, err = parseArray16(b.Bytes(), 0)
 		}
@@ -574,7 +580,7 @@ func (m tagRecordMap16) LookupTag(tag Tag) NavLink {
 	}
 	trace().Debugf("tag record map has %d entries", m.records.length)
 	for i := 0; i < m.records.length; i++ {
-		b := m.records.UnsafeGet(i)
+		b := m.records.Get(i)
 		rtag := MakeTag(b.Bytes()[:4])
 		trace().Debugf("testing for tag = %s", rtag)
 		if tag == rtag {
@@ -595,7 +601,7 @@ func (m tagRecordMap16) Tags() []Tag {
 	trace().Debugf("tag record map has %d entries", m.records.length)
 	tags := make([]Tag, 0, 3)
 	for i := 0; i < m.records.length; i++ {
-		b := m.records.UnsafeGet(i)
+		b := m.records.Get(i)
 		tag := MakeTag(b.Bytes()[:4])
 		trace().Debugf("  Tag = (%s)", tag)
 		tags = append(tags, tag)

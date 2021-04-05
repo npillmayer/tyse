@@ -371,7 +371,7 @@ func (cdf *classDefinitionsFormat1) Lookup(glyph GlyphIndex) int {
 	if glyph < cdf.start || glyph >= cdf.start+GlyphIndex(cdf.count) {
 		return 0
 	}
-	clz := cdf.valueArray.UnsafeGet(int(glyph - cdf.start)).U16(0)
+	clz := cdf.valueArray.Get(int(glyph - cdf.start)).U16(0)
 	return int(clz)
 }
 
@@ -382,7 +382,7 @@ type classDefinitionsFormat2 struct {
 
 func (cdf *classDefinitionsFormat2) Lookup(glyph GlyphIndex) int {
 	for i := 0; i < cdf.count; i++ {
-		rec := cdf.classRanges.UnsafeGet(i)
+		rec := cdf.classRanges.Get(i)
 		if glyph < GlyphIndex(rec.U16(0)) {
 			return 0
 		}
@@ -471,6 +471,53 @@ type AttachmentPointList struct {
 	attachPointOffsets fontBinSegm
 }
 
+// --- Feature ---------------------------------------------------------------
+
+// Features define the functionality of an OpenType Layout font and they are named to convey
+// meaning to the text-processing client. Consider a feature named 'liga' to create ligatures.
+// Because of its name, the client knows what the feature does and can decide whether to
+// apply it. Font developers can use these features, as well as create their own.
+type feature struct {
+	err     error
+	params  NavLink
+	lookups array
+}
+
+// Link links to the feature's parameters buffer.
+func (f feature) Link() NavLink {
+	return f.params
+}
+
+func (f feature) Map() NavMap {
+	return tagRecordMap16{}
+}
+
+func (f feature) List() NavList {
+	r := make([]uint16, f.lookups.length)
+	for i := 0; i < f.lookups.length; i++ {
+		if i < 0 || (i+1)*f.lookups.recordSize > len(f.lookups.loc.Bytes()) {
+			i = 0
+		}
+		b, _ := f.lookups.loc.view(i*f.lookups.recordSize, f.lookups.recordSize)
+		r[i] = u16(b)
+	}
+	return u16List(r)
+}
+
+func (f feature) IsVoid() bool {
+	return f.lookups.length == 0
+}
+
+func (f feature) Error() error {
+	return f.err
+}
+
+func (f feature) Name() string {
+	return "Feature"
+}
+
+var _ Navigator = feature{}
+
 // --- Lookup tables ---------------------------------------------------------
 
 // A LookupList table contains an array of offsets to Lookup tables (lookupOffsets).
@@ -499,6 +546,7 @@ type LookupList struct {
 	err          error
 }
 
+/*
 func (ll LookupList) Len() int {
 	return ll.length
 }
@@ -509,6 +557,7 @@ func (ll LookupList) Get(i int) NavLocation {
 	}
 	return ll.UnsafeGet(i)
 }
+*/
 
 // Navigate will navigate to Lookup i in the list.
 func (ll LookupList) Navigate(i int) Lookup {
@@ -607,7 +656,7 @@ func (l Lookup) Subtable(i int) *LookupSubtable {
 	if l.subTablesCache == nil {
 		l.subTablesCache = make([]LookupSubtable, l.SubTableCount)
 		for i := 0; i < l.subTables.length; i++ {
-			n := l.subTables.UnsafeGet(i).U16(0) // offset to subtable[i]
+			n := l.subTables.Get(i).U16(0) // offset to subtable[i]
 			trace().Debugf("lookup subtable at offset %d", n)
 			link := makeLink16(n, l.loc.Bytes(), "LookupSubtable") // wrap offset into link
 			loc := link.Jump()
@@ -786,7 +835,7 @@ func LigatureSetLookup(loc NavLocation, glyphs []GlyphIndex) GlyphIndex {
 	}
 	// iterate over all Ligature entries, pointed to by an offset16
 	for i := 0; i < ligset.length; i++ {
-		ptr := ligset.UnsafeGet(i).U16(0)
+		ptr := ligset.Get(i).U16(0)
 		// Ligature table (glyph components for one ligature):
 		// uint16  ligatureGlyph     glyph ID of ligature to substitute
 		// uint16  componentCount    Number of components in the ligature
@@ -803,7 +852,7 @@ func LigatureSetLookup(loc NavLocation, glyphs []GlyphIndex) GlyphIndex {
 		}
 		match := true
 		for i, g := range glyphs {
-			if g != GlyphIndex(comps.UnsafeGet(i).U16(0)) {
+			if g != GlyphIndex(comps.Get(i).U16(0)) {
 				match = false
 				break
 			}
