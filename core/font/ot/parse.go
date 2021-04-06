@@ -849,6 +849,7 @@ func parseLangSys(b fontBinSegm, offset int, target string) (langSys, error) {
 		return lsys, err
 	}
 	lsys.featureIndices = features
+	trace().Debugf("LangSys points to %d features", features.length)
 	return lsys, nil
 }
 

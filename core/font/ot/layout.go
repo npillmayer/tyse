@@ -436,11 +436,15 @@ func (lsys langSys) Map() NavMap {
 func (lsys langSys) List() NavList {
 	r := make([]uint16, lsys.featureIndices.length+1)
 	r[0] = lsys.mandatory
+	// if r[0] == 0xffff {
+	// 	r[0] = 0
+	// }
 	for i := 0; i < lsys.featureIndices.length; i++ {
 		if i < 0 || (i+1)*lsys.featureIndices.recordSize > len(lsys.featureIndices.loc.Bytes()) {
 			i = 0
 		}
 		b, _ := lsys.featureIndices.loc.view(i*lsys.featureIndices.recordSize, lsys.featureIndices.recordSize)
+		//trace().Debugf("r.i+1[%d] = %d", i+1, u16(b))
 		r[i+1] = u16(b)
 	}
 	return u16List(r)
@@ -566,7 +570,7 @@ func (ll LookupList) Navigate(i int) Lookup {
 		return Lookup{}
 	}
 	if ll.lookupsCache == nil {
-		ll.lookupsCache = make([]Lookup, ll.length, ll.length)
+		ll.lookupsCache = make([]Lookup, ll.length)
 	} else if ll.lookupsCache[i].Type != 0 { // type 0 is illegal, i.e. uninitialized
 		return ll.lookupsCache[i]
 	}

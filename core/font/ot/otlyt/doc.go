@@ -5,7 +5,6 @@ Status
 
 Work in progress.
 
-No font collections nor variable fonts are supported yet, but will be in time.
 
 License
 

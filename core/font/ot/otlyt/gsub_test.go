@@ -12,39 +12,44 @@ import (
 	"github.com/npillmayer/tyse/core/locate/resources"
 )
 
-func TestLiga(t *testing.T) {
+func TestFeatureList(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
-	gsub := getTable(otf, "GSUB", t).Self().AsGSub()
-	liga := gsub.FeatureList.LookupTag(ot.T("liga"))
-	if liga == nil {
-		t.Errorf("liga table not found in font Calibri")
+	t.Logf("Using font %s for test", otf.F.Fontname)
+	// Calibri has no DFLT feature set
+	gsubFeats, gposFeats, err := FontFeatures(otf, ot.T("latn"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gsubFeats) == 0 {
+		t.Errorf("GSUB features not found in font Calibri")
+	}
+	if len(gposFeats) == 0 {
+		t.Errorf("GPOS features not found in font Calibri")
+	}
+	t.Logf("found %d GSUB features", len(gsubFeats))
+	t.Logf("found %d GPOS features", len(gposFeats))
+	if len(gsubFeats) != 24 {
+		t.Errorf("expected Calibri to have 24 GSUB features for 'latn', has %d", len(gsubFeats))
 	}
 }
 
 // ---------------------------------------------------------------------------
 
-func getTable(otf *ot.Font, name string, t *testing.T) ot.Table {
-	table := otf.Table(ot.T(name))
-	if table == nil {
-		t.Fatalf("table %s not found in font", name)
-	}
-	return table
-}
-
 func parseFont(t *testing.T, pattern string) *ot.Font {
-	otf := loadTestFont(t, pattern)
-	if otf == nil {
+	sfnt := loadTestFont(t, pattern)
+	if sfnt == nil {
 		return nil
 	}
-	otf, err := ot.Parse(otf.F.Binary)
+	otf, err := ot.Parse(sfnt.F.Binary)
 	if err != nil {
 		core.UserError(err)
 		t.Fatal(err)
 	}
+	otf.F = sfnt.F
 	t.Logf("--- font parsed ---")
 	return otf
 }

@@ -532,11 +532,15 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 // from a given tag. This kind of map is used within OpenType fonts in several
 // instances, e.g.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
+//
+// For some record maps the (tag) keys are not unique (e.g., the feature-list table),
+// so in this case the first matching entry will be returned.
 type TagRecordMap interface {
-	Name() string          // OpenType specification name of this map
-	LookupTag(Tag) NavLink // returns the link associated with a given tag
-	Tags() []Tag           // returns all the tags which the map uses as keys
-	Count() int            // number of entries in the map
+	Name() string           // OpenType specification name of this map
+	LookupTag(Tag) NavLink  // returns the link associated with a given tag
+	Tags() []Tag            // returns all the tags which the map uses as keys
+	Count() int             // number of entries in the map
+	Get(int) (Tag, NavLink) // get entry at position n
 }
 
 // recsize is the byte size of the record entry not including the Tag.
@@ -617,6 +621,16 @@ func (m tagRecordMap16) Count() int {
 	return m.records.length
 }
 
+func (m tagRecordMap16) Get(i int) (Tag, NavLink) {
+	b := m.records.Get(i)
+	tag := MakeTag(b.Bytes()[:4])
+	link, err := parseLink16(b.Bytes(), 4, m.base, m.target)
+	if err != nil {
+		return 0, link16{}
+	}
+	return tag, link
+}
+
 func (m tagRecordMap16) IsTagRecordMap() bool {
 	return true
 }
@@ -661,6 +675,11 @@ func (mw mapWrapper) Tags() []Tag {
 	return tags
 }
 
+// Get does nothing
+func (mw mapWrapper) Get(int) (Tag, NavLink) {
+	return 0, link16{}
+}
+
 func (mw mapWrapper) IsTagRecordMap() bool {
 	return true
 }
@@ -692,8 +711,8 @@ func (u16l u16List) Get(i int) NavLocation {
 
 func (u16l u16List) All() []NavLocation {
 	r := make([]NavLocation, len(u16l))
-	for _, x := range u16l {
-		r = append(r, fontBinSegm([]byte{byte(x >> 8 & 0xff), byte(x & 0xff)}))
+	for i, x := range u16l {
+		r[i] = fontBinSegm([]byte{byte(x >> 8 & 0xff), byte(x & 0xff)})
 	}
 	return r
 }
