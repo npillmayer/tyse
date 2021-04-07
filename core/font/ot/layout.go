@@ -50,15 +50,15 @@ func (h LayoutHeader) Version() (int, int) {
 // ▪︎ Feature Variations Section.
 // (see type LayoutTableSectionName)
 //
-func (h *LayoutHeader) offsetFor(which LayoutTableSectionName) int {
+func (h *LayoutHeader) offsetFor(which layoutTableSectionName) int {
 	switch which {
-	case LayoutScriptSection:
+	case layoutScriptSection:
 		return int(h.offsets.ScriptListOffset)
-	case LayoutFeatureSection:
+	case layoutFeatureSection:
 		return int(h.offsets.FeatureListOffset)
-	case LayoutLookupSection:
+	case layoutLookupSection:
 		return int(h.offsets.LookupListOffset)
-	case LayoutFeatureVariationsSection:
+	case layoutFeatureVariationsSection:
 		return int(h.offsets.FeatureVariationsOffset)
 	}
 	trace().Errorf("illegal section offset type into layout table: %d", which)
@@ -92,16 +92,14 @@ type layoutHeader11 struct {
 
 // --- Layout tables sections ------------------------------------------------
 
-// LayoutTableSectionName lists the sections of OT layout tables, i.e. GPOS and GSUB.
-type LayoutTableSectionName int
+// layoutTableSectionName lists the sections of OT layout tables, i.e. GPOS and GSUB.
+type layoutTableSectionName int
 
 const (
-	LayoutScriptSection LayoutTableSectionName = iota
-	LayoutFeatureSection
-	// Lookup records:
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
-	LayoutLookupSection
-	LayoutFeatureVariationsSection
+	layoutScriptSection layoutTableSectionName = iota
+	layoutFeatureSection
+	layoutLookupSection
+	layoutFeatureVariationsSection
 )
 
 // LayoutTableLookupFlag is a flag type for layout tables (GPOS and GSUB).
@@ -300,6 +298,7 @@ type coverageHeader struct {
 }
 
 func buildGlyphRangeFromCoverage(chead coverageHeader, b fontBinSegm) GlyphRange {
+	trace().Debugf("coverage format = %d, count = %d", chead.CoverageFormat, chead.Count)
 	if chead.CoverageFormat == 1 {
 		return &glyphRangeArray{
 			is32:     false,                  // entries are uint16
@@ -527,7 +526,8 @@ var _ Navigator = feature{}
 // A LookupList table contains an array of offsets to Lookup tables (lookupOffsets).
 // The font developer defines the Lookup sequence in the Lookup array to control the order
 // in which a text-processing client applies lookup data to glyph substitution or
-// positioning operations.
+// positioning operations. (See
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table).
 //
 // Lookup tables are essential for implementing the various OpenType font features.
 // The details are sometimes tricky and it's often hard to remember how a lookup type
@@ -542,6 +542,8 @@ var _ Navigator = feature{}
 // Other packages working on top of `ot` should abstract this further and operate
 // in terms of OT features, hiding altogether the existence of lookup lists and lookups from
 // clients.
+//
+// LookupList implements the NavList interface.
 //
 type LookupList struct {
 	array
@@ -609,6 +611,8 @@ func IsGPosLookupType(ltype LayoutTableLookupType) bool {
 // whether the lookup is part of a GSUB or GPOS table. GSUB supports eight LookupTypes,
 // and GPOS supports nine LookupTypes
 //
+// Lookup implements the NavMap interface.
+//
 type Lookup struct {
 	lookupInfo
 	err              error
@@ -654,7 +658,7 @@ func viewLookup(b NavLocation) Lookup {
 }
 
 func (l Lookup) Subtable(i int) *LookupSubtable {
-	if i >= int(l.SubTableCount) {
+	if l.err != nil || i >= int(l.SubTableCount) {
 		return nil
 	}
 	if l.subTablesCache == nil {
@@ -707,55 +711,28 @@ func (l Lookup) AsTagRecordMap() TagRecordMap {
 
 var _ NavMap = Lookup{}
 
-// Each LookupType may occur in one or more subtable formats. The “best” format depends on
+// LookupSubtable is a type for OpenType Lookup Subtables, which are the basis for Lookup operations
+// (see https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table).
+//
+// “Each LookupType may occur in one or more subtable formats. The ‘best’ format depends on
 // the type of substitution and the resulting storage efficiency. When glyph information
 // is best presented in more than one format, a single lookup may define more than
-// one subtable, as long as all the subtables are for the same LookupType.
+// one subtable, as long as all the subtables are for the same LookupType.”
+//
+// The interpretation of the Index-elements and the Support field depend heavily on the
+// type of the lookup-subtable. For example, for a GSUB lookup of type 'Single Substitution Format 1'
+// Support will be interpreted as a delta and be added to glyph IDs, while lookup type
+// 'Ligature Substitution Format 1' will ignore the Support field and repeatedly descend into
+// the Index tables to match glyph sequences suitable for ligature substitution. (see
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-1-single-substitution-subtable).
+// Package `ot` will not do this interpretation, but rather leave it to higher-protocol packages.
+//
 type LookupSubtable struct {
-	lookupType LayoutTableLookupType // may differ from Lookup.Type for Type=Extension
-	format     uint16
-	coverage   Coverage
-	index      varArray
-	support    interface{} // TODO make this a more specific interface
-}
-
-// GSUB LookupType 1: Single Substitution Subtable
-//
-// Single substitution (SingleSubst) subtables tell a client to replace a single glyph
-// with another glyph. The subtables can be either of two formats. Both formats require
-// two distinct sets of glyph indices: one that defines input glyphs (specified in the
-// Coverage table), and one that defines the output glyphs.
-
-// GSUB LookupSubtable Type 1 Format 1 calculates the indices of the output glyphs, which
-// are not explicitly defined in the subtable. To calculate an output glyph index,
-// Format 1 adds a constant delta value to the input glyph index. For the substitutions to
-// occur properly, the glyph indices in the input and output ranges must be in the same order.
-// This format does not use the Coverage index that is returned from the Coverage table.
-//
-func gsubLookupType1Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	_, ok := lksub.coverage.GlyphRange.Lookup(g)
-	if !ok {
-		return fontBinSegm{}
-	}
-	// support is deltaGlyphID: add to original glyph ID to get substitute glyph ID
-	delta := lksub.support.(GlyphIndex)
-	return uintBytes(uint16(g + delta))
-}
-
-// GSUB LookupSubtable Type 1 Format 2 provides an array of output glyph indices
-// (substituteGlyphIDs) explicitly matched to the input glyph indices specified in the
-// Coverage table.
-//
-// The substituteGlyphIDs array must contain the same number of glyph indices as the
-// Coverage table. To locate the corresponding output glyph index in the substituteGlyphIDs
-// array, this format uses the Coverage index returned from the Coverage table.
-//
-func gsubLookupType1Fmt2(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
-	if !ok {
-		return fontBinSegm{}
-	}
-	return lookupAndReturn(&lksub.index, inx, true)
+	LookupType LayoutTableLookupType // may differ from Lookup.Type for Type=Extension
+	Format     uint16                // lookup subtables may come in more than one format
+	Coverage   Coverage              // for which glyphs is this lookup applicable
+	Index      VarArray              // Index tables/arrays to lookup up substitutions/positions
+	Support    interface{}           // some lookup variants use additional data
 }
 
 // LookupType 2: Multiple Substitution Subtable
@@ -771,11 +748,11 @@ func gsubLookupType1Fmt2(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLoca
 // glyphs. Each Sequence table contains a count of the glyphs in the output glyph sequence
 // (glyphCount) and an array of output glyph indices (substituteGlyphIDs).
 func gsubLookupType2Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
 	if !ok {
 		return fontBinSegm{}
 	}
-	return lookupAndReturn(&lksub.index, inx, true)
+	return lookupAndReturn(lksub.Index, inx, true)
 }
 
 // LookupType 3: Alternate Substitution Subtable
@@ -792,11 +769,11 @@ func gsubLookupType2Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLoca
 // count of the alternative glyphs (glyphCount) and an array of their glyph indices
 // (alternateGlyphIDs).
 func gsubLookupType3Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
 	if !ok {
 		return fontBinSegm{}
 	}
-	return lookupAndReturn(&lksub.index, inx, true)
+	return lookupAndReturn(lksub.Index, inx, true)
 }
 
 // LookupType 4: Ligature Substitution Subtable
@@ -813,11 +790,11 @@ func gsubLookupType3Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLoca
 // NavLocation which is a LigatureSet, i.e. a list of records of unequal lengths.
 //
 func gsubLookupType4Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
 	if !ok {
 		return fontBinSegm{}
 	}
-	return lookupAndReturn(&lksub.index, inx, true) // returns a LigatureSet
+	return lookupAndReturn(lksub.Index, inx, true) // returns a LigatureSet
 }
 
 // LigatureSetLookup trys to match a sequence of glyph IDs to the pattern portions
@@ -879,17 +856,17 @@ func LigatureSetLookup(loc NavLocation, glyphs []GlyphIndex) GlyphIndex {
 // within the input sequence.
 // Each sequence position + nested lookup combination is specified in a SequenceLookupRecord.
 func gsubLookupType5Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.coverage.GlyphRange.Lookup(g)
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
 	if !ok {
 		return fontBinSegm{}
 	}
-	return lookupAndReturn(&lksub.index, inx, true) // returns a LigatureSet
+	return lookupAndReturn(lksub.Index, inx, true) // returns a LigatureSet
 }
 
 // lookupAndReturn is a small helper which looks up an index for a glyph (previously
 // returned from a coverage table), checks for errors, and returns the resulting bytes.
 // TODO check that this is inlined by the compiler.
-func lookupAndReturn(index *varArray, ginx int, deep bool) NavLocation {
+func lookupAndReturn(index VarArray, ginx int, deep bool) NavLocation {
 	outglyph, err := index.Get(ginx, deep)
 	if err != nil {
 		return fontBinSegm{}

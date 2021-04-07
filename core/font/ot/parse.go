@@ -620,6 +620,7 @@ func parseLayoutHeader(lytt *LayoutTable, b fontBinSegm, err error) error {
 
 // --- Layout table lookup list ----------------------------------------------
 
+/*
 // No longer used.
 //
 // parseLookup parses a single Lookup record. b expected to be the beginning of LookupList.
@@ -665,6 +666,7 @@ func parseLookup(b fontBinSegm, offset uint16) (*Lookup, error) {
 	// TODO Read lookup.MarkFilteringSet  ?
 	return &lookup, nil
 }
+*/
 
 // parseLookupList parses the LookupList.
 // See https://www.microsoft.com/typography/otspec/chapter2.htm#lulTbl
@@ -672,7 +674,7 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	lloffset := lytt.header.offsetFor(LayoutLookupSection)
+	lloffset := lytt.header.offsetFor(layoutLookupSection)
 	if lloffset >= len(b) {
 		return io.ErrUnexpectedEOF
 	}
@@ -706,6 +708,7 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 }
 
 func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	if len(b) < 4 {
 		return LookupSubtable{}
 	}
@@ -716,11 +719,13 @@ func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lookup
 }
 
 func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	format := b.U16(0)
 	trace().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
-	sub := LookupSubtable{lookupType: lookupType, format: format}
-	if lookupType != 7 { // GSUB type Extension has not coverage table
-		sub.coverage = parseCoverage(b)
+	sub := LookupSubtable{LookupType: lookupType, Format: format}
+	if lookupType != 7 { // GSUB type Extension has no coverage table
+		covlink, _ := parseLink16(b, 2, b, "Coverage")
+		sub.Coverage = parseCoverage(covlink.Jump().Bytes())
 	}
 	switch lookupType {
 	case 1:
@@ -740,10 +745,10 @@ func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 // another glyph.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-1-single-substitution-subtable
 func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	if sub.format == 1 {
-		sub.support = int16(b.U16(4))
+	if sub.Format == 1 {
+		sub.Support = int16(b.U16(4))
 	} else {
-		sub.index = parseVarArrary16(b, 4, 1, "LookupSubtable")
+		sub.Index = parseVarArrary16(b, 4, 1, "LookupSubtable")
 	}
 	return sub
 }
@@ -757,7 +762,7 @@ func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubta
 // alternatives from which a user can choose a glyph variant to replace the input glyph.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-3-alternate-substitution-subtable
 func parseGSubLookupSubtableType2or3(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	sub.index = parseVarArrary16(b, 4, 2, "LookupSubtable")
+	sub.Index = parseVarArrary16(b, 4, 2, "LookupSubtable")
 	return sub
 }
 
@@ -767,7 +772,7 @@ func parseGSubLookupSubtableType2or3(b fontBinSegm, sub LookupSubtable) LookupSu
 // number of ligature substitutions.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-4-ligature-substitution-subtable
 func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	sub.index = parseVarArrary16(b, 4, 2, "LookupSubtable")
+	sub.Index = parseVarArrary16(b, 4, 2, "LookupSubtable")
 	return sub
 }
 
@@ -777,17 +782,17 @@ func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubta
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-7-extension-substitution
 func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubtable {
 	if b.Size() < 8 {
-		trace().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.lookupType)
+		trace().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.LookupType)
 		return LookupSubtable{}
 	}
-	if sub.lookupType = LayoutTableLookupType(b.U16(2)); sub.lookupType == GSubLookupTypeExtensionSubs {
+	if sub.LookupType = LayoutTableLookupType(b.U16(2)); sub.LookupType == GSubLookupTypeExtensionSubs {
 		trace().Errorf("OpenType GSUB lookup subtable type 7 recursion detected")
 		return LookupSubtable{}
 	}
-	trace().Debugf("OpenType GSUB extension subtable is of type %s", sub.lookupType.GSubString())
+	trace().Debugf("OpenType GSUB extension subtable is of type %s", sub.LookupType.GSubString())
 	link, _ := parseLink32(b, 4, b, "ext.LookupSubtable")
 	loc := link.Jump()
-	return parseGSubLookupSubtable(loc.Bytes(), sub.lookupType)
+	return parseGSubLookupSubtable(loc.Bytes(), sub.LookupType)
 }
 
 func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
@@ -821,7 +826,7 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 	// lytt.features = frecords
 	// return nil
 	lytt.FeatureList = tagRecordMap16{}
-	link := link16{base: b, offset: uint16(lytt.header.offsetFor(LayoutFeatureSection))}
+	link := link16{base: b, offset: uint16(lytt.header.offsetFor(layoutFeatureSection))}
 	features := link.Jump() // now we stand at the FeatureList table
 	featureRecords := parseTagRecordMap16(features.Bytes(), 0, features.Bytes(), "FeatureList", "Feature")
 	lytt.FeatureList = featureRecords
@@ -866,7 +871,7 @@ func parseScriptList(lytt *LayoutTable, b fontBinSegm, err error) error {
 		return err
 	}
 	lytt.ScriptList = tagRecordMap16{}
-	link := link16{base: b, offset: uint16(lytt.header.offsetFor(LayoutScriptSection))}
+	link := link16{base: b, offset: uint16(lytt.header.offsetFor(layoutScriptSection))}
 	scripts := link.Jump() // now we stand at the ScriptList table
 	scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
 	lytt.ScriptList = scriptRecords
@@ -904,11 +909,16 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
 // A Coverage table defines a unique index value, the Coverage Index, for each
 // covered glyph.
 func parseCoverage(b fontBinSegm) Coverage {
+	trace().Debugf("parsing Coverage")
 	h := coverageHeader{}
-	r := bytes.NewReader(b)
-	if err := binary.Read(r, binary.BigEndian, &h); err != nil {
-		return Coverage{}
-	}
+	h.CoverageFormat = b.U16(0)
+	h.Count = b.U16(2)
+	// r := bytes.NewReader(b)
+	// if err := binary.Read(r, binary.BigEndian, &h); err != nil {
+	// 	return Coverage{}
+	// }
+	trace().Debugf("coverage header format %d has count = %d ", h.CoverageFormat, h.Count)
+	//trace().Debugf("cont = %v", asU16Slice(b[:20]))
 	return Coverage{
 		coverageHeader: h,
 		GlyphRange:     buildGlyphRangeFromCoverage(h, b),

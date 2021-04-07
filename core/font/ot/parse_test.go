@@ -261,9 +261,9 @@ func TestParseGSubLookups(t *testing.T) {
 		t.Logf("no cached sub-tables")
 	}
 	st := lookup.Subtable(0)
-	t.Logf("type of sub-table is %s", st.lookupType.GSubString())
-	if st.lookupType != 1 {
-		t.Errorf("expected first lookup to be of type 7 -> 1, is %d", st.lookupType)
+	t.Logf("type of sub-table is %s", st.LookupType.GSubString())
+	if st.LookupType != 1 {
+		t.Errorf("expected first lookup to be of type 7 -> 1, is %d", st.LookupType)
 	}
 }
 

@@ -25,12 +25,19 @@ func u32(b []byte) uint32 {
 
 // NavLocation is a position at a byte within a font's binary data.
 // It represents the start of a segment/slice of binary data.
+//
+// NavLocation is always the final link of a chain of Navigator calls, giving access to
+// underlying (unstructured) font data. It is the client's responsibility to interpret the
+// structure and impose it onto the NavLocation's bytes.
+//
+// If somewhere along a chain of navigation calls an error occured, the finally resulting NavLocation
+// may be of size 0.
 type NavLocation interface {
-	Size() int     // size in bytes
-	Bytes() []byte // return as a byte slice
-	Reader() io.Reader
-	U16(int) uint16
-	U32(int) uint32
+	Size() int         // size in bytes
+	Bytes() []byte     // return as a byte slice
+	Reader() io.Reader // return as a Reader
+	U16(int) uint16    // convenience access to 16 bit data at byte index
+	U32(int) uint32    // convenience access to 32 bit data at byte index
 }
 
 // fontBinSegm is a segment of byte data.
@@ -64,6 +71,16 @@ func (b fontBinSegm) U32(i int) uint32 {
 		return 0
 	}
 	return n
+}
+
+func asU16Slice(b fontBinSegm) []uint16 {
+	r := make([]uint16, len(b)/2+1)
+	j := 0
+	for i := 0; i < len(b); i += 2 {
+		r[j] = uint16(b[i])<<8 + uint16(b[i+1])
+		j++
+	}
+	return r
 }
 
 // return an unsigned integer as an array of two bytes.
@@ -178,7 +195,7 @@ func (r *glyphRangeArray) Lookup(g GlyphIndex) (int, bool) {
 }
 
 type rangeRecord struct {
-	from, to rune
+	from, to GlyphIndex
 	index    uint16
 }
 
@@ -197,6 +214,7 @@ type glyphRangeRecords struct {
 // glyphRangeRecords return the index of the key in the range table.
 // 0 is a valid return value.
 func (r *glyphRangeRecords) Lookup(g GlyphIndex) (int, bool) {
+	trace().Debugf("glyph range lookup of glyph ID %d", g)
 	if r.count <= 0 {
 		return 0, false
 	}
@@ -207,23 +225,31 @@ func (r *glyphRangeRecords) Lookup(g GlyphIndex) (int, bool) {
 			if err != nil {
 				return 0, false
 			}
-			record.from = rune(k)
+			record.from = GlyphIndex(k)
 			k, _ = r.data.u32(i*(2+2+2) + 4)
-			record.to = rune(k)
+			record.to = GlyphIndex(k)
 			v, _ := r.data.u16(i*(2+2+2) + 6)
 			record.index = v
+			if record.from <= g && g <= record.to {
+				return int(record.index + uint16(g-record.from)), true
+			}
 		}
 	} else {
+		trace().Debugf("range of %d records", r.count)
 		for i := 0; i < r.count; i++ {
 			k, err := r.data.u16(i * (2 + 2 + 2))
 			if err != nil {
 				return 0, false
 			}
-			record.from = rune(k)
+			record.from = GlyphIndex(k)
 			k, _ = r.data.u16(i*(2+2+2) + 2)
-			record.to = rune(k)
+			record.to = GlyphIndex(k)
 			k, _ = r.data.u16(i*(2+2+2) + 4)
 			record.index = k
+			trace().Debugf("from %d to %d => %d...", record.from, record.to, record.index)
+			if record.from <= g && g <= record.to {
+				return int(record.index + uint16(g-record.from)), true
+			}
 		}
 	}
 	return 0, false
@@ -263,17 +289,17 @@ func (l tagList) Tag(i int) Tag {
 
 // NavLink is a type to represent the transfer between one Navigator item and
 // another. Clients may use it to either arrive at the binary segment of the
-// destination (call Jump) or receiving the destination as a Navigator item
+// destination (call Jump) or to receive the destination as a Navigator item
 // (call Navigate).
 //
 // Name returns the class name of the link's destination. IsNull is used to check
 // if this NavLink represents a link to a valid destination.
 type NavLink interface {
-	Base() NavLocation
-	Jump() NavLocation
-	IsNull() bool
-	Navigate() Navigator
-	Name() string
+	Base() NavLocation   // source location
+	Jump() NavLocation   // destination location
+	IsNull() bool        // is this a valid link?
+	Navigate() Navigator // interpret destination as an OpenType structure element
+	Name() string        // OpenType structure name of destination
 }
 
 func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (NavLink, error) {
@@ -491,6 +517,12 @@ func (a array) All() []NavLocation {
 	return r
 }
 
+// VarArray is a type for arrays of variable length records, which in turn may point to nested
+// arrays of (variable size) records.
+type VarArray interface {
+	Get(i int, deep bool) (NavLocation, error) // get record at index i; if deep: query nested arrays
+}
+
 type varArray struct {
 	name         string
 	ptrs         array
@@ -506,6 +538,7 @@ func parseVarArrary16(b fontBinSegm, szOffset, indirections int, name string) va
 	cnt, _ := b.u16(szOffset)
 	va := varArray{name: name, indirections: indirections, base: b}
 	va.ptrs = array{recordSize: 2, length: int(cnt), loc: b[szOffset+2:]}
+	trace().Debugf("parsing VarArray of size %d = %v", cnt, asU16Slice(b[szOffset+2:20]))
 	return va
 }
 
@@ -517,14 +550,19 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 	if !deep {
 		indirect = 1
 	}
-	for i := 0; i < indirect; i++ {
-		b := a.Get(i) // TODO will this create an infinite loop in case of error?
-		if i+1 < va.indirections {
+	for j := 0; j < indirect; j++ {
+		b = a.Get(i) // TODO will this create an infinite loop in case of error?
+		trace().Debugf("vararray->Get(%d), a = %v", i, asU16Slice(a.loc.Bytes()[:20]))
+		trace().Debugf("b = %d", b.U16(0))
+		if j+1 < va.indirections {
 			a, err = parseArray16(b.Bytes(), 0)
 		}
 	}
+	trace().Debugf("vararrray->Get = %v", asU16Slice(b.Bytes()[:2]))
 	return b, err
 }
+
+var _ VarArray = varArray{}
 
 // --- Tag record map --------------------------------------------------------
 

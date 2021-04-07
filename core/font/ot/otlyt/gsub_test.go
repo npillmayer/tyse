@@ -26,6 +26,23 @@ func TestTagRegistry(t *testing.T) {
 	}
 }
 
+func TestCalibriCMap(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := parseFont(t, "calibri")
+	t.Logf("Using font %s for test", otf.F.Fontname)
+	cmap := otf.Table(ot.T("cmap")).Self().AsCMap()
+	r, pos := rune('('), ot.GlyphIndex(4)
+	glyphID := cmap.GlyphIndexMap.Lookup(r)
+	t.Logf("found glyph ID %#x for %#U", glyphID, r)
+	if glyphID != pos {
+		t.Errorf("expected %#U to be on glyph position %d, is %d", r, pos, glyphID)
+	}
+	t.Fail()
+}
+
 func TestFeatureList(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
@@ -60,7 +77,46 @@ func TestFeatureList(t *testing.T) {
 	}
 }
 
+func TestFeatureCase(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := parseFont(t, "calibri")
+	t.Logf("Using font %s for test", otf.F.Fontname)
+	// Calibri has no DFLT feature set
+	gsubFeats, _, err := FontFeatures(otf, ot.T("latn"), 0)
+	if err != nil || len(gsubFeats) < 2 {
+		t.Errorf("GSUB feature 'case' not found in font Calibri")
+	}
+	featcase := gsubFeats[1]
+	if featcase == nil || featcase.Tag() != ot.T("case") {
+		t.Errorf("expected feature #1 to be 'case', isn't")
+	}
+	t.Logf("# of lookups for 'case' = %d", featcase.LookupCount())
+	t.Logf("index of lookup #0 for 'case' = %d", featcase.LookupIndex(0))
+	if featcase.LookupIndex(0) != 9 {
+		t.Errorf("expected index of lookup #0 of feature 'case' to be 9, isn't")
+	}
+	_, applied := ApplyFeature(otf, featcase, prepareGlyphBuffer("@", otf, t), 0)
+	if !applied {
+		t.Logf("feature 'case' not applied")
+	}
+	t.Fail()
+}
+
 // ---------------------------------------------------------------------------
+
+func prepareGlyphBuffer(s string, otf *ot.Font, t *testing.T) []ot.GlyphIndex {
+	cmap := otf.Table(ot.T("cmap")).Self().AsCMap()
+	runes := []rune(s)
+	buf := make([]ot.GlyphIndex, len(runes))
+	for i, r := range runes {
+		glyphID := cmap.GlyphIndexMap.Lookup(r)
+		buf[i] = glyphID
+	}
+	return buf
+}
 
 func parseFont(t *testing.T, pattern string) *ot.Font {
 	sfnt := loadTestFont(t, pattern)

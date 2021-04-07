@@ -9,7 +9,7 @@ At the heart of OpenType layout lie the **features** of a font. From the OpenTyp
 > A language system defines features, which are typographic rules for using glyphs to represent a language.
 > Sample features are a 'vert' feature that substitutes vertical glyphs in Japanese, a 'liga' feature for
 > using ligatures in place of separate glyphs, and a 'mark' feature that positions diacritical marks with
-> respect to base glyphs in Arabic (see Figure 2c). In the absence of language-specific rules, default
+> respect to base glyphs in Arabic. In the absence of language-specific rules, default
 > language system features apply to the entire script. For instance, a default language system feature for
 > the Arabic script substitutes initial, medial, and final glyph forms based on a glyph’s position in a
 > word.
