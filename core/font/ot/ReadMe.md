@@ -62,7 +62,7 @@ Package `ot` will not provide functions to interpret any table of a font, but ra
 expose the tables to the client in a semantic way. It is not possible to, for example, ask
 package `ot` for a kerning distance between two glyphs. Instead, clients have to check
 for the availability of kerning tables and consult the appropriate table(s)
-themselves. From this point of view, `ot` is a low-level package.
+themselves. From this point of view `ot` is a low-level package.
 
 The binary data of a font can be thought of as a bunch of structures
 connected by links. The linking is done by offsets (u16 or u32) from link anchors
@@ -84,8 +84,8 @@ However, this type is not exposing GSUB in full depth.
 To find out if the current font contains features applicable for Latin script with
 Turkish language flavour, type:
 
-    list := gsub.ScriptList.LookupTag(T("latn")).Navigate().Map().LookupTag(T("TRK")).Navigate().List()
-    fmt.Println("list of length %d for Turkish", list.Len())
+    langSys := gsub.ScriptList.LookupTag(T("latn")).Navigate().Map().LookupTag(T("TRK")).Navigate().List()
+    fmt.Println("%d font-features for Turkish", langSys.Len())
     // => yields 24 with font 'Calibri'
 
 This is an early draft, not suited to be used by other programs.
