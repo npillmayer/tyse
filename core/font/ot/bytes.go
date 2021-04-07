@@ -83,25 +83,25 @@ func (b fontBinSegm) view(offset, n int) (fontBinSegm, error) {
 // varLenView returns bytes from the given offset for sub-tables with varying
 // length. The length of bytes is determined by staticLength plus n*itemLength,
 // where n is read as uint16 from countOffset (relative to offset).
-func (b fontBinSegm) varLenView(offset, staticLength, countOffset, itemLength int) ([]byte, int, error) {
-	if 0 > offset || offset > offset+staticLength {
-		return nil, 0, errBufferBounds
-	}
-	if 0 > countOffset || countOffset+1 >= staticLength {
-		return nil, 0, errBufferBounds
-	}
-	// read static part which contains our count
-	buf, err := b.view(offset, staticLength)
-	if err != nil {
-		return nil, 0, err
-	}
-	count := int(u16(buf[countOffset:]))
-	buf, err = b.view(offset, staticLength+count*itemLength)
-	if err != nil {
-		return nil, 0, err
-	}
-	return buf, count, nil
-}
+// func (b fontBinSegm) varLenView(offset, staticLength, countOffset, itemLength int) ([]byte, int, error) {
+// 	if 0 > offset || offset > offset+staticLength {
+// 		return nil, 0, errBufferBounds
+// 	}
+// 	if 0 > countOffset || countOffset+1 >= staticLength {
+// 		return nil, 0, errBufferBounds
+// 	}
+// 	// read static part which contains our count
+// 	buf, err := b.view(offset, staticLength)
+// 	if err != nil {
+// 		return nil, 0, err
+// 	}
+// 	count := int(u16(buf[countOffset:]))
+// 	buf, err = b.view(offset, staticLength+count*itemLength)
+// 	if err != nil {
+// 		return nil, 0, err
+// 	}
+// 	return buf, count, nil
+// }
 
 // u16 returns the uint16 in b at the relative offset i.
 func (b fontBinSegm) u16(i int) (uint16, error) {

@@ -40,18 +40,6 @@ func newCMapTable(tag Tag, b fontBinSegm, offset, size uint32) *CMapTable {
 	return t
 }
 
-const ( // taken from https://github.com/golang/image/tree/master/font/sfnt.
-	// This value is arbitrary, but defends against parsing malicious font
-	// files causing excessive memory allocations. For reference, Adobe's
-	// SourceHanSansSC-Regular.otf has 65535 glyphs and:
-	//	- its format-4  cmap table has  1581 segments.
-	//	- its format-12 cmap table has 16498 segments.
-	maxCMapSegments = 20000
-
-	// Adobe's SourceHanSansSC-Regular.otf has up to 30000 subroutines.
-	maxNumSubroutines = 40000
-)
-
 // platformEncodingWidth returns the number of bytes per character assumed by
 // the given Platform ID and Platform Specific ID.
 //

@@ -12,6 +12,20 @@ import (
 	"github.com/npillmayer/tyse/core/locate/resources"
 )
 
+func TestTagRegistry(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	typ, err := identifyFeatureTag(ot.T("liga"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if typ != GSubFeatureType {
+		t.Errorf("expected 'liga' to be found as a GSUB feature, isn't")
+	}
+}
+
 func TestFeatureList(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
@@ -34,6 +48,15 @@ func TestFeatureList(t *testing.T) {
 	t.Logf("found %d GPOS features", len(gposFeats))
 	if len(gsubFeats) != 24 {
 		t.Errorf("expected Calibri to have 24 GSUB features for 'latn', has %d", len(gsubFeats))
+	}
+	featcase := gsubFeats[1]
+	if featcase == nil || featcase.Tag() != ot.T("case") {
+		t.Errorf("expected feature #1 to be 'case', isn't")
+	}
+	t.Logf("# of lookups for 'case' = %d", featcase.LookupCount())
+	t.Logf("index of lookup #0 for 'case' = %d", featcase.LookupIndex(0))
+	if featcase.LookupIndex(0) != 9 {
+		t.Errorf("expected index of lookup #0 of feature 'case' to be 9, isn't")
 	}
 }
 

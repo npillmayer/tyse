@@ -187,9 +187,9 @@ func (tb *tableBase) Binary() []byte {
 	return tb.data
 }
 
-func (tb *tableBase) bytes() fontBinSegm {
-	return tb.data
-}
+// func (tb *tableBase) bytes() fontBinSegm {
+// 	return tb.data
+// }
 
 func (tb *tableBase) Self() TableSelf {
 	return TableSelf{tableBase: tb}

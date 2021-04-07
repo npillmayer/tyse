@@ -183,7 +183,7 @@ func errDanglingLink(obj string) error {
 	return fmt.Errorf("cannot resolve link to %s", obj)
 }
 
-var nullNav = linkAndMap{}
+//var nullNav = linkAndMap{}
 var nullList = u16List{}
 
 type navName struct {
@@ -236,8 +236,9 @@ func (f otFields) All() []NavLocation {
 	for _, p := range f.pattern {
 		if x, err := f.b.view(offset, int(p)); err == nil {
 			r = append(r, x)
+		} else {
+			return []NavLocation{fontBinSegm{}}
 		}
-		return []NavLocation{fontBinSegm{}}
 	}
 	return r
 }

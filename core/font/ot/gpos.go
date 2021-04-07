@@ -40,7 +40,6 @@ const (
 	GPosLookupTypeExtensionPos      LayoutTableLookupType = 9 // Extension mechanism for other positionings
 )
 
-const xxxxLookupTypeNames = "0123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789"
 const gposLookupTypeNames = "Single|Pair|Cursive|MarkToBase|MarkToLigature|MarkToMark|ContextPos|Chained|Ext"
 
 var gposLookupTypeInx = [...]int{0, 7, 12, 20, 31, 46, 57, 68, 76, 80}
@@ -48,7 +47,7 @@ var gposLookupTypeInx = [...]int{0, 7, 12, 20, 31, 46, 57, 68, 76, 80}
 // GPosString interprets a layout table lookup type as a GPOS table type.
 func (lt LayoutTableLookupType) GPosString() string {
 	lt -= 1
-	if lt >= 0 && lt < GPosLookupTypeExtensionPos {
+	if lt < GPosLookupTypeExtensionPos {
 		return gposLookupTypeNames[gposLookupTypeInx[lt] : gposLookupTypeInx[lt+1]-1]
 	}
 	return strconv.Itoa(int(lt))

@@ -20,8 +20,10 @@ import (
 // feature does and decide whether to implement it.
 //
 type Feature interface {
-	Tag() ot.Tag           // e.g., 'liga'
-	Apply([]rune, int) int // apply feature to one or more glyphs
+	Tag() ot.Tag          // e.g., 'liga'
+	Params() ot.Navigator // parameters for this feature
+	LookupCount() int     // number of Lookups for this feature
+	LookupIndex(int) int  // get index of lookup #i
 }
 
 type feature struct {
@@ -105,24 +107,42 @@ func (f feature) Tag() ot.Tag {
 	return f.tag
 }
 
+// Params returns the parameters for this feature.
+func (f feature) Params() ot.Navigator {
+	return f.nav.Link().Navigate()
+}
+
+func (f feature) LookupCount() int {
+	return f.nav.List().Len()
+}
+
+func (f feature) LookupIndex(i int) int {
+	if i < 0 || i >= f.nav.List().Len() {
+		return -1
+	}
+	inx := f.nav.List().Get(i).U16(0)
+	return int(inx)
+}
+
 // Apply will apply a feature to one or more glyphs of buffer buf, starting at
 // position pos. Will return the position after application of the feature.
 //
 // If a feature is unsuited for the glyph at pos, Apply will do nothing and return pos.
-func (f feature) Apply(buf []rune, pos int) int {
-	return 0
-}
+//
+// func (f feature) Apply(buf []rune, pos int) int {
+// 	return 0
+// }
 
 // get GSUB and GPOS from a font
 func getLayoutTables(otf *ot.Font) ([]*ot.LayoutTable, error) {
 	var table ot.Table
-	var lytt = make([]*ot.LayoutTable, 2, 2)
+	var lytt = make([]*ot.LayoutTable, 2)
 	if table = otf.Table(ot.T("GSUB")); table == nil {
-		return nil, fmt.Errorf("font %s has no GSUB table", otf.F.Fontname)
+		return nil, errFontFormat(fmt.Sprintf("font %s has no GSUB table", otf.F.Fontname))
 	}
 	lytt[0] = &table.Self().AsGSub().LayoutTable
 	if table = otf.Table(ot.T("GPOS")); table == nil {
-		return nil, fmt.Errorf("font %s has no GPOS table", otf.F.Fontname)
+		return nil, errFontFormat(fmt.Sprintf("font %s has no GPOS table", otf.F.Fontname))
 	}
 	lytt[1] = &table.Self().AsGPos().LayoutTable
 	return lytt, nil
@@ -137,7 +157,7 @@ func identifyFeatureTag(tag ot.Tag) (LayoutTagType, error) {
 	}
 	typ, ok := RegisteredFeatureTags[tag]
 	if !ok {
-		return 0, fmt.Errorf("feature '%s' seems not to be registered", tag)
+		return 0, errFontFormat(fmt.Sprintf("feature '%s' seems not to be registered", tag))
 	}
 	return typ, nil
 }

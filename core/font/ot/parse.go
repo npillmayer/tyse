@@ -637,7 +637,7 @@ func parseLookup(b fontBinSegm, offset uint16) (*Lookup, error) {
 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
 	}
 	//trace().Debugf("lookup table (%d) has %d subtables", lookup.Type, lookup.SubRecordCount)
-	subs := make([]uint16, lookup.SubTableCount, lookup.SubTableCount)
+	subs := make([]uint16, lookup.SubTableCount)
 	if err := binary.Read(r, binary.BigEndian, &subs); err != nil {
 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
 	}
