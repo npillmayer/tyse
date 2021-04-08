@@ -54,9 +54,9 @@ const (
 	GSubLookupTypeReverseChaining LayoutTableLookupType = 8 // Applied in reverse order, replace single glyph in chaining context
 )
 
-const gsubLookupTypeNames = "Single|Multiple|Ligature|Alternate|Context|Chaining|Extension|Reverse"
+const gsubLookupTypeNames = "Single|Multiple|Alternate|Ligature|Context|Chaining|Extension|Reverse"
 
-var gsubLookupTypeInx = [...]int{0, 7, 16, 25, 35, 43, 52, 62, 70}
+var gsubLookupTypeInx = [...]int{0, 7, 16, 26, 35, 43, 52, 62, 70}
 
 // GSubString interprets a layout table lookup type as a GSUB table type.
 func (lt LayoutTableLookupType) GSubString() string {

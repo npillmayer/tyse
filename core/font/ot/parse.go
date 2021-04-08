@@ -723,7 +723,7 @@ func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 	format := b.U16(0)
 	trace().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
 	sub := LookupSubtable{LookupType: lookupType, Format: format}
-	if lookupType != 7 { // GSUB type Extension has no coverage table
+	if lookupType != 7 && format != 3 { // GSUB type Extension has no coverage table
 		covlink, _ := parseLink16(b, 2, b, "Coverage")
 		sub.Coverage = parseCoverage(covlink.Jump().Bytes())
 	}
@@ -734,6 +734,8 @@ func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 		return parseGSubLookupSubtableType2or3(b, sub)
 	case 4:
 		return parseGSubLookupSubtableType4(b, sub)
+	case 6:
+		return parseGSubLookupSubtableType6(b, sub)
 	case 7:
 		return parseGSubLookupSubtableType7(b, sub)
 	}
@@ -774,6 +776,48 @@ func parseGSubLookupSubtableType2or3(b fontBinSegm, sub LookupSubtable) LookupSu
 func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
 	sub.Index = parseVarArrary16(b, 4, 2, "LookupSubtable")
 	return sub
+}
+
+// LookupType 6: Chained Contexts Substitution Subtable
+// A Chained Contexts Substitution subtable describes glyph substitutions in context with an ability to
+// look back and/or look ahead in the sequence of glyphs. The design of the Chained Contexts Substitution
+// subtable is parallel to that of the Contextual Substitution subtable, including the availability of
+// three formats. Each format can describe one or more chained backtrack, input, and lookahead sequence
+// combinations, and one or more substitutions for glyphs in each input sequence.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
+func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	switch sub.Format {
+	case 1:
+		sub.Index = parseVarArrary16(b, 4, 2, "LookupSubtable")
+	case 2:
+		backtrack := parseContextClassDef(b, 4)
+		input := parseContextClassDef(b, 6)
+		lookahead := parseContextClassDef(b, 8)
+		if backtrack == nil || input == nil || lookahead == nil {
+			return LookupSubtable{}
+		}
+		sub.Index = parseVarArrary16(b, 10, 2, "LookupSubtable")
+		sub.Support = []*ClassDefinitions{
+			backtrack,
+			input,
+			lookahead,
+		}
+	case 3:
+		panic("TODO 6/3")
+	}
+	return sub
+}
+
+func parseContextClassDef(b fontBinSegm, at int) *ClassDefinitions {
+	link, err := parseLink16(b, 4, b, "ClassDef")
+	if err != nil {
+		return nil
+	}
+	cdef, err := parseClassDefinitions(link.Jump().Bytes())
+	if err != nil {
+		return nil
+	}
+	return &cdef
 }
 
 // LookupType 7: Extension Substitution

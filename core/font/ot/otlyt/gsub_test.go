@@ -150,8 +150,8 @@ func TestFeatureCCMP(t *testing.T) {
 	}
 	t.Logf("# of lookups for 'ccmp' = %d", featCCMP.LookupCount())
 	t.Logf("index of lookup #0 for 'ccmp' = %d", featCCMP.LookupIndex(0))
-	if featCCMP.LookupIndex(0) != 9 {
-		t.Errorf("expected index of lookup #0 of feature 'ccmp' to be 9, isn't")
+	if featCCMP.LookupIndex(0) != 4 {
+		t.Errorf("expected index of lookup #0 of feature 'ccmp' to be 4, isn't")
 	}
 	_, applied, buf := ApplyFeature(otf, featCCMP, []ot.GlyphIndex{3776, 3780}, 0, 0)
 	t.Logf("Application of 'ccmp' returned glyph buffer %v", buf)
