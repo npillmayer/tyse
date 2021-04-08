@@ -156,17 +156,17 @@ func (f feature) LookupIndex(i int) int {
 //
 // If a feature is unsuited for the glyph at pos, ApplyFeature will do nothing and return pos.
 //
-// Atttention: It is a requirement that font otf contains the appropriate layout table (either GSUB or
+// Attention: It is a requirement that font otf contains the appropriate layout table (either GSUB or
 // GPOS) for the feature. Having the table missing may result in a crash. This should never happen, as
 // extracting the feature will have required the layout table in the first place. Presence of the
 // layout table is not checked again.
 //
-func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos int) (int, bool) {
+func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos int) (int, bool, []ot.GlyphIndex) {
 	if feat == nil { // this is legal for unused mandatory feature slots
-		return pos, false
+		return pos, false, buf
 	} else if buf == nil || pos < 0 || pos >= len(buf) {
 		trace().Infof("application of font-feature requested for unusable buffer condition")
-		return pos, false
+		return pos, false, buf
 	}
 	var lytTable *ot.LayoutTable
 	if feat.Type() == GSubFeatureType {
@@ -178,17 +178,17 @@ func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos int) (int
 	for i := 0; i < feat.LookupCount(); i++ { // lookups have to be applied in sequence
 		inx := feat.LookupIndex(i)
 		lookup := lytTable.LookupList.Navigate(inx)
-		pos, ok = applyLookup(&lookup, feat, buf, pos)
+		pos, ok, buf = applyLookup(&lookup, feat, buf, pos)
 		applied = applied || ok
 	}
-	return pos, applied
+	return pos, applied, buf
 }
 
 // To apply a lookup, we have to iterate over the lookup's subtables and call them
 // appropriately, respecting different subtable semantics and formats.
 // Therefore this function more or less is a large switch to delegate to functions
 // implementing a specific subtable logic.
-func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos int) (int, bool) {
+func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos int) (int, bool, []ot.GlyphIndex) {
 	trace().Debugf("applying lookup '%s'/%d", feat.Tag(), lookup.Type)
 	for i := 0; i < int(lookup.SubTableCount); i++ {
 		// all subtables have the same lookup subtable type, but may have different formats;
@@ -207,11 +207,13 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos int) 
 			default:
 				errFontFormat(fmt.Sprintf("unkonwn lookup subtable format %d", sub.Format))
 			}
+		case 2:
+			return gsubLookupType2Fmt1(lookup, sub, buf, pos)
 		default:
 			panic("TODO")
 		}
 	}
-	return pos, false
+	return pos, false, buf
 }
 
 // GSUB LookupType 1: Single Substitution Subtable
@@ -227,55 +229,111 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos int) 
 // occur properly, the glyph indices in the input and output ranges must be in the same order.
 // This format does not use the Coverage index that is returned from the Coverage table.
 //
-func gsubLookupType1Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (int, bool) {
+func gsubLookupType1Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
 	_, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d", buf[pos], ok)
 	if !ok {
-		return pos, false
+		return pos, false, buf
 	}
 	// support is deltaGlyphID: add to original glyph ID to get substitute glyph ID
 	delta := lksub.Support.(ot.GlyphIndex)
 	trace().Debugf("OT lookup GSUB 1/1: subst %d for %d", buf[pos]+delta, buf[pos])
 	buf[pos] = buf[pos] + delta
-	return pos, true
+	return pos + 1, true, buf
 }
 
 // GSUB LookupSubtable Type 1 Format 2 provides an array of output glyph indices
 // (substituteGlyphIDs) explicitly matched to the input glyph indices specified in the
 // Coverage table.
-//
 // The substituteGlyphIDs array must contain the same number of glyph indices as the
 // Coverage table. To locate the corresponding output glyph index in the substituteGlyphIDs
 // array, this format uses the Coverage index returned from the Coverage table.
 //
-func gsubLookupType1Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (int, bool) {
+func gsubLookupType1Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
 	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
-		return pos, false
+		return pos, false, buf
 	}
 	if glyph := lookupGlyph(lksub.Index, inx, false); glyph != 0 {
-		trace().Debugf("OT lookup GSUB 1/1: subst %d for %d", glyph, buf[pos])
+		trace().Debugf("OT lookup GSUB 1/2: subst %d for %d", glyph, buf[pos])
 		buf[pos] = glyph
-		return pos, true
+		return pos + 1, true, buf
 	}
-	return pos, false
+	return pos, false, buf
+}
+
+// LookupType 2: Multiple Substitution Subtable
+//
+// A Multiple Substitution (MultipleSubst) subtable replaces a single glyph with more
+// than one glyph, as when multiple glyphs replace a single ligature.
+
+// GSUB LookupSubtable Type 2 Format 1 defines a count of offsets in the sequenceOffsets
+// array (sequenceCount), and an array of offsets to Sequence tables that define the output
+// glyph indices (sequenceOffsets). The Sequence table offsets are ordered by the Coverage
+// index of the input glyphs.
+// For each input glyph listed in the Coverage table, a Sequence table defines the output
+// glyphs. Each Sequence table contains a count of the glyphs in the output glyph sequence
+// (glyphCount) and an array of output glyph indices (substituteGlyphIDs).
+func gsubLookupType2Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	if glyphs := lookupGlyphs(lksub.Index, inx, false); len(glyphs) != 0 {
+		trace().Debugf("OT lookup GSUB 2/1: subst %v for %d", glyphs, buf[pos])
+		buf = replaceGlyphs(buf, pos, pos+1, glyphs)
+		return pos + len(glyphs), true, buf
+	}
+	return pos, false, buf
 }
 
 // --- Helpers ---------------------------------------------------------------
+
+func replaceGlyphs(buf []ot.GlyphIndex, from, to int, glyphs []ot.GlyphIndex) []ot.GlyphIndex {
+	if to <= from {
+		return buf
+	}
+	diff := len(glyphs) - (to - from) // difference in length between old and new
+	for diff > len(nullGlyphs) {      // this should never happen
+		nullGlyphs = append(nullGlyphs, nullGlyphs...)
+	}
+	if diff > 0 { // if new glyph sequence is longer than old one => create space
+		buf = append(buf, nullGlyphs[:diff]...)
+	}
+	copy(buf[from+diff:], buf[to:])
+	copy(buf[from:from+diff], glyphs)
+	return buf
+}
+
+var nullGlyphs = []ot.GlyphIndex{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 // lookupGlyph is a small helper which looks up an index for a glyph (previously
 // returned from a coverage table), checks for errors, and returns the resulting bytes.
 // TODO check that this is inlined by the compiler.
 func lookupGlyph(index ot.VarArray, ginx int, deep bool) ot.GlyphIndex {
-	if index == nil {
-		panic("index is nil")
-	}
 	outglyph, err := index.Get(ginx, deep)
 	if err != nil {
 		return 0
 	}
 	return ot.GlyphIndex(outglyph.U16(0))
+}
+
+// lookupGlyphs is a small helper which looks up an index for a glyph (previously
+// returned from a coverage table), checks for errors, and returns the resulting glyphs.
+func lookupGlyphs(index ot.VarArray, ginx int, deep bool) []ot.GlyphIndex {
+	outglyphs, err := index.Get(ginx, deep)
+	if err != nil {
+		return []ot.GlyphIndex{}
+	}
+	return outglyphs.Glyphs()
 }
 
 // get GSUB and GPOS from a font safely

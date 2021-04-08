@@ -98,11 +98,14 @@ func TestFeatureCase(t *testing.T) {
 	if featcase.LookupIndex(0) != 9 {
 		t.Errorf("expected index of lookup #0 of feature 'case' to be 9, isn't")
 	}
-	_, applied := ApplyFeature(otf, featcase, prepareGlyphBuffer("@", otf, t), 0)
+	_, applied, buf := ApplyFeature(otf, featcase, prepareGlyphBuffer("@", otf, t), 0)
+	t.Logf("Application of 'case' returned glyph buffer %v", buf)
 	if !applied {
-		t.Logf("feature 'case' not applied")
+		t.Error("feature 'case' not applied")
 	}
-	t.Fail()
+	if buf[0] != 925 {
+		t.Errorf("expected 'case' to replace '@' with glyph 925, have %d", buf[0])
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -735,26 +735,6 @@ type LookupSubtable struct {
 	Support    interface{}           // some lookup variants use additional data
 }
 
-// LookupType 2: Multiple Substitution Subtable
-//
-// A Multiple Substitution (MultipleSubst) subtable replaces a single glyph with more
-// than one glyph, as when multiple glyphs replace a single ligature.
-
-// GSUB LookupSubtable Type 2 Format 1 defines a count of offsets in the sequenceOffsets
-// array (sequenceCount), and an array of offsets to Sequence tables that define the output
-// glyph indices (sequenceOffsets). The Sequence table offsets are ordered by the Coverage
-// index of the input glyphs.
-// For each input glyph listed in the Coverage table, a Sequence table defines the output
-// glyphs. Each Sequence table contains a count of the glyphs in the output glyph sequence
-// (glyphCount) and an array of output glyph indices (substituteGlyphIDs).
-func gsubLookupType2Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
-	if !ok {
-		return fontBinSegm{}
-	}
-	return lookupAndReturn(lksub.Index, inx, true)
-}
-
 // LookupType 3: Alternate Substitution Subtable
 //
 // An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic

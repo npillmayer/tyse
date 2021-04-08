@@ -33,11 +33,12 @@ func u32(b []byte) uint32 {
 // If somewhere along a chain of navigation calls an error occured, the finally resulting NavLocation
 // may be of size 0.
 type NavLocation interface {
-	Size() int         // size in bytes
-	Bytes() []byte     // return as a byte slice
-	Reader() io.Reader // return as a Reader
-	U16(int) uint16    // convenience access to 16 bit data at byte index
-	U32(int) uint32    // convenience access to 32 bit data at byte index
+	Size() int            // size in bytes
+	Bytes() []byte        // return as a byte slice
+	Reader() io.Reader    // return as a Reader
+	U16(int) uint16       // convenience access to 16 bit data at byte index
+	U32(int) uint32       // convenience access to 32 bit data at byte index
+	Glyphs() []GlyphIndex // convenience conversion to slice of glyphs
 }
 
 // fontBinSegm is a segment of byte data.
@@ -73,15 +74,27 @@ func (b fontBinSegm) U32(i int) uint32 {
 	return n
 }
 
-func asU16Slice(b fontBinSegm) []uint16 {
-	r := make([]uint16, len(b)/2+1)
+// convenience conversion to slice of glyphs
+func (b fontBinSegm) Glyphs() []GlyphIndex {
+	glyphs := make([]GlyphIndex, len(b)/2+1)
 	j := 0
 	for i := 0; i < len(b); i += 2 {
-		r[j] = uint16(b[i])<<8 + uint16(b[i+1])
+		glyphs[j] = GlyphIndex(b[i])<<8 + GlyphIndex(b[i+1])
 		j++
 	}
-	return r
+	return glyphs
+
 }
+
+// func asU16Slice(b fontBinSegm) []uint16 {
+// 	r := make([]uint16, len(b)/2+1)
+// 	j := 0
+// 	for i := 0; i < len(b); i += 2 {
+// 		r[j] = uint16(b[i])<<8 + uint16(b[i+1])
+// 		j++
+// 	}
+// 	return r
+// }
 
 // return an unsigned integer as an array of two bytes.
 func uintBytes(n uint16) fontBinSegm {
@@ -538,7 +551,7 @@ func parseVarArrary16(b fontBinSegm, szOffset, indirections int, name string) va
 	cnt, _ := b.u16(szOffset)
 	va := varArray{name: name, indirections: indirections, base: b}
 	va.ptrs = array{recordSize: 2, length: int(cnt), loc: b[szOffset+2:]}
-	trace().Debugf("parsing VarArray of size %d = %v", cnt, asU16Slice(b[szOffset+2:20]))
+	trace().Debugf("parsing VarArray of size %d = %v", cnt, b[szOffset+2:20].Glyphs())
 	return va
 }
 
@@ -552,13 +565,13 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 	}
 	for j := 0; j < indirect; j++ {
 		b = a.Get(i) // TODO will this create an infinite loop in case of error?
-		trace().Debugf("vararray->Get(%d), a = %v", i, asU16Slice(a.loc.Bytes()[:20]))
+		trace().Debugf("vararray->Get(%d), a = %v", i, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
 		trace().Debugf("b = %d", b.U16(0))
 		if j+1 < va.indirections {
 			a, err = parseArray16(b.Bytes(), 0)
 		}
 	}
-	trace().Debugf("vararrray->Get = %v", asU16Slice(b.Bytes()[:2]))
+	trace().Debugf("vararrray->Get = %d", b.U16(0))
 	return b, err
 }
 
