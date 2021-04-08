@@ -161,7 +161,7 @@ func (f feature) LookupIndex(i int) int {
 // extracting the feature will have required the layout table in the first place. Presence of the
 // layout table is not checked again.
 //
-func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos int) (int, bool, []ot.GlyphIndex) {
+func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos, alt int) (int, bool, []ot.GlyphIndex) {
 	if feat == nil { // this is legal for unused mandatory feature slots
 		return pos, false, buf
 	} else if buf == nil || pos < 0 || pos >= len(buf) {
@@ -178,7 +178,7 @@ func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos int) (int
 	for i := 0; i < feat.LookupCount(); i++ { // lookups have to be applied in sequence
 		inx := feat.LookupIndex(i)
 		lookup := lytTable.LookupList.Navigate(inx)
-		pos, ok, buf = applyLookup(&lookup, feat, buf, pos)
+		pos, ok, buf = applyLookup(&lookup, feat, buf, pos, alt)
 		applied = applied || ok
 	}
 	return pos, applied, buf
@@ -188,7 +188,7 @@ func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos int) (int
 // appropriately, respecting different subtable semantics and formats.
 // Therefore this function more or less is a large switch to delegate to functions
 // implementing a specific subtable logic.
-func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos int) (int, bool, []ot.GlyphIndex) {
+func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt int) (int, bool, []ot.GlyphIndex) {
 	trace().Debugf("applying lookup '%s'/%d", feat.Tag(), lookup.Type)
 	for i := 0; i < int(lookup.SubTableCount); i++ {
 		// all subtables have the same lookup subtable type, but may have different formats;
@@ -198,17 +198,19 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos int) 
 			continue
 		}
 		switch sub.LookupType {
-		case 1:
+		case 1: // Single Substitution Subtable
 			switch sub.Format {
 			case 1:
 				return gsubLookupType1Fmt1(lookup, sub, buf, pos)
 			case 2:
 				return gsubLookupType1Fmt2(lookup, sub, buf, pos)
-			default:
-				errFontFormat(fmt.Sprintf("unkonwn lookup subtable format %d", sub.Format))
 			}
-		case 2:
+		case 2: // Multiple Substitution Subtable
 			return gsubLookupType2Fmt1(lookup, sub, buf, pos)
+		case 3: // Alternate Substitution Subtable
+			return gsubLookupType3Fmt1(lookup, sub, buf, pos, alt)
+		case 4: // Ligature Substitution Subtable
+			return gsubLookupType4Fmt1(lookup, sub, buf, pos)
 		default:
 			panic("TODO")
 		}
@@ -287,10 +289,72 @@ func gsubLookupType2Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 	if !ok {
 		return pos, false, buf
 	}
-	if glyphs := lookupGlyphs(lksub.Index, inx, false); len(glyphs) != 0 {
+	if glyphs := lookupGlyphs(lksub.Index, inx, true); len(glyphs) != 0 {
 		trace().Debugf("OT lookup GSUB 2/1: subst %v for %d", glyphs, buf[pos])
 		buf = replaceGlyphs(buf, pos, pos+1, glyphs)
 		return pos + len(glyphs), true, buf
+	}
+	return pos, false, buf
+}
+
+// LookupType 3: Alternate Substitution Subtable
+//
+// An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic
+// alternatives from which a user can choose a glyph variant to replace the input glyph.
+// For example, if a font contains four variants of the ampersand symbol, the 'cmap' table
+// will specify the index of one of the four glyphs as the default glyph index, and an
+// AlternateSubst subtable will list the indices of the other three glyphs as alternatives.
+// A text-processing client would then have the option of replacing the default glyph with
+// any of the three alternatives.
+
+// GSUB LookupSubtable Type 3 Format 1: For each glyph, an AlternateSet subtable contains a
+// count of the alternative glyphs (glyphCount) and an array of their glyph indices
+// (alternateGlyphIDs). Parameter `alt` selects an alternative glyph from this array.
+// Having `alt` set to -1 will selected the last alternative glyph from the array.
+func gsubLookupType3Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos, alt int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	if glyphs := lookupGlyphs(lksub.Index, inx, true); len(glyphs) != 0 {
+		if alt < 0 {
+			alt = len(glyphs) - 1
+		}
+		if alt < len(glyphs) {
+			trace().Debugf("OT lookup GSUB 3/1: subst %v for %d", glyphs[alt], buf[pos])
+			buf[pos] = glyphs[alt]
+			return pos + 1, true, buf
+		}
+	}
+	return pos, false, buf
+}
+
+// LookupType 4: Ligature Substitution Subtable
+//
+// A Ligature Substitution (LigatureSubst) subtable identifies ligature substitutions where
+// a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any number
+// of ligature substitutions.
+
+// GSUB LookupSubtable Type 4 Format 1 receives a sequence of glyphs and outputs a
+// single glyph replacing the sequence. The Coverage table specifies only the index of the
+// first glyph component of each ligature set.
+//
+// As this is a multi-lookup algorithm, calling gsubLookupType4Fmt1 will return a
+// NavLocation which is a LigatureSet, i.e. a list of records of unequal lengths.
+//
+func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	if ligatures := lookupGlyphs(lksub.Index, inx, true); len(ligatures) != 0 {
+		trace().Debugf("read a ligatures-table: %v", ligatures)
 	}
 	return pos, false, buf
 }

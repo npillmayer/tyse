@@ -34,13 +34,12 @@ func TestCalibriCMap(t *testing.T) {
 	otf := parseFont(t, "calibri")
 	t.Logf("Using font %s for test", otf.F.Fontname)
 	cmap := otf.Table(ot.T("cmap")).Self().AsCMap()
-	r, pos := rune('('), ot.GlyphIndex(4)
+	r, pos := rune('A'), ot.GlyphIndex(4)
 	glyphID := cmap.GlyphIndexMap.Lookup(r)
 	t.Logf("found glyph ID %#x for %#U", glyphID, r)
 	if glyphID != pos {
 		t.Errorf("expected %#U to be on glyph position %d, is %d", r, pos, glyphID)
 	}
-	t.Fail()
 }
 
 func TestFeatureList(t *testing.T) {
@@ -98,7 +97,7 @@ func TestFeatureCase(t *testing.T) {
 	if featcase.LookupIndex(0) != 9 {
 		t.Errorf("expected index of lookup #0 of feature 'case' to be 9, isn't")
 	}
-	_, applied, buf := ApplyFeature(otf, featcase, prepareGlyphBuffer("@", otf, t), 0)
+	_, applied, buf := ApplyFeature(otf, featcase, prepareGlyphBuffer("@", otf, t), 0, 0)
 	t.Logf("Application of 'case' returned glyph buffer %v", buf)
 	if !applied {
 		t.Error("feature 'case' not applied")

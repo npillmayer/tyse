@@ -735,48 +735,6 @@ type LookupSubtable struct {
 	Support    interface{}           // some lookup variants use additional data
 }
 
-// LookupType 3: Alternate Substitution Subtable
-//
-// An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic
-// alternatives from which a user can choose a glyph variant to replace the input glyph.
-// For example, if a font contains four variants of the ampersand symbol, the 'cmap' table
-// will specify the index of one of the four glyphs as the default glyph index, and an
-// AlternateSubst subtable will list the indices of the other three glyphs as alternatives.
-// A text-processing client would then have the option of replacing the default glyph with
-// any of the three alternatives.
-
-// GSUB LookupSubtable Type 3 Format 1: For each glyph, an AlternateSet subtable contains a
-// count of the alternative glyphs (glyphCount) and an array of their glyph indices
-// (alternateGlyphIDs).
-func gsubLookupType3Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
-	if !ok {
-		return fontBinSegm{}
-	}
-	return lookupAndReturn(lksub.Index, inx, true)
-}
-
-// LookupType 4: Ligature Substitution Subtable
-//
-// A Ligature Substitution (LigatureSubst) subtable identifies ligature substitutions where
-// a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any number
-// of ligature substitutions.
-
-// GSUB LookupSubtable Type 4 Format 1 receives a sequence of glyphs and outputs a
-// single glyph replacing the sequence. The Coverage table specifies only the index of the
-// first glyph component of each ligature set.
-//
-// As this is a multi-lookup algorithm, calling gsubLookupType4Fmt1 will return a
-// NavLocation which is a LigatureSet, i.e. a list of records of unequal lengths.
-//
-func gsubLookupType4Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
-	if !ok {
-		return fontBinSegm{}
-	}
-	return lookupAndReturn(lksub.Index, inx, true) // returns a LigatureSet
-}
-
 // LigatureSetLookup trys to match a sequence of glyph IDs to the pattern portions
 // ('components') of every Ligature of a LigatureSet, and if a match is found,
 // returns the ligature glyph for the pattern.
