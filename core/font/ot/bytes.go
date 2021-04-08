@@ -33,12 +33,13 @@ func u32(b []byte) uint32 {
 // If somewhere along a chain of navigation calls an error occured, the finally resulting NavLocation
 // may be of size 0.
 type NavLocation interface {
-	Size() int            // size in bytes
-	Bytes() []byte        // return as a byte slice
-	Reader() io.Reader    // return as a Reader
-	U16(int) uint16       // convenience access to 16 bit data at byte index
-	U32(int) uint32       // convenience access to 32 bit data at byte index
-	Glyphs() []GlyphIndex // convenience conversion to slice of glyphs
+	Size() int                  // size in bytes
+	Bytes() []byte              // return as a byte slice
+	Slice(int, int) NavLocation // return a sub-segment of this location
+	Reader() io.Reader          // return as a Reader
+	U16(int) uint16             // convenience access to 16 bit data at byte index
+	U32(int) uint32             // convenience access to 32 bit data at byte index
+	Glyphs() []GlyphIndex       // convenience conversion to slice of glyphs
 }
 
 // fontBinSegm is a segment of byte data.
@@ -52,6 +53,17 @@ func (b fontBinSegm) Size() int {
 
 func (b fontBinSegm) Bytes() []byte {
 	return b
+}
+
+// return a sub-segment of this location
+func (b fontBinSegm) Slice(from int, to int) NavLocation {
+	if from < 0 {
+		from = 0
+	}
+	if to > len(b) {
+		to = len(b)
+	}
+	return b[from:to]
 }
 
 func (b fontBinSegm) Reader() io.Reader {
@@ -76,7 +88,11 @@ func (b fontBinSegm) U32(i int) uint32 {
 
 // convenience conversion to slice of glyphs
 func (b fontBinSegm) Glyphs() []GlyphIndex {
-	glyphs := make([]GlyphIndex, len(b)/2+1)
+	l := len(b)
+	if l|0x1 > 0 {
+		l += 1
+	}
+	glyphs := make([]GlyphIndex, l/2)
 	j := 0
 	for i := 0; i < len(b); i += 2 {
 		glyphs[j] = GlyphIndex(b[i])<<8 + GlyphIndex(b[i+1])
@@ -563,15 +579,19 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 	if !deep {
 		indirect = 1
 	}
+	base := va.base
 	for j := 0; j < indirect; j++ {
 		b = a.Get(i) // TODO will this create an infinite loop in case of error?
-		trace().Debugf("vararray->Get(%d), a = %v", i, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
-		trace().Debugf("b = %d", b.U16(0))
+		trace().Debugf("varArray->Get(%d|%d), a = %v", i, a.length, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
+		trace().Debugf("b = %d, %d to go", b.U16(0), va.indirections-1-j)
 		if j+1 < va.indirections {
+			link := makeLink16(b.U16(0), base, "Sequence")
+			b = link.Jump()
 			a, err = parseArray16(b.Bytes(), 0)
+			trace().Debugf("new a has size %d, is %v", a.length, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
 		}
 	}
-	trace().Debugf("vararrray->Get = %d", b.U16(0))
+	trace().Debugf("varArray result = %d", b.U16(0))
 	return b, err
 }
 

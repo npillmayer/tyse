@@ -107,6 +107,62 @@ func TestFeatureCase(t *testing.T) {
 	}
 }
 
+/*
+Calibri:
+	<ScriptTag value="latn"/>
+		<DefaultLangSys>
+			<FeatureIndex index="5" value="21"/>
+
+	<FeatureRecord index="21">
+        <FeatureTag value="ccmp"/>                   // Glyph Composition/Decomposition
+        <Feature>
+			<LookupListIndex index="0" value="4"/>   // decompose
+
+	<Lookup index="4">
+        <LookupType value="7"/>
+        <ExtensionSubst index="0" Format="1">
+		<ExtensionLookupType value="4"/>
+			<LigatureSubst Format="1">
+				<LigatureSet glyph="glyph03776">
+					<Ligature components="glyph03780" glyph="glyph03786"/>
+*/
+func TestFeatureCCMP(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := parseFont(t, "calibri")
+	t.Logf("Using font %s for test", otf.F.Fontname)
+	// Calibri has no DFLT feature set
+	gsubFeats, _, err := FontFeatures(otf, ot.T("latn"), 0)
+	if err != nil || len(gsubFeats) < 2 {
+		t.Errorf("GSUB feature 'ccmp' not found in font Calibri")
+	}
+	var featCCMP Feature
+	for _, feat := range gsubFeats {
+		if feat != nil && feat.Tag() == ot.T("ccmp") {
+			featCCMP = feat
+			break
+		}
+	}
+	if featCCMP == nil {
+		t.Errorf("expected feature 'ccmp', haven't")
+	}
+	t.Logf("# of lookups for 'ccmp' = %d", featCCMP.LookupCount())
+	t.Logf("index of lookup #0 for 'ccmp' = %d", featCCMP.LookupIndex(0))
+	if featCCMP.LookupIndex(0) != 9 {
+		t.Errorf("expected index of lookup #0 of feature 'ccmp' to be 9, isn't")
+	}
+	_, applied, buf := ApplyFeature(otf, featCCMP, []ot.GlyphIndex{3776, 3780}, 0, 0)
+	t.Logf("Application of 'ccmp' returned glyph buffer %v", buf)
+	if !applied {
+		t.Error("feature 'ccmp' not applied")
+	}
+	if buf[0] != 925 {
+		t.Errorf("expected 'ccmp' to replace '@' with glyph 925, have %d", buf[0])
+	}
+}
+
 // ---------------------------------------------------------------------------
 
 func prepareGlyphBuffer(s string, otf *ot.Font, t *testing.T) []ot.GlyphIndex {

@@ -353,11 +353,97 @@ func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 	if !ok {
 		return pos, false, buf
 	}
-	if ligatures := lookupGlyphs(lksub.Index, inx, true); len(ligatures) != 0 {
-		trace().Debugf("read a ligatures-table: %v", ligatures)
+	ligatureSet, err := lksub.Index.Get(inx, false)
+	if err != nil || ligatureSet.Size() < 2 {
+		return pos, false, buf
+	}
+	ligCount := ligatureSet.U16(0)
+	if ligatureSet.Size() < int(2+ligCount*2) { // must have room for count and u16offset[count]
+		return pos, false, buf
+	}
+	for i := 0; i < int(ligCount); i++ { // iterate over every ligature record in a ligature table
+		ligpos := int(ligatureSet.U16(2 + i*2)) // jump to start of ligature record
+		if ligatureSet.Size() < ligpos+6 {
+			return pos, false, buf
+		}
+		// Ligature table (glyph components for one ligature):
+		// uint16 |  ligatureGlyph                       |  glyph ID of ligature to substitute
+		// uint16 |  componentCount                      |  Number of components in the ligature
+		// uint16 |  componentGlyphIDs[componentCount-1] |  Array of component glyph IDs
+		componentCount := int(ligatureSet.U16(ligpos + 2))
+		if componentCount == 0 || componentCount > 10 { // 10 is arbitrary, just to be careful
+			continue
+		}
+		componentGlyphs := ligatureSet.Slice(ligpos+4, ligpos+4+(componentCount-1)*2).Glyphs()
+		trace().Debugf("%d component glyphs of ligature: %d %v", componentCount, buf[pos], componentGlyphs)
+		// now we know that buf[pos] has matched the first glyph of the component pattern and
+		// we will have to match buf[pos+1, ...] to the remaining componentGlyphs
+		match := true
+		for i, g := range componentGlyphs {
+			if pos+i+1 >= len(buf) || g != buf[pos+i+1] {
+				match = false
+				break
+			}
+		}
+		if match {
+			ligatureGlyph := ot.GlyphIndex(ligatureSet.U16(ligpos))
+			buf = replaceGlyphs(buf, pos, pos+componentCount, []ot.GlyphIndex{ligatureGlyph})
+			trace().Debugf("after application of ligature buf = %v", buf[pos:pos+1])
+			return pos + componentCount, true, buf
+		}
 	}
 	return pos, false, buf
 }
+
+// LigatureSetLookup trys to match a sequence of glyph IDs to the pattern portions
+// ('components') of every Ligature of a LigatureSet, and if a match is found,
+// returns the ligature glyph for the pattern.
+//
+// loc is a byte segment usually returned from a call to a type 4 (Ligature Substitution)
+// GSUB lookup.
+//
+// The resulting glyph should replace a sequence of glyphs from the input code-points
+// including the initial glyph input to the type 4 Ligature Substitution, continued
+// with the glyphs provided to LigatureSetLookup.
+//
+/*
+func LigatureSetLookup(loc ot.NavLocation, glyphs []ot.GlyphIndex) ot.GlyphIndex {
+	// loc shoud be at a LigatureSet
+	ligset, err := parseArray16(loc.Bytes(), 0)
+	if err != nil {
+		return 0
+	}
+	// iterate over all Ligature entries, pointed to by an offset16
+	for i := 0; i < ligset.length; i++ {
+		ptr := ligset.Get(i).U16(0)
+		// Ligature table (glyph components for one ligature):
+		// uint16  ligatureGlyph     glyph ID of ligature to substitute
+		// uint16  componentCount    Number of components in the ligature
+		// uint16  componentGlyphIDs[componentCount-1]    Array of component glyph IDs
+		ligglyph := GlyphIndex(loc.U16(int(ptr)))
+		compCount := loc.U16(int(ptr) + 2)
+		comps := array{
+			recordSize: 6, // 3 * sizeof(uint16)
+			length:     int(compCount) - 1,
+			loc:        loc.Bytes()[ptr:],
+		}
+		if len(glyphs) != comps.length {
+			break
+		}
+		match := true
+		for i, g := range glyphs {
+			if g != GlyphIndex(comps.Get(i).U16(0)) {
+				match = false
+				break
+			}
+		}
+		if match {
+			return ligglyph
+		}
+	}
+	return 0
+}
+*/
 
 // --- Helpers ---------------------------------------------------------------
 
@@ -372,8 +458,11 @@ func replaceGlyphs(buf []ot.GlyphIndex, from, to int, glyphs []ot.GlyphIndex) []
 	if diff > 0 { // if new glyph sequence is longer than old one => create space
 		buf = append(buf, nullGlyphs[:diff]...)
 	}
-	copy(buf[from+diff:], buf[to:])
-	copy(buf[from:from+diff], glyphs)
+	copy(buf[to+diff:], buf[to:])
+	if diff < 0 {
+		buf = buf[:len(buf)+diff]
+	}
+	copy(buf[from:from+len(glyphs)], glyphs)
 	return buf
 }
 

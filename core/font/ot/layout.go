@@ -735,54 +735,6 @@ type LookupSubtable struct {
 	Support    interface{}           // some lookup variants use additional data
 }
 
-// LigatureSetLookup trys to match a sequence of glyph IDs to the pattern portions
-// ('components') of every Ligature of a LigatureSet, and if a match is found,
-// returns the ligature glyph for the pattern.
-//
-// loc is a byte segment usually returned from a call to a type 4 (Ligature Substitution)
-// GSUB lookup.
-//
-// The resulting glyph should replace a sequence of glyphs from the input code-points
-// including the initial glyph input to the type 4 Ligature Substitution, continued
-// with the glyphs provided to LigatureSetLookup.
-//
-func LigatureSetLookup(loc NavLocation, glyphs []GlyphIndex) GlyphIndex {
-	// loc shoud be at a LigatureSet
-	ligset, err := parseArray16(loc.Bytes(), 0)
-	if err != nil {
-		return 0
-	}
-	// iterate over all Ligature entries, pointed to by an offset16
-	for i := 0; i < ligset.length; i++ {
-		ptr := ligset.Get(i).U16(0)
-		// Ligature table (glyph components for one ligature):
-		// uint16  ligatureGlyph     glyph ID of ligature to substitute
-		// uint16  componentCount    Number of components in the ligature
-		// uint16  componentGlyphIDs[componentCount-1]    Array of component glyph IDs
-		ligglyph := GlyphIndex(loc.U16(int(ptr)))
-		compCount := loc.U16(int(ptr) + 2)
-		comps := array{
-			recordSize: 6, // 3 * sizeof(uint16)
-			length:     int(compCount) - 1,
-			loc:        loc.Bytes()[ptr:],
-		}
-		if len(glyphs) != comps.length {
-			break
-		}
-		match := true
-		for i, g := range glyphs {
-			if g != GlyphIndex(comps.Get(i).U16(0)) {
-				match = false
-				break
-			}
-		}
-		if match {
-			return ligglyph
-		}
-	}
-	return 0
-}
-
 // LookupType 5: Contextual Substitution Subtable
 //
 // A Contextual Substitution subtable describes glyph substitutions in context that replace one
