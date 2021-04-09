@@ -1047,9 +1047,14 @@ func parseChainedSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (Look
 }
 
 func parseChainedSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
-	backtrack, err1 := parseChainedSeqContextCoverages(b, 2)
-	input, err2 := parseChainedSeqContextCoverages(b, 6)
-	lookahead, err3 := parseChainedSeqContextCoverages(b, 10)
+	trace().Debugf("chained sequence context format 3 ........................")
+	trace().Debugf("b = %v", b[:26].Glyphs())
+	offset := 2
+	backtrack, err1 := parseChainedSeqContextCoverages(b, offset)
+	offset += 2 + step(backtrack)
+	input, err2 := parseChainedSeqContextCoverages(b, offset)
+	offset += 2 + step(input)
+	lookahead, err3 := parseChainedSeqContextCoverages(b, offset)
 	if err1 != nil || err2 != nil || err3 != nil {
 		return LookupSubtable{}, errFontFormat("corrupt chained sequence context (format 3)")
 	}
@@ -1059,6 +1064,13 @@ func parseChainedSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (Look
 		LookaheadCoverage: lookahead,
 	}
 	return sub, nil
+}
+
+func step(cov []Coverage) int {
+	if len(cov) == 0 {
+		return 0
+	}
+	return 2
 }
 
 func parseContextClassDef(b fontBinSegm, at int) (ClassDefinitions, error) {

@@ -117,6 +117,13 @@ Calibri:
         <FeatureTag value="ccmp"/>                   // Glyph Composition/Decomposition
         <Feature>
 			<LookupListIndex index="0" value="4"/>   // decompose
+			<LookupListIndex index="1" value="5"/>   // --> Lookup 40
+			<LookupListIndex index="2" value="6"/>   // -- flag: markAttachmentType[1]
+			<LookupListIndex index="3" value="7"/>
+			<LookupListIndex index="4" value="8"/>
+        </Feature>
+
+
 
 	<Lookup index="4">
         <LookupType value="7"/>
@@ -153,13 +160,13 @@ func TestFeatureCCMP(t *testing.T) {
 	if featCCMP.LookupIndex(0) != 4 {
 		t.Errorf("expected index of lookup #0 of feature 'ccmp' to be 4, isn't")
 	}
-	_, applied, buf := ApplyFeature(otf, featCCMP, []ot.GlyphIndex{3776, 3780}, 0, 0)
+	_, applied, buf := ApplyFeature(otf, featCCMP, []ot.GlyphIndex{3776, 3780, 840}, 0, 0)
 	t.Logf("Application of 'ccmp' returned glyph buffer %v", buf)
 	if !applied {
 		t.Error("feature 'ccmp' not applied")
 	}
-	if buf[0] != 925 {
-		t.Errorf("expected 'ccmp' to replace '@' with glyph 925, have %d", buf[0])
+	if buf[0] != 3786 {
+		t.Errorf("expected 'ccmp' to replace (3776 3780) with glyph 3786, have %d", buf[0])
 	}
 }
 

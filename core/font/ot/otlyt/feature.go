@@ -190,7 +190,8 @@ func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos, alt int)
 // implementing a specific subtable logic.
 func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt int) (int, bool, []ot.GlyphIndex) {
 	trace().Debugf("applying lookup '%s'/%d", feat.Tag(), lookup.Type)
-	for i := 0; i < int(lookup.SubTableCount); i++ {
+	for i := 0; i < int(lookup.SubTableCount) && pos < len(buf); i++ {
+		trace().Debugf("-------------------- pos = %d", pos)
 		// all subtables have the same lookup subtable type, but may have different formats;
 		// except for type = Extension
 		sub := lookup.Subtable(i)
@@ -217,7 +218,7 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt 
 				return gsubLookupType5Fmt1(lookup, sub, buf, pos)
 			case 2:
 				return gsubLookupType5Fmt2(lookup, sub, buf, pos)
-			case 4:
+			case 3:
 				return gsubLookupType5Fmt3(lookup, sub, buf, pos)
 			}
 		case 6:
@@ -226,11 +227,11 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt 
 				return gsubLookupType6Fmt1(lookup, sub, buf, pos)
 			case 2:
 				return gsubLookupType6Fmt2(lookup, sub, buf, pos)
-			case 4:
-				return gsubLookupType6Fmt2(lookup, sub, buf, pos)
+			case 3:
+				return gsubLookupType6Fmt3(lookup, sub, buf, pos)
 			}
 		}
-		trace().Errorf("unknown GSUB lookup type %d", sub.LookupType)
+		trace().Errorf("unknown GSUB lookup type %d/%d", sub.LookupType, sub.Format)
 	}
 	return pos, false, buf
 }
@@ -406,7 +407,7 @@ func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 			ligatureGlyph := ot.GlyphIndex(ligatureSet.U16(ligpos))
 			buf = replaceGlyphs(buf, pos, pos+componentCount, []ot.GlyphIndex{ligatureGlyph})
 			trace().Debugf("after application of ligature buf = %v", buf[pos:pos+1])
-			return pos + componentCount, true, buf
+			return pos + 1, true, buf
 		}
 	}
 	return pos, false, buf
@@ -472,13 +473,40 @@ func gsubLookupType6Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 	// return pos, false, buf
 }
 
+// Chained Sequence Context Format 3: coverage-based glyph contexts
+// GSUB type 6 format 3 subtables and GPOS type 6 format 3 subtables define input sequences patterns, as
+// well as chained backtrack and lookahead sequence patterns, in terms of sets of glyph defined using
+// Coverage tables.
+// The ChainedSequenceContextFormat3 table specifies exactly one input sequence pattern. It has three
+// arrays of offsets to coverage tables: one for the input sequence pattern, one for the backtrack
+// sequence pattern, and one for the lookahead sequence pattern. For each array, the offsets correspond,
+// in order, to the positions in the sequence pattern.
 func gsubLookupType6Fmt3(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
-	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
-	if !ok {
+	seqctx, ok := lksub.Support.(*ot.SequenceContext)
+	if !ok || len(seqctx.InputCoverage) == 0 {
 		return pos, false, buf
+	}
+	for i, cov := range seqctx.InputCoverage {
+		if pos+i >= len(buf) {
+			return pos, false, buf
+		}
+		inx, ok := cov.GlyphRange.Lookup(buf[pos+i])
+		trace().Debugf("input coverage of glyph ID %d is %d/%v", buf[pos+i], inx, ok)
+		if !ok {
+			return pos, false, buf
+		}
+	}
+	for i, cov := range seqctx.BacktrackCoverage {
+		if pos-i-1 < 0 {
+			return pos, false, buf
+		}
+		inx, ok := cov.GlyphRange.Lookup(buf[pos+i])
+		trace().Debugf("backtrack coverage of glyph ID %d is %d/%v", buf[pos-i-1], inx, ok)
+		if !ok {
+			return pos, false, buf
+		}
 	}
 	panic("TODO 6/3")
 	//return pos, false, buf
