@@ -827,18 +827,24 @@ func parseGSubLookupSubtableType5(b fontBinSegm, sub LookupSubtable) LookupSubta
 // combinations, and one or more substitutions for glyphs in each input sequence.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
 func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	var err error
+	sub, err = parseChainedSequenceContext(b, sub)
+	if err != nil {
+		trace().Errorf(err.Error()) // nothing we can/will do about it
+	}
 	switch sub.Format {
 	case 1:
 		sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
 	case 2:
 		sub.Index = parseVarArrary16(b, 10, 2, 2, "LookupSubtable")
 	case 3:
-		sub.Index = parseVarArrary16(b, 14, 2, 2, "LookupSubtable")
-	}
-	var err error
-	sub, err = parseChainedSequenceContext(b, sub)
-	if err != nil {
-		trace().Errorf(err.Error()) // nothing we can/will do about it
+		offset := 2 // skip format field
+		// TODO treat error conditions
+		seqctx := sub.Support.(*SequenceContext)
+		offset += 2 + len(seqctx.BacktrackCoverage)*2
+		offset += 2 + len(seqctx.InputCoverage)*2
+		offset += 2 + len(seqctx.LookaheadCoverage)*2
+		sub.Index = parseVarArrary16(b, offset, 2, 2, "LookupSubtable")
 	}
 	return sub
 }
