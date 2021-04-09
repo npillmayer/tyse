@@ -764,10 +764,30 @@ func lookupAndReturn(index VarArray, ginx int, deep bool) NavLocation {
 	return outglyph
 }
 
+// SequenceContext is a type for identifying the input sequence context for
+// contextual lookups (see
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#common-structures-for-contextual-lookup-subtables).
+//
+// Clients will receive this struct in the `Support` field of a LookupSubtable, whenever it's appropriate:
+//
+// ▪︎ GSUB Lookup Type 5 and 6, format 2 and 3
+// ▪︎ GPOS Lookup Type 5 and 7, format 2 and 3
+//
+// For type 5, the length of each non-void slice will be exactly 1; for type 6/7 they may be of
+// arbitrary length. Its exact allocation will depend on the type/format combination of the lookup
+// subtable.
+//
+type SequenceContext struct {
+	BacktrackCoverage []Coverage         // for format 3
+	InputCoverage     []Coverage         // for format 3
+	LookaheadCoverage []Coverage         // for format 3
+	ClassDefs         []ClassDefinitions // for format 2
+}
+
 // sequenceContext is a type for identifying the input sequence context for
 // contextual lookups.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-1-simple-glyph-contexts
-type sequenceContext struct {
+type XsequenceContext struct {
 	format        uint16           // 1, 2 or 3
 	coverage      []Coverage       // for all formats
 	classDef      ClassDefinitions // for format 2

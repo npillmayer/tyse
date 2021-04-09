@@ -391,6 +391,25 @@ func parseHMtx(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	return t, nil
 }
 
+// --- Names -----------------------------------------------------------------
+
+func parseNames(b fontBinSegm) (nameNames, error) {
+	if len(b) < 6 {
+		return nameNames{}, errFontFormat("name section corrupt")
+	}
+	N, _ := b.u16(2)
+	names := nameNames{}
+	strOffset, _ := b.u16(4)
+	names.strbuf = b[strOffset:]
+	trace().Debugf("name table has %d strings, starting at %d", N, strOffset)
+	if len(b) < 6+12*int(N) {
+		return nameNames{}, errFontFormat("name section corrupt")
+	}
+	recs := b[6 : 6+12*int(N)]
+	names.nameRecs = viewArray(recs, 12)
+	return names, nil
+}
+
 // --- GDEF table ------------------------------------------------------------
 
 // The Glyph Definition (GDEF) table provides various glyph properties used in
@@ -586,7 +605,7 @@ func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	return gsub, err
 }
 
-// --- Common code for GPos and GSub -----------------------------------------
+// === Common Code for GPOS and GSUB =========================================
 
 // parseLayoutHeader parses a layout table header, i.e. reads version information
 // and header information (containing offsets).
@@ -618,232 +637,24 @@ func parseLayoutHeader(lytt *LayoutTable, b fontBinSegm, err error) error {
 	return nil
 }
 
-// --- Layout table lookup list ----------------------------------------------
+// --- Script list -----------------------------------------------------------
 
-/*
-// No longer used.
-//
-// parseLookup parses a single Lookup record. b expected to be the beginning of LookupList.
-// See https://www.microsoft.com/typography/otspec/chapter2.htm#featTbl
-//
-// A lookup record starts with type and flag fields, followed by a count of
-// sub-tables.
-func parseLookup(b fontBinSegm, offset uint16) (*Lookup, error) {
-	if int(offset) >= len(b) {
-		return nil, io.ErrUnexpectedEOF
-	}
-	r := bytes.NewReader(b[offset:])
-	var lookup Lookup
-	if err := binary.Read(r, binary.BigEndian, &lookup.lookupInfo); err != nil {
-		return nil, fmt.Errorf("reading lookupRecord: %s", err)
-	}
-	//trace().Debugf("lookup table (%d) has %d subtables", lookup.Type, lookup.SubRecordCount)
-	subs := make([]uint16, lookup.SubTableCount)
-	if err := binary.Read(r, binary.BigEndian, &subs); err != nil {
-		return nil, fmt.Errorf("reading lookupRecord: %s", err)
-	}
-	// lookup.subrecordOffsets = subs
-	// if lookup.Type != GSUB_LUTYPE_Single {
-	// 	return &lookup, nil
-	// }
-	// for i := 0; i < len(subs); i++ {
-	// 	off := subs[i]
-	// 	//trace().Debugf("offset of sub-table[%d] = %d", i, subs[i])
-	// 	r = bytes.NewReader(b[offset+off:])
-	// 	subst := lookupSubstFormat1{}
-	// 	if err := binary.Read(r, binary.BigEndian, &subst); err != nil {
-	// 		return nil, fmt.Errorf("reading lookupRecord: %s", err)
-	// 	}
-	// 	//trace().Debugf("   format spec = %d", subst.Format)
-	// 	if subst.Format == 2 {
-	// 		subst2 := lookupSubstFormat2{}
-	// 		subst2.lookupSubstFormat1 = subst
-	// 		if err := read16arr(r, &subst2.SubstituteGlyphIDs, int(subst.Glyphs)); err != nil {
-	// 			return nil, err
-	// 		}
-	// 	}
-	// }
-	// TODO Read lookup.MarkFilteringSet  ?
-	return &lookup, nil
-}
-*/
-
-// parseLookupList parses the LookupList.
-// See https://www.microsoft.com/typography/otspec/chapter2.htm#lulTbl
-func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
+// A ScriptList table consists of a count of the scripts represented by the glyphs in the
+// font (ScriptCount) and an array of records (ScriptRecord), one for each script for which
+// the font defines script-specific features (a script without script-specific features
+// does not need a ScriptRecord). Each ScriptRecord consists of a ScriptTag that identifies
+// a script, and an offset to a Script table. The ScriptRecord array is stored in
+// alphabetic order of the script tags.
+func parseScriptList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	lloffset := lytt.header.offsetFor(layoutLookupSection)
-	if lloffset >= len(b) {
-		return io.ErrUnexpectedEOF
-	}
-	b = b[lloffset:]
-	//
-	ll := LookupList{base: b}
-	ll.array, ll.err = parseArray16(b, 0)
-	lytt.LookupList = ll
-	// r := bytes.NewReader(b)
-	// var count uint16
-	// if err := binary.Read(r, binary.BigEndian, &count); err != nil {
-	// 	return fmt.Errorf("reading lookup count: %s", err)
-	// }
-	// trace().Debugf("font has %d lookup list entries", count)
-	// if count > 0 {
-	// 	lookupOffsets := make([]uint16, count, count)
-	// 	if err := binary.Read(r, binary.BigEndian, &lookupOffsets); err != nil {
-	// 		return fmt.Errorf("reading lookup offsets: %s", err)
-	// 	}
-	// 	lytt.LookupList = nil
-	// 	for i := 0; i < int(count); i++ {
-	// 		//trace().Debugf("lookup offset #%d = %d", i, lookupOffsets[i])
-	// 		lookup, err := parseLookup(b, lookupOffsets[i])
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		lytt.LookupList = append(lytt.LookupList, lookup)
-	// 	}
-	// }
+	lytt.ScriptList = tagRecordMap16{}
+	link := link16{base: b, offset: uint16(lytt.header.offsetFor(layoutScriptSection))}
+	scripts := link.Jump() // now we stand at the ScriptList table
+	scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
+	lytt.ScriptList = scriptRecords
 	return nil
-}
-
-func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
-	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
-	if len(b) < 4 {
-		return LookupSubtable{}
-	}
-	if IsGPosLookupType(lookupType) {
-		return parseGPosLookupSubtable(b, GPosLookupType(lookupType))
-	}
-	return parseGSubLookupSubtable(b, GSubLookupType(lookupType))
-}
-
-func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
-	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
-	format := b.U16(0)
-	trace().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
-	sub := LookupSubtable{LookupType: lookupType, Format: format}
-	if lookupType != 7 && format != 3 { // GSUB type Extension has no coverage table
-		covlink, _ := parseLink16(b, 2, b, "Coverage")
-		sub.Coverage = parseCoverage(covlink.Jump().Bytes())
-	}
-	switch lookupType {
-	case 1:
-		return parseGSubLookupSubtableType1(b, sub)
-	case 2, 3:
-		return parseGSubLookupSubtableType2or3(b, sub)
-	case 4:
-		return parseGSubLookupSubtableType4(b, sub)
-	case 6:
-		return parseGSubLookupSubtableType6(b, sub)
-	case 7:
-		return parseGSubLookupSubtableType7(b, sub)
-	}
-	return LookupSubtable{} // TODO
-}
-
-// LookupType 1: Single Substitution Subtable
-// Single substitution (SingleSubst) subtables tell a client to replace a single glyph with
-// another glyph.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-1-single-substitution-subtable
-func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	if sub.Format == 1 {
-		sub.Support = int16(b.U16(4))
-	} else {
-		sub.Index = parseVarArrary16(b, 4, 1, "LookupSubtable")
-	}
-	return sub
-}
-
-// LookupType 2: Multiple Substitution Subtable
-// A Multiple Substitution (MultipleSubst) subtable replaces a single glyph with more than
-// one glyph, as when multiple glyphs replace a single ligature.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-2-multiple-substitution-subtable
-// LookupType 3: Alternate Substitution Subtable
-// An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic
-// alternatives from which a user can choose a glyph variant to replace the input glyph.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-3-alternate-substitution-subtable
-func parseGSubLookupSubtableType2or3(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	sub.Index = parseVarArrary16(b, 4, 2, "LookupSubtable")
-	return sub
-}
-
-// LookupType 4: Ligature Substitution Subtable
-// A Ligature Substitution (LigatureSubst) subtable identifies ligature substitutions where
-// a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any
-// number of ligature substitutions.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-4-ligature-substitution-subtable
-func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	sub.Index = parseVarArrary16(b, 4, 2, "LookupSubtable")
-	return sub
-}
-
-// LookupType 6: Chained Contexts Substitution Subtable
-// A Chained Contexts Substitution subtable describes glyph substitutions in context with an ability to
-// look back and/or look ahead in the sequence of glyphs. The design of the Chained Contexts Substitution
-// subtable is parallel to that of the Contextual Substitution subtable, including the availability of
-// three formats. Each format can describe one or more chained backtrack, input, and lookahead sequence
-// combinations, and one or more substitutions for glyphs in each input sequence.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
-func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	switch sub.Format {
-	case 1:
-		sub.Index = parseVarArrary16(b, 4, 2, "LookupSubtable")
-	case 2:
-		backtrack := parseContextClassDef(b, 4)
-		input := parseContextClassDef(b, 6)
-		lookahead := parseContextClassDef(b, 8)
-		if backtrack == nil || input == nil || lookahead == nil {
-			return LookupSubtable{}
-		}
-		sub.Index = parseVarArrary16(b, 10, 2, "LookupSubtable")
-		sub.Support = []*ClassDefinitions{
-			backtrack,
-			input,
-			lookahead,
-		}
-	case 3:
-		panic("TODO 6/3")
-	}
-	return sub
-}
-
-func parseContextClassDef(b fontBinSegm, at int) *ClassDefinitions {
-	link, err := parseLink16(b, 4, b, "ClassDef")
-	if err != nil {
-		return nil
-	}
-	cdef, err := parseClassDefinitions(link.Jump().Bytes())
-	if err != nil {
-		return nil
-	}
-	return &cdef
-}
-
-// LookupType 7: Extension Substitution
-// This lookup provides a mechanism whereby any other lookup type’s subtables are stored at
-// a 32-bit offset location in the GSUB table.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-7-extension-substitution
-func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	if b.Size() < 8 {
-		trace().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.LookupType)
-		return LookupSubtable{}
-	}
-	if sub.LookupType = LayoutTableLookupType(b.U16(2)); sub.LookupType == GSubLookupTypeExtensionSubs {
-		trace().Errorf("OpenType GSUB lookup subtable type 7 recursion detected")
-		return LookupSubtable{}
-	}
-	trace().Debugf("OpenType GSUB extension subtable is of type %s", sub.LookupType.GSubString())
-	link, _ := parseLink32(b, 4, b, "ext.LookupSubtable")
-	loc := link.Jump()
-	return parseGSubLookupSubtable(loc.Bytes(), sub.LookupType)
-}
-
-func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
-	format := b.U16(0)
-	trace().Debugf("parsing GPOS sub-table type %s, format %d", lookupType.GPosString(), format)
-	panic("TODO GPOS Lookup Subtable")
-	//return LookupSubtable{}
 }
 
 // --- Feature list ----------------------------------------------------------
@@ -857,18 +668,6 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
-	// floffset := lytt.header.OffsetFor(LayoutFeatureSection)
-	// if floffset >= len(b) {
-	// 	return io.ErrUnexpectedEOF
-	// }
-	// flist, n, err := lytt.data.varLenView(floffset, 2, 0, 6)
-	// r := bytes.NewReader(flist[2:])
-	// frecords := make([]featureRecord, n, n)
-	// if err := binary.Read(r, binary.BigEndian, &frecords); err != nil {
-	// 	return fmt.Errorf("reading feature records: %s", err)
-	// }
-	// lytt.features = frecords
-	// return nil
 	lytt.FeatureList = tagRecordMap16{}
 	link := link16{base: b, offset: uint16(lytt.header.offsetFor(layoutFeatureSection))}
 	features := link.Jump() // now we stand at the FeatureList table
@@ -902,24 +701,172 @@ func parseLangSys(b fontBinSegm, offset int, target string) (langSys, error) {
 	return lsys, nil
 }
 
-// --- Script list -----------------------------------------------------------
+// --- Layout table lookup list ----------------------------------------------
 
-// A ScriptList table consists of a count of the scripts represented by the glyphs in the
-// font (ScriptCount) and an array of records (ScriptRecord), one for each script for which
-// the font defines script-specific features (a script without script-specific features
-// does not need a ScriptRecord). Each ScriptRecord consists of a ScriptTag that identifies
-// a script, and an offset to a Script table. The ScriptRecord array is stored in
-// alphabetic order of the script tags.
-func parseScriptList(lytt *LayoutTable, b fontBinSegm, err error) error {
+// parseLookupList parses the LookupList.
+// See https://www.microsoft.com/typography/otspec/chapter2.htm#lulTbl
+func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	if err != nil {
 		return err
 	}
-	lytt.ScriptList = tagRecordMap16{}
-	link := link16{base: b, offset: uint16(lytt.header.offsetFor(layoutScriptSection))}
-	scripts := link.Jump() // now we stand at the ScriptList table
-	scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
-	lytt.ScriptList = scriptRecords
+	lloffset := lytt.header.offsetFor(layoutLookupSection)
+	if lloffset >= len(b) {
+		return io.ErrUnexpectedEOF
+	}
+	b = b[lloffset:]
+	//
+	ll := LookupList{base: b}
+	ll.array, ll.err = parseArray16(b, 0)
+	lytt.LookupList = ll
 	return nil
+}
+
+func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
+	if len(b) < 4 {
+		return LookupSubtable{}
+	}
+	if IsGPosLookupType(lookupType) {
+		return parseGPosLookupSubtable(b, GPosLookupType(lookupType))
+	}
+	return parseGSubLookupSubtable(b, GSubLookupType(lookupType))
+}
+
+func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
+	format := b.U16(0)
+	trace().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
+	sub := LookupSubtable{LookupType: lookupType, Format: format}
+	if lookupType != 7 && format != 3 { // GSUB type Extension has no coverage table
+		covlink, _ := parseLink16(b, 2, b, "Coverage")
+		sub.Coverage = parseCoverage(covlink.Jump().Bytes())
+	}
+	switch lookupType {
+	case 1:
+		return parseGSubLookupSubtableType1(b, sub)
+	case 2, 3:
+		return parseGSubLookupSubtableType2or3(b, sub)
+	case 4:
+		return parseGSubLookupSubtableType4(b, sub)
+	case 5:
+		return parseGSubLookupSubtableType5(b, sub)
+	case 6:
+		return parseGSubLookupSubtableType6(b, sub)
+	case 7:
+		return parseGSubLookupSubtableType7(b, sub)
+	}
+	trace().Errorf("unknown GSUB lookup type: %d", lookupType)
+	return LookupSubtable{}
+}
+
+// LookupType 1: Single Substitution Subtable
+// Single substitution (SingleSubst) subtables tell a client to replace a single glyph with
+// another glyph.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-1-single-substitution-subtable
+func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	if sub.Format == 1 {
+		sub.Support = int16(b.U16(4))
+	} else {
+		sub.Index = parseVarArrary16(b, 4, 2, 1, "LookupSubtable")
+	}
+	return sub
+}
+
+// LookupType 2: Multiple Substitution Subtable
+// A Multiple Substitution (MultipleSubst) subtable replaces a single glyph with more than
+// one glyph, as when multiple glyphs replace a single ligature.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-2-multiple-substitution-subtable
+// LookupType 3: Alternate Substitution Subtable
+// An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic
+// alternatives from which a user can choose a glyph variant to replace the input glyph.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-3-alternate-substitution-subtable
+func parseGSubLookupSubtableType2or3(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
+	return sub
+}
+
+// LookupType 4: Ligature Substitution Subtable
+// A Ligature Substitution (LigatureSubst) subtable identifies ligature substitutions where
+// a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any
+// number of ligature substitutions.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-4-ligature-substitution-subtable
+func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
+	return sub
+}
+
+// LookupType 5: Contextual Substitution Subtable
+// A Contextual Substitution subtable describes glyph substitutions in context that replace one or more
+// glyphs within a certain pattern of glyphs.
+// Input sequence patterns are matched against the text glyph sequence, and then actions to be applied
+// to glyphs within the input sequence. The actions are specified as “nested” lookups, and each is applied
+// to a particular sequence position within the input sequence.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-5-contextual-substitution-subtable
+func parseGSubLookupSubtableType5(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	switch sub.Format {
+	case 1:
+		sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
+	case 2:
+		sub.Index = parseVarArrary16(b, 6, 2, 2, "LookupSubtable")
+	case 3:
+		sub.Index = parseVarArrary16(b, 4, 4, 2, "LookupSubtable")
+	}
+	var err error
+	sub, err = parseSequenceContext(b, sub)
+	if err != nil {
+		trace().Errorf(err.Error()) // nothing we can/will do about it
+	}
+	return sub
+}
+
+// LookupType 6: Chained Contexts Substitution Subtable
+// A Chained Contexts Substitution subtable describes glyph substitutions in context with an ability to
+// look back and/or look ahead in the sequence of glyphs. The design of the Chained Contexts Substitution
+// subtable is parallel to that of the Contextual Substitution subtable, including the availability of
+// three formats. Each format can describe one or more chained backtrack, input, and lookahead sequence
+// combinations, and one or more substitutions for glyphs in each input sequence.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
+func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	switch sub.Format {
+	case 1:
+		sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
+	case 2:
+		sub.Index = parseVarArrary16(b, 10, 2, 2, "LookupSubtable")
+	case 3:
+		sub.Index = parseVarArrary16(b, 14, 2, 2, "LookupSubtable")
+	}
+	var err error
+	sub, err = parseChainedSequenceContext(b, sub)
+	if err != nil {
+		trace().Errorf(err.Error()) // nothing we can/will do about it
+	}
+	return sub
+}
+
+// LookupType 7: Extension Substitution
+// This lookup provides a mechanism whereby any other lookup type’s subtables are stored at
+// a 32-bit offset location in the GSUB table.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-7-extension-substitution
+func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+	if b.Size() < 8 {
+		trace().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.LookupType)
+		return LookupSubtable{}
+	}
+	if sub.LookupType = LayoutTableLookupType(b.U16(2)); sub.LookupType == GSubLookupTypeExtensionSubs {
+		trace().Errorf("OpenType GSUB lookup subtable type 7 recursion detected")
+		return LookupSubtable{}
+	}
+	trace().Debugf("OpenType GSUB extension subtable is of type %s", sub.LookupType.GSubString())
+	link, _ := parseLink32(b, 4, b, "ext.LookupSubtable")
+	loc := link.Jump()
+	return parseGSubLookupSubtable(loc.Bytes(), sub.LookupType)
+}
+
+func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+	format := b.U16(0)
+	trace().Debugf("parsing GPOS sub-table type %s, format %d", lookupType.GPosString(), format)
+	panic("TODO GPOS Lookup Subtable")
+	//return LookupSubtable{}
 }
 
 // --- parse class def table -------------------------------------------------
@@ -978,21 +925,22 @@ func parseCoverage(b fontBinSegm) Coverage {
 // must be matched, and so the actions are specified in a context-sensitive manner.
 
 // Three subtable formats are defined, which describe the input sequences in different ways.
-func parseSequenceContext(b fontBinSegm) (sequenceContext, error) {
+func parseSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 2 {
-		return sequenceContext{}, errFontFormat("corrupt sequence context")
+		return sub, errFontFormat("corrupt sequence context")
 	}
-	format := b.U16(0)
-	switch format {
+	//format := b.U16(0)
+	switch sub.Format {
 	case 1:
-		parseSequenceContextFormat1(format, b)
+		//parseSequenceContextFormat1(sub.Format, b, sub)
+		// nothing to to for format 1
+		return sub, nil
 	case 2:
-		parseSequenceContextFormat2(format, b)
+		return parseSequenceContextFormat2(b, sub)
 	case 3:
-		parseSequenceContextFormat3(format, b)
+		return parseSequenceContextFormat3(b, sub)
 	}
-	return sequenceContext{}, errFontFormat(
-		fmt.Sprintf("unknown sequence context format %d", format))
+	return sub, errFontFormat(fmt.Sprintf("unknown sequence context format %d", sub.Format))
 }
 
 // SequenceContextFormat1: simple glyph contexts
@@ -1001,19 +949,20 @@ func parseSequenceContext(b fontBinSegm) (sequenceContext, error) {
 // Offset16 	coverageOffset 	Offset to Coverage table, from beginning of SequenceContextFormat1 table
 // uint16 	seqRuleSetCount 	Number of SequenceRuleSet tables
 // Offset16 	seqRuleSetOffsets[seqRuleSetCount] 	Array of offsets to SequenceRuleSet tables, from beginning of SequenceContextFormat1 table (offsets may be NULL)
-func parseSequenceContextFormat1(fmtno uint16, b fontBinSegm) (sequenceContext, error) {
+func parseSequenceContextFormat1(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 6 {
-		return sequenceContext{}, errFontFormat("corrupt sequence context")
+		return sub, errFontFormat("corrupt sequence context")
 	}
-	seqctx := sequenceContext{format: fmtno, coverage: make([]Coverage, 1)}
-	link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
-	if err != nil {
-		return sequenceContext{}, errFontFormat("corrupt sequence context")
-	}
-	cov := link.Jump()
-	seqctx.coverage[0] = parseCoverage(cov.Bytes())
-	seqctx.rules = parseVarArrary16(b, 4, 2, "SequenceContext")
-	return seqctx, nil
+	// seqctx := SequenceContext{}
+	// link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
+	// if err != nil {
+	// 	return sequenceContext{}, errFontFormat("corrupt sequence context")
+	// }
+	// cov := link.Jump()
+	// seqctx.coverage[0] = parseCoverage(cov.Bytes())
+	// seqctx.rules = parseVarArrary16(b, 4, 2, "SequenceContext")
+	// return seqctx, nil
+	return sub, nil
 }
 
 // SequenceContextFormat2 table:
@@ -1023,25 +972,15 @@ func parseSequenceContextFormat1(fmtno uint16, b fontBinSegm) (sequenceContext, 
 // Offset16 	classDefOffset 	Offset to ClassDef table, from beginning of SequenceContextFormat2 table
 // uint16 	classSeqRuleSetCount 	Number of ClassSequenceRuleSet tables
 // Offset16 	classSeqRuleSetOffsets[classSeqRuleSetCount] 	Array of offsets to ClassSequenceRuleSet tables, from beginning of SequenceContextFormat2 table (may be NULL)
-func parseSequenceContextFormat2(fmtno uint16, b fontBinSegm) (sequenceContext, error) {
+func parseSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 8 {
-		return sequenceContext{}, errFontFormat("corrupt sequence context")
+		return sub, errFontFormat("corrupt sequence context")
 	}
-	seqctx := sequenceContext{format: fmtno, coverage: make([]Coverage, 1)}
-	link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
-	if err != nil {
-		return sequenceContext{}, errFontFormat("corrupt sequence context")
-	}
-	cov := link.Jump()
-	seqctx.coverage[0] = parseCoverage(cov.Bytes())
-	link, err = parseLink16(b, 2, b, "SequenceContext Coverage")
-	if err != nil {
-		return sequenceContext{}, errFontFormat("corrupt sequence context")
-	}
-	classdef := link.Jump()
-	seqctx.classDef, err = parseClassDefinitions(classdef.Bytes())
-	seqctx.rules = parseVarArrary16(b, 6, 2, "SequenceContext")
-	return seqctx, nil
+	seqctx := SequenceContext{}
+	sub.Support = seqctx
+	seqctx.ClassDefs = make([]ClassDefinitions, 1)
+	seqctx.ClassDefs[0] = parseContextClassDef(b, 4)
+	return sub, nil
 }
 
 // The SequenceContextFormat3 table specifies exactly one input sequence pattern. It has an
@@ -1055,37 +994,81 @@ func parseSequenceContextFormat2(fmtno uint16, b fontBinSegm) (sequenceContext, 
 // uint16 	seqLookupCount 	Number of SequenceLookupRecords
 // Offset16 	coverageOffsets[glyphCount] 	Array of offsets to Coverage tables, from beginning of SequenceContextFormat3 subtable
 // SequenceLookupRecord 	seqLookupRecords[seqLookupCount] 	Array of SequenceLookupRecords
-func parseSequenceContextFormat3(fmtno uint16, b fontBinSegm) (sequenceContext, error) {
+func parseSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 8 {
-		return sequenceContext{}, errFontFormat("corrupt sequence context")
+		return sub, errFontFormat("corrupt sequence context")
 	}
-	count := b.U16(2)
-	seqctx := sequenceContext{format: fmtno}
-	seqctx.coverage = make([]Coverage, count)
-	for i := 0; i < int(count); i++ {
+	glyphCount := int(b.U16(2))
+	seqctx := SequenceContext{}
+	sub.Support = seqctx
+	seqctx.InputCoverage = make([]Coverage, glyphCount)
+	for i := 0; i < glyphCount; i++ {
 		link, err := parseLink16(b, 6+i*2, b, "SequenceContext Coverage")
 		if err != nil {
-			return sequenceContext{}, errFontFormat("corrupt sequence context")
+			return sub, errFontFormat("corrupt sequence context")
 		}
 		cov := link.Jump()
-		seqctx.coverage[i] = parseCoverage(cov.Bytes())
+		seqctx.InputCoverage[i] = parseCoverage(cov.Bytes())
 	}
-	count = b.U16(6 + int(count)*2)
-	seqctx.lookupRecords = array{
-		recordSize: 4, // 2* sizeof(uint16)
-		length:     int(count),
-		loc:        b[4+count*2:],
-	}
-	return seqctx, nil
+	return sub, nil
 }
 
-// ClassSequenceRule table:
+func parseChainedSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+	if len(b) <= 2 {
+		return sub, errFontFormat("corrupt chained sequence context")
+	}
+	switch sub.Format {
+	case 1:
+		//parseSequenceContextFormat1(sub.Format, b, sub)
+		// nothing to to for format 1
+		panic("TODO chained 1")
+		//return sub, nil
+	case 2:
+		return parseChainedSequenceContextFormat2(b, sub)
+	case 3:
+		return parseChainedSequenceContextFormat3(b, sub)
+	}
+	return sub, errFontFormat(fmt.Sprintf("unknown chained sequence context format %d", sub.Format))
+}
+
+func parseChainedSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+	backtrack := parseContextClassDef(b, 4)
+	input := parseContextClassDef(b, 6)
+	lookahead := parseContextClassDef(b, 8)
+	if backtrack.format == 0 || input.format == 0 || lookahead.format == 0 {
+		return LookupSubtable{}, errFontFormat("corrupt chained sequence context (format 2)")
+	}
+	sub.Support = &SequenceContext{
+		ClassDefs: []ClassDefinitions{backtrack, input, lookahead},
+	}
+	return sub, nil
+}
+
+func parseChainedSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+	panic("not yet implemented: chained sequence context format 3")
+}
+
+func parseContextClassDef(b fontBinSegm, at int) ClassDefinitions {
+	link, err := parseLink16(b, at, b, "ClassDef")
+	if err != nil {
+		return ClassDefinitions{}
+	}
+	cdef, err := parseClassDefinitions(link.Jump().Bytes())
+	if err != nil {
+		return ClassDefinitions{}
+	}
+	return cdef
+}
+
+// TODO Argument should be NavLocation, return value should be []SeqLookupRecord
+//
+// SequenceRule table:
 // Type     Name                          Description
 // uint16   glyphCount                    Number of glyphs to be matched
 // uint16   seqLookupCount                Number of SequenceLookupRecords
 // uint16   inputSequence[glyphCount-1]   Sequence of classes to be matched to the input glyph sequence, beginning with the second glyph position
 // SequenceLookupRecord seqLookupRecords[seqLookupCount]   Array of SequenceLookupRecords
-func parseSequenceRule(b fontBinSegm) sequenceRule {
+func (lksub LookupSubtable) SequenceRule(b fontBinSegm) sequenceRule {
 	seqrule := sequenceRule{}
 	seqrule.glyphCount = b.U16(0)
 	seqrule.inputSequence = array{
@@ -1104,23 +1087,4 @@ func parseSequenceRule(b fontBinSegm) sequenceRule {
 		loc:        b[4+seqrule.inputSequence.length*2:],
 	}
 	return seqrule
-}
-
-// --- Names -----------------------------------------------------------------
-
-func parseNames(b fontBinSegm) (nameNames, error) {
-	if len(b) < 6 {
-		return nameNames{}, errFontFormat("name section corrupt")
-	}
-	N, _ := b.u16(2)
-	names := nameNames{}
-	strOffset, _ := b.u16(4)
-	names.strbuf = b[strOffset:]
-	trace().Debugf("name table has %d strings, starting at %d", N, strOffset)
-	if len(b) < 6+12*int(N) {
-		return nameNames{}, errFontFormat("name section corrupt")
-	}
-	recs := b[6 : 6+12*int(N)]
-	names.nameRecs = viewArray(recs, 12)
-	return names, nil
 }

@@ -559,15 +559,15 @@ type varArray struct {
 	base         fontBinSegm
 }
 
-func parseVarArrary16(b fontBinSegm, szOffset, indirections int, name string) varArray {
+func parseVarArrary16(b fontBinSegm, szOffset, gap, indirections int, name string) varArray {
 	if len(b) < 6 {
 		trace().Errorf("byte segment too small to parse variable array")
 		return varArray{}
 	}
 	cnt, _ := b.u16(szOffset)
 	va := varArray{name: name, indirections: indirections, base: b}
-	va.ptrs = array{recordSize: 2, length: int(cnt), loc: b[szOffset+2:]}
-	trace().Debugf("parsing VarArray of size %d = %v", cnt, b[szOffset+2:20].Glyphs())
+	va.ptrs = array{recordSize: 2, length: int(cnt), loc: b[szOffset+gap:]}
+	trace().Debugf("parsing VarArray of size %d = %v", cnt, b[szOffset+gap:20].Glyphs())
 	return va
 }
 
