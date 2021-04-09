@@ -744,10 +744,8 @@ func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 	switch lookupType {
 	case 1:
 		return parseGSubLookupSubtableType1(b, sub)
-	case 2, 3:
-		return parseGSubLookupSubtableType2or3(b, sub)
-	case 4:
-		return parseGSubLookupSubtableType4(b, sub)
+	case 2, 3, 4:
+		return parseGSubLookupSubtableType2or3or4(b, sub)
 	case 5:
 		return parseGSubLookupSubtableType5(b, sub)
 	case 6:
@@ -776,21 +774,18 @@ func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubta
 // A Multiple Substitution (MultipleSubst) subtable replaces a single glyph with more than
 // one glyph, as when multiple glyphs replace a single ligature.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-2-multiple-substitution-subtable
+//
 // LookupType 3: Alternate Substitution Subtable
 // An Alternate Substitution (AlternateSubst) subtable identifies any number of aesthetic
 // alternatives from which a user can choose a glyph variant to replace the input glyph.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-3-alternate-substitution-subtable
-func parseGSubLookupSubtableType2or3(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
-	return sub
-}
-
+//
 // LookupType 4: Ligature Substitution Subtable
 // A Ligature Substitution (LigatureSubst) subtable identifies ligature substitutions where
 // a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any
 // number of ligature substitutions.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-4-ligature-substitution-subtable
-func parseGSubLookupSubtableType4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+func parseGSubLookupSubtableType2or3or4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
 	sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
 	return sub
 }
@@ -838,7 +833,7 @@ func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubta
 	case 2:
 		sub.Index = parseVarArrary16(b, 10, 2, 2, "LookupSubtable")
 	case 3:
-		offset := 2 // skip format field
+		offset := 2 // skip over format field
 		// TODO treat error conditions
 		seqctx := sub.Support.(*SequenceContext)
 		offset += 2 + len(seqctx.BacktrackCoverage)*2
@@ -938,9 +933,7 @@ func parseSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubtable, er
 	//format := b.U16(0)
 	switch sub.Format {
 	case 1:
-		//parseSequenceContextFormat1(sub.Format, b, sub)
-		// nothing to to for format 1
-		return sub, nil
+		return parseSequenceContextFormat1(b, sub)
 	case 2:
 		return parseSequenceContextFormat2(b, sub)
 	case 3:
@@ -959,6 +952,8 @@ func parseSequenceContextFormat1(b fontBinSegm, sub LookupSubtable) (LookupSubta
 	if len(b) <= 6 {
 		return sub, errFontFormat("corrupt sequence context")
 	}
+	// nothing to to for format 1
+	//
 	// seqctx := SequenceContext{}
 	// link, err := parseLink16(b, 2, b, "SequenceContext Coverage")
 	// if err != nil {
@@ -985,8 +980,9 @@ func parseSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubta
 	seqctx := SequenceContext{}
 	sub.Support = seqctx
 	seqctx.ClassDefs = make([]ClassDefinitions, 1)
-	seqctx.ClassDefs[0] = parseContextClassDef(b, 4)
-	return sub, nil
+	var err error
+	seqctx.ClassDefs[0], err = parseContextClassDef(b, 4)
+	return sub, err
 }
 
 // The SequenceContextFormat3 table specifies exactly one input sequence pattern. It has an
@@ -1038,10 +1034,10 @@ func parseChainedSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubta
 }
 
 func parseChainedSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
-	backtrack := parseContextClassDef(b, 4)
-	input := parseContextClassDef(b, 6)
-	lookahead := parseContextClassDef(b, 8)
-	if backtrack.format == 0 || input.format == 0 || lookahead.format == 0 {
+	backtrack, err1 := parseContextClassDef(b, 4)
+	input, err2 := parseContextClassDef(b, 6)
+	lookahead, err3 := parseContextClassDef(b, 8)
+	if err1 != nil || err2 != nil || err3 != nil {
 		return LookupSubtable{}, errFontFormat("corrupt chained sequence context (format 2)")
 	}
 	sub.Support = &SequenceContext{
@@ -1051,19 +1047,45 @@ func parseChainedSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (Look
 }
 
 func parseChainedSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
-	panic("not yet implemented: chained sequence context format 3")
+	backtrack, err1 := parseChainedSeqContextCoverages(b, 2)
+	input, err2 := parseChainedSeqContextCoverages(b, 6)
+	lookahead, err3 := parseChainedSeqContextCoverages(b, 10)
+	if err1 != nil || err2 != nil || err3 != nil {
+		return LookupSubtable{}, errFontFormat("corrupt chained sequence context (format 3)")
+	}
+	sub.Support = &SequenceContext{
+		BacktrackCoverage: backtrack,
+		InputCoverage:     input,
+		LookaheadCoverage: lookahead,
+	}
+	return sub, nil
 }
 
-func parseContextClassDef(b fontBinSegm, at int) ClassDefinitions {
+func parseContextClassDef(b fontBinSegm, at int) (ClassDefinitions, error) {
 	link, err := parseLink16(b, at, b, "ClassDef")
 	if err != nil {
-		return ClassDefinitions{}
+		return ClassDefinitions{}, err
 	}
 	cdef, err := parseClassDefinitions(link.Jump().Bytes())
 	if err != nil {
-		return ClassDefinitions{}
+		return ClassDefinitions{}, err
 	}
-	return cdef
+	return cdef, nil
+}
+
+func parseChainedSeqContextCoverages(b fontBinSegm, at int) ([]Coverage, error) {
+	count := int(b.U16(at))
+	coverages := make([]Coverage, count)
+	trace().Debugf("chained seq context with %d coverages", count)
+	for i := 0; i < count; i++ {
+		link, err := parseLink16(b, at+2+i*2, b, "ChainedSequenceContext Coverage")
+		if err != nil {
+			trace().Errorf("error parsing coverages' offset")
+			return []Coverage{}, err
+		}
+		coverages[i] = parseCoverage(link.Jump().Bytes())
+	}
+	return coverages, nil
 }
 
 // TODO Argument should be NavLocation, return value should be []SeqLookupRecord

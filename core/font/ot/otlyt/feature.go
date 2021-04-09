@@ -192,7 +192,7 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt 
 	trace().Debugf("applying lookup '%s'/%d", feat.Tag(), lookup.Type)
 	for i := 0; i < int(lookup.SubTableCount); i++ {
 		// all subtables have the same lookup subtable type, but may have different formats;
-		// (except for type = Extension)
+		// except for type = Extension
 		sub := lookup.Subtable(i)
 		if sub == nil {
 			continue
@@ -211,9 +211,26 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt 
 			return gsubLookupType3Fmt1(lookup, sub, buf, pos, alt)
 		case 4: // Ligature Substitution Subtable
 			return gsubLookupType4Fmt1(lookup, sub, buf, pos)
-		default:
-			panic("TODO")
+		case 5:
+			switch sub.Format {
+			case 1:
+				return gsubLookupType5Fmt1(lookup, sub, buf, pos)
+			case 2:
+				return gsubLookupType5Fmt2(lookup, sub, buf, pos)
+			case 4:
+				return gsubLookupType5Fmt3(lookup, sub, buf, pos)
+			}
+		case 6:
+			switch sub.Format {
+			case 1:
+				return gsubLookupType6Fmt1(lookup, sub, buf, pos)
+			case 2:
+				return gsubLookupType6Fmt2(lookup, sub, buf, pos)
+			case 4:
+				return gsubLookupType6Fmt2(lookup, sub, buf, pos)
+			}
 		}
+		trace().Errorf("unknown GSUB lookup type %d", sub.LookupType)
 	}
 	return pos, false, buf
 }
@@ -395,55 +412,77 @@ func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 	return pos, false, buf
 }
 
-// LigatureSetLookup trys to match a sequence of glyph IDs to the pattern portions
-// ('components') of every Ligature of a LigatureSet, and if a match is found,
-// returns the ligature glyph for the pattern.
-//
-// loc is a byte segment usually returned from a call to a type 4 (Ligature Substitution)
-// GSUB lookup.
-//
-// The resulting glyph should replace a sequence of glyphs from the input code-points
-// including the initial glyph input to the type 4 Ligature Substitution, continued
-// with the glyphs provided to LigatureSetLookup.
-//
-/*
-func LigatureSetLookup(loc ot.NavLocation, glyphs []ot.GlyphIndex) ot.GlyphIndex {
-	// loc shoud be at a LigatureSet
-	ligset, err := parseArray16(loc.Bytes(), 0)
-	if err != nil {
-		return 0
+func gsubLookupType5Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
 	}
-	// iterate over all Ligature entries, pointed to by an offset16
-	for i := 0; i < ligset.length; i++ {
-		ptr := ligset.Get(i).U16(0)
-		// Ligature table (glyph components for one ligature):
-		// uint16  ligatureGlyph     glyph ID of ligature to substitute
-		// uint16  componentCount    Number of components in the ligature
-		// uint16  componentGlyphIDs[componentCount-1]    Array of component glyph IDs
-		ligglyph := GlyphIndex(loc.U16(int(ptr)))
-		compCount := loc.U16(int(ptr) + 2)
-		comps := array{
-			recordSize: 6, // 3 * sizeof(uint16)
-			length:     int(compCount) - 1,
-			loc:        loc.Bytes()[ptr:],
-		}
-		if len(glyphs) != comps.length {
-			break
-		}
-		match := true
-		for i, g := range glyphs {
-			if g != GlyphIndex(comps.Get(i).U16(0)) {
-				match = false
-				break
-			}
-		}
-		if match {
-			return ligglyph
-		}
-	}
-	return 0
+	panic("TODO 5/1")
+	// return pos, false, buf
 }
-*/
+
+func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	panic("TODO 5/2")
+	// return pos, false, buf
+}
+
+func gsubLookupType5Fmt3(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	panic("TODO 5/3")
+	// return pos, false, buf
+}
+
+func gsubLookupType6Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	panic("TODO 6/1")
+	// return pos, false, buf
+}
+
+func gsubLookupType6Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	panic("TODO 6/2")
+	// return pos, false, buf
+}
+
+func gsubLookupType6Fmt3(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
+	int, bool, []ot.GlyphIndex) {
+	//
+	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
+	if !ok {
+		return pos, false, buf
+	}
+	panic("TODO 6/3")
+	//return pos, false, buf
+}
 
 // --- Helpers ---------------------------------------------------------------
 
