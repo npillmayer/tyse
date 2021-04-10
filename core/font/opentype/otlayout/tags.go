@@ -1,4 +1,4 @@
-package otlyt
+package otlayout
 
 import "github.com/npillmayer/tyse/core/font/ot"
 

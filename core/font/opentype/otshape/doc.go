@@ -1,9 +1,6 @@
 /*
-Package otlyt provides access to OpenType font layout features.
+Package otshape is work in progress.
 
-Status
-
-Work in progress.
 
 
 License
@@ -39,7 +36,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package otlyt
+package otshape
 
 import (
 	"github.com/npillmayer/schuko/gtrace"
@@ -52,7 +49,7 @@ func trace() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
-// errFontFormat produces user level errors for font parsing.
-func errFontFormat(x string) error {
-	return core.Error(core.EINVALID, "OpenType font format: %s", x)
+// errShaper produces user level errors for text shaping.
+func errShaper(x string) error {
+	return core.Error(core.EINVALID, "OpenType text shaping: %s", x)
 }
