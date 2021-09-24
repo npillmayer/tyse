@@ -1,6 +1,6 @@
 package otlayout
 
-import "github.com/npillmayer/tyse/core/font/ot"
+import "github.com/npillmayer/tyse/core/font/opentype/ot"
 
 // LayoutTagType denotes the type an OpenType layout tag as registered here:
 // https://docs.microsoft.com/en-us/typography/opentype/spec/ttoreg

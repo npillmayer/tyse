@@ -8,7 +8,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
-	"github.com/npillmayer/tyse/core/font/ot"
+	"github.com/npillmayer/tyse/core/font/opentype/ot"
 	"github.com/npillmayer/tyse/core/locate/resources"
 )
 

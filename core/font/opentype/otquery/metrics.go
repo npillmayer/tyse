@@ -3,7 +3,7 @@ package otquery
 import (
 	"strings"
 
-	"github.com/npillmayer/tyse/core/font/ot"
+	"github.com/npillmayer/tyse/core/font/opentype/ot"
 	"golang.org/x/text/language"
 )
 

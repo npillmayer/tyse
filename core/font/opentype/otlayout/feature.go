@@ -3,7 +3,7 @@ package otlayout
 import (
 	"fmt"
 
-	"github.com/npillmayer/tyse/core/font/ot"
+	"github.com/npillmayer/tyse/core/font/opentype/ot"
 )
 
 // Feature is a type for OpenType layout features.

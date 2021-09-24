@@ -67,7 +67,7 @@ func TestTableNavOS2(t *testing.T) {
 	}
 	loc := table.Fields().List().Get(1)
 	if loc.U16(0) != 400 {
-		t.Errorf("expected xAvgCharWidth (size %d) to be 400, is %d", loc.Size(), loc.U16(0))
+		t.Errorf("expected xAvgCharWidth (size %d) of Calibri to be 400, is %d", loc.Size(), loc.U16(0))
 	}
 }
 
