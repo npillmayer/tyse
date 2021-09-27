@@ -1,6 +1,13 @@
 /*
 Package otshape is work in progress.
 
+From the OpenType spec
+(https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#features-and-lookups):
+
+aOpenType Layout features and lookups define information that is specific to the glyphs in a given font.
+They do not encode information that is constant within the conventions of a particular language or the
+typography of a particular script. Information that would be replicated across all fonts in a given
+language belongs in the text-processing application for that language, not in the fonts.
 
 
 License

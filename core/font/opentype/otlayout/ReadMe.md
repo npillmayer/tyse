@@ -15,8 +15,8 @@ At the heart of OpenType layout lie the **features** of a font. From the OpenTyp
 > word.
 
 Features relay the heavy lifting to **Lookup**s and lookup-subtables, which come in various flavours
-and formats. Package `otlyt` relies on package `ot` to hide some of the nifty details of the
-lookup-idiosyncracies, but their application is still somewhat complicated. `otlyt` trys to offer a
+and formats. Package `otlayout` relies on package `ot` to hide some of the nifty details of the
+lookup-idiosyncracies, but their application is still somewhat complicated. `otlayout` trys to offer a
 uniform API for feature application, alleviating clients from having to consider the details of
 all registered OT features.
 

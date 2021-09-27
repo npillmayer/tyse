@@ -170,6 +170,36 @@ func TestFeatureCCMP(t *testing.T) {
 	}
 }
 
+func TestFeatureCCMPGentium(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	otf := parseFont(t, "GentiumPlus-R")
+	t.Logf("Using font %s for test", otf.F.Fontname)
+	// Calibri has no DFLT feature set
+	gsubFeats, _, err := FontFeatures(otf, ot.DFLT, 0)
+	if err != nil || len(gsubFeats) < 2 {
+		t.Errorf("GSUB feature 'ccmp' not found in font GentiumPlus")
+	}
+	var featCCMP Feature
+	for _, feat := range gsubFeats {
+		if feat != nil && feat.Tag() == ot.T("ccmp") {
+			featCCMP = feat
+			break
+		}
+	}
+	if featCCMP == nil {
+		t.Errorf("expected feature 'ccmp', haven't")
+	}
+	t.Logf("# of lookups for 'ccmp' = %d", featCCMP.LookupCount())
+	t.Logf("index of lookup #0 for 'ccmp' = %d", featCCMP.LookupIndex(0))
+	if featCCMP.LookupIndex(0) != 0 {
+		t.Errorf("expected index of lookup #0 of feature 'ccmp' to be 0, isn't")
+	}
+	//t.Fail()
+}
+
 // ---------------------------------------------------------------------------
 
 func prepareGlyphBuffer(s string, otf *ot.Font, t *testing.T) []ot.GlyphIndex {

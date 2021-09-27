@@ -746,7 +746,7 @@ type LookupSubtable struct {
 // within the input sequence.
 // Each sequence position + nested lookup combination is specified in a SequenceLookupRecord.
 func gsubLookupType5Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(g)
+	inx, ok := lksub.Coverage.GlyphRange.Match(g)
 	if !ok {
 		return fontBinSegm{}
 	}
@@ -771,6 +771,7 @@ func lookupAndReturn(index VarArray, ginx int, deep bool) NavLocation {
 // Clients will receive this struct in the `Support` field of a LookupSubtable, whenever it's appropriate:
 //
 // ▪︎ GSUB Lookup Type 5 and 6, format 2 and 3
+//
 // ▪︎ GPOS Lookup Type 5 and 7, format 2 and 3
 //
 // For type 5, the length of each non-void slice will be exactly 1; for type 6/7 they may be of
@@ -787,7 +788,7 @@ type SequenceContext struct {
 // sequenceContext is a type for identifying the input sequence context for
 // contextual lookups.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-1-simple-glyph-contexts
-type XsequenceContext struct {
+type xsequenceContext struct {
 	format        uint16           // 1, 2 or 3
 	coverage      []Coverage       // for all formats
 	classDef      ClassDefinitions // for format 2

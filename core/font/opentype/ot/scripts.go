@@ -1,5 +1,7 @@
 package ot
 
+var DFLT = T("DFLT")
+
 var standardScripts = []Tag{
 	T("latn"), // Latin
 	T("cyrl"), // Cyrillic

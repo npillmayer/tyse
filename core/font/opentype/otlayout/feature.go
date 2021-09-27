@@ -7,7 +7,7 @@ import (
 )
 
 // Feature is a type for OpenType layout features.
-// From the specification Website
+// From the specification website
 // https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags :
 //
 // “Features provide information about how to use the glyphs in a font to render a script or
@@ -56,13 +56,13 @@ func FontFeatures(otf *ot.Font, script, lang ot.Tag) ([]Feature, []Feature, erro
 	}
 	var feats = make([][]Feature, 2)
 	if script == 0 {
-		script = ot.T("DFLT")
+		script = ot.DFLT
 	}
 	for i := 0; i < 2; i++ { // collect features from GSUB and GPOS
 		t := lytTables[i]
 		scr := t.ScriptList.LookupTag(script)
-		if scr.IsNull() && script != ot.T("DFLT") {
-			scr = t.ScriptList.LookupTag(ot.T("DFLT"))
+		if scr.IsNull() && script != ot.DFLT {
+			scr = t.ScriptList.LookupTag(ot.DFLT)
 		}
 		if scr.IsNull() {
 			trace().Infof("font %s has no feature-links from script %s", otf.F.Fontname, script)
@@ -252,7 +252,7 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt 
 func gsubLookupType1Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	_, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	_, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d", buf[pos], ok)
 	if !ok {
 		return pos, false, buf
@@ -274,7 +274,7 @@ func gsubLookupType1Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType1Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -302,7 +302,7 @@ func gsubLookupType1Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType2Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -332,7 +332,7 @@ func gsubLookupType2Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType3Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos, alt int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -366,7 +366,7 @@ func gsubLookupType3Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -413,13 +413,57 @@ func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 	return pos, false, buf
 }
 
+// LookupType 5: Contextual Substitution
+//
+// GSUB type 5 format 1 subtables (and GPOS type 7 format 1 subtables) define input sequences in terms of
+// specific glyph IDs. Several sequences may be specified, but each is specified using glyph IDs.
+//
+// The first glyphs for the sequences are specified in a Coverage table. The remaining glyphs in each
+// sequence are defined in SequenceRule tables—one for each sequence. If multiple sequences start with
+// the same glyph, that glyph ID must be listed once in the Coverage table, and the corresponding sequence
+// rules are aggregated using a SequenceRuleSet table—one for each initial glyph specified in the
+// Coverage table.
+//
+// When evaluating a SequenceContextFormat1 subtable for a given position in a glyph sequence, the client
+// searches for the current glyph in the Coverage table. If found, the corresponding SequenceRuleSet
+// table is retrieved, and the SequenceRule tables for that set are examined to see if the current glyph
+// sequence matches any of the sequence rules. The first matching rule subtable is used.
+//
 func gsubLookupType5Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
+	}
+	ruleSet, err := lksub.Index.Get(inx, false)
+	if err != nil || inx*2 >= ruleSet.Size() { // extra coverage glyphs or extra sequence rule sets are ignored
+		return pos, false, buf
+	}
+	// SequenceRuleSet table – all contexts beginning with the same glyph:
+	// uint16   | seqRuleCount                 | Number of SequenceRule tables
+	// Offset16 | seqRuleOffsets[posRuleCount] | Array of offsets to SequenceRule tables, from
+	//                                           beginning of the SequenceRuleSet table
+	seqRuleCnt := ruleSet.U16(0)
+	if inx >= int(seqRuleCnt) { // extra coverage glyphs or extra sequence rule sets are ignored
+	}
+	for i := uint16(0); i < seqRuleCnt; i++ {
+		/*
+			seqRule, err := ruleSet.Index.Get(i, false) // TODO wrap in array, how? forgot
+			if err != nil {
+				trace().Debugf("cannot read sequence rule #%d", i)
+				return pos, false, buf // ill-formed type 5
+			}
+		*/
+		// SequenceRule table:
+		// uint16 | glyphCount                  | Number of glyphs in the input glyph sequence
+		// uint16 | seqLookupCount              | Number of SequenceLookupRecords
+		// uint16 | inputSequence[glyphCount-1] | Array of input glyph IDs—starting with the second glyph
+		// SequenceLookupRecord | seqLookupRecords[seqLookupCount] | Array of Sequence lookup records
+		/*
+			inputSequence := seqRule.U16(0) // TODO
+		*/
 	}
 	panic("TODO 5/1")
 	// return pos, false, buf
@@ -428,7 +472,7 @@ func gsubLookupType5Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -440,7 +484,7 @@ func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType5Fmt3(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -452,7 +496,7 @@ func gsubLookupType5Fmt3(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType6Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -464,7 +508,7 @@ func gsubLookupType6Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 func gsubLookupType6Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
-	inx, ok := lksub.Coverage.GlyphRange.Lookup(buf[pos])
+	inx, ok := lksub.Coverage.GlyphRange.Match(buf[pos])
 	trace().Debugf("coverage of glyph ID %d is %d/%v", buf[pos], inx, ok)
 	if !ok {
 		return pos, false, buf
@@ -492,7 +536,7 @@ func gsubLookupType6Fmt3(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 		if pos+i >= len(buf) {
 			return pos, false, buf
 		}
-		inx, ok := cov.GlyphRange.Lookup(buf[pos+i])
+		inx, ok := cov.GlyphRange.Match(buf[pos+i])
 		trace().Debugf("input coverage of glyph ID %d is %d/%v", buf[pos+i], inx, ok)
 		if !ok {
 			return pos, false, buf
@@ -502,7 +546,7 @@ func gsubLookupType6Fmt3(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 		if pos-i-1 < 0 {
 			return pos, false, buf
 		}
-		inx, ok := cov.GlyphRange.Lookup(buf[pos+i])
+		inx, ok := cov.GlyphRange.Match(buf[pos+i])
 		trace().Debugf("backtrack coverage of glyph ID %d is %d/%v", buf[pos-i-1], inx, ok)
 		if !ok {
 			return pos, false, buf

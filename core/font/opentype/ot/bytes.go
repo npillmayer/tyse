@@ -102,15 +102,15 @@ func (b fontBinSegm) Glyphs() []GlyphIndex {
 
 }
 
-// func asU16Slice(b fontBinSegm) []uint16 {
-// 	r := make([]uint16, len(b)/2+1)
-// 	j := 0
-// 	for i := 0; i < len(b); i += 2 {
-// 		r[j] = uint16(b[i])<<8 + uint16(b[i+1])
-// 		j++
-// 	}
-// 	return r
-// }
+func asU16Slice(b fontBinSegm) []uint16 {
+	r := make([]uint16, len(b)/2+1)
+	j := 0
+	for i := 0; i < len(b); i += 2 {
+		r[j] = uint16(b[i])<<8 + uint16(b[i+1])
+		j++
+	}
+	return r
+}
 
 // return an unsigned integer as an array of two bytes.
 func uintBytes(n uint16) fontBinSegm {
@@ -183,7 +183,7 @@ func (b fontBinSegm) u32(i int) (uint32, error) {
 // If an input glyph g is contained in the range, and index and true is returned,
 // false otherwise.
 type GlyphRange interface {
-	Lookup(g GlyphIndex) (int, bool) // is glyph ID g
+	Match(g GlyphIndex) (int, bool) // is glyph ID g
 	ByteSize() int
 }
 
@@ -197,7 +197,7 @@ type glyphRangeArray struct {
 // glyphRangeArrays have entries stored as a block of consecutive keys.
 // glyphRangeArrays return the index of the key in the range table.
 // 0 is a valid return value.
-func (r *glyphRangeArray) Lookup(g GlyphIndex) (int, bool) {
+func (r *glyphRangeArray) Match(g GlyphIndex) (int, bool) {
 	if r.count <= 0 {
 		return 0, false
 	}
@@ -242,7 +242,7 @@ type glyphRangeRecords struct {
 // glyphRangeRecords have entries stored as range records.
 // glyphRangeRecords return the index of the key in the range table.
 // 0 is a valid return value.
-func (r *glyphRangeRecords) Lookup(g GlyphIndex) (int, bool) {
+func (r *glyphRangeRecords) Match(g GlyphIndex) (int, bool) {
 	trace().Debugf("glyph range lookup of glyph ID %d", g)
 	if r.count <= 0 {
 		return 0, false
@@ -559,7 +559,12 @@ type varArray struct {
 	base         fontBinSegm
 }
 
-func parseVarArrary16(b fontBinSegm, szOffset, gap, indirections int, name string) varArray {
+// ParseVarArray interprets a byte sequence as a `VarArray`.
+func ParseVarArray(loc NavLocation, sizeOffset int, name string) VarArray {
+	return parseVarArray16(loc.Bytes(), sizeOffset, 0, 1, name)
+}
+
+func parseVarArray16(b fontBinSegm, szOffset, gap, indirections int, name string) varArray {
 	if len(b) < 6 {
 		trace().Errorf("byte segment too small to parse variable array")
 		return varArray{}

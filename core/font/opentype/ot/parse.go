@@ -722,7 +722,7 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 }
 
 func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
-	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
+	trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	if len(b) < 4 {
 		return LookupSubtable{}
 	}
@@ -732,12 +732,17 @@ func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lookup
 	return parseGSubLookupSubtable(b, GSubLookupType(lookupType))
 }
 
+// parseGSubLookupSubtable parses a segment of binary data from a font file (NavLocation)
+// and expects to read a lookup subtable.
 func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
 	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	format := b.U16(0)
 	trace().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
 	sub := LookupSubtable{LookupType: lookupType, Format: format}
-	if lookupType != 7 && format != 3 { // GSUB type Extension has no coverage table
+	// Most of the subtable formats use a coverage table in some form to decide on which glyphs to
+	// operate on. parseGSubLookupSubtable will parse this coverage table and put it into
+	// `sub.Coverage`, then branch down to the different lookup types.
+	if !(lookupType == 7 && format == 3) { // GSUB type Extension has no coverage table
 		covlink, _ := parseLink16(b, 2, b, "Coverage")
 		sub.Coverage = parseCoverage(covlink.Jump().Bytes())
 	}
@@ -765,7 +770,7 @@ func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubta
 	if sub.Format == 1 {
 		sub.Support = int16(b.U16(4))
 	} else {
-		sub.Index = parseVarArrary16(b, 4, 2, 1, "LookupSubtable")
+		sub.Index = parseVarArray16(b, 4, 2, 1, "LookupSubtableGSub1")
 	}
 	return sub
 }
@@ -786,7 +791,7 @@ func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubta
 // number of ligature substitutions.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-4-ligature-substitution-subtable
 func parseGSubLookupSubtableType2or3or4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
-	sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
+	sub.Index = parseVarArray16(b, 4, 2, 2, "LookupSubtableGSub2/3/4")
 	return sub
 }
 
@@ -797,14 +802,18 @@ func parseGSubLookupSubtableType2or3or4(b fontBinSegm, sub LookupSubtable) Looku
 // to glyphs within the input sequence. The actions are specified as “nested” lookups, and each is applied
 // to a particular sequence position within the input sequence.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-5-contextual-substitution-subtable
+//
+// For contextual substitution subtables we usually will have to parse a rule set. We will put it
+// into the Index field. Additional context data structures may include ClassDefs or other things and
+// will be put into the Support field by calling parseSequenceContext.
 func parseGSubLookupSubtableType5(b fontBinSegm, sub LookupSubtable) LookupSubtable {
 	switch sub.Format {
 	case 1:
-		sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
+		sub.Index = parseVarArray16(b, 4, 2, 2, "LookupSubtableGSub5-1")
 	case 2:
-		sub.Index = parseVarArrary16(b, 6, 2, 2, "LookupSubtable")
+		sub.Index = parseVarArray16(b, 6, 2, 2, "LookupSubtableGSub5-2")
 	case 3:
-		sub.Index = parseVarArrary16(b, 4, 4, 2, "LookupSubtable")
+		sub.Index = parseVarArray16(b, 4, 4, 2, "LookupSubtableGSub5-3")
 	}
 	var err error
 	sub, err = parseSequenceContext(b, sub)
@@ -829,9 +838,9 @@ func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubta
 	}
 	switch sub.Format {
 	case 1:
-		sub.Index = parseVarArrary16(b, 4, 2, 2, "LookupSubtable")
+		sub.Index = parseVarArray16(b, 4, 2, 2, "LookupSubtableGSub6-1")
 	case 2:
-		sub.Index = parseVarArrary16(b, 10, 2, 2, "LookupSubtable")
+		sub.Index = parseVarArray16(b, 10, 2, 2, "LookupSubtableGSub6-2")
 	case 3:
 		offset := 2 // skip over format field
 		// TODO treat error conditions
@@ -839,7 +848,7 @@ func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubta
 		offset += 2 + len(seqctx.BacktrackCoverage)*2
 		offset += 2 + len(seqctx.InputCoverage)*2
 		offset += 2 + len(seqctx.LookaheadCoverage)*2
-		sub.Index = parseVarArrary16(b, offset, 2, 2, "LookupSubtable")
+		sub.Index = parseVarArray16(b, offset, 2, 2, "LookupSubtableGSub6-3")
 	}
 	return sub
 }
