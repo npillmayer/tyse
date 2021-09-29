@@ -885,6 +885,7 @@ func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 // consecutive glyph indices to different classes, or one that puts groups of consecutive
 // glyph indices into the same class.
 func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
+	trace().Debugf("HELLO, parsing a ClassDef")
 	cdef := ClassDefinitions{}
 	r := bytes.NewReader(b)
 	if err := binary.Read(r, binary.BigEndian, &cdef.format); err != nil {
@@ -892,9 +893,11 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
 	}
 	var n, g uint16
 	if cdef.format == 1 {
+		trace().Debugf("parsing a ClassDef of format 1")
 		n, _ = b.u16(4) // number of glyph IDs in table
 		g, _ = b.u16(2) // start glyph ID
 	} else if cdef.format == 2 {
+		trace().Debugf("parsing a ClassDef of format 2")
 		n, _ = b.u16(2) // number of glyph ID ranges in table
 	} else {
 		return cdef, errFontFormat(fmt.Sprintf("unknown ClassDef format %d", n))
@@ -976,21 +979,22 @@ func parseSequenceContextFormat1(b fontBinSegm, sub LookupSubtable) (LookupSubta
 }
 
 // SequenceContextFormat2 table:
-// Type 	Name 	Description
-// uint16 	format 	Format identifier: format = 2
-// Offset16 	coverageOffset 	Offset to Coverage table, from beginning of SequenceContextFormat2 table
-// Offset16 	classDefOffset 	Offset to ClassDef table, from beginning of SequenceContextFormat2 table
-// uint16 	classSeqRuleSetCount 	Number of ClassSequenceRuleSet tables
-// Offset16 	classSeqRuleSetOffsets[classSeqRuleSetCount] 	Array of offsets to ClassSequenceRuleSet tables, from beginning of SequenceContextFormat2 table (may be NULL)
+// Type      Name                   Description
+// uint16    format                 Format identifier: format = 2
+// Offset16  coverageOffset         Offset to Coverage table, from beginning of SequenceContextFormat2 table
+// Offset16  classDefOffset         Offset to ClassDef table, from beginning of SequenceContextFormat2 table
+// uint16    classSeqRuleSetCount   Number of ClassSequenceRuleSet tables
+// Offset16  classSeqRuleSetOffsets[classSeqRuleSetCount]    Array of offsets to ClassSequenceRuleSet tables, from beginning of SequenceContextFormat2 table (may be NULL)
 func parseSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 8 {
 		return sub, errFontFormat("corrupt sequence context")
 	}
-	seqctx := SequenceContext{}
+	seqctx := &SequenceContext{}
 	sub.Support = seqctx
 	seqctx.ClassDefs = make([]ClassDefinitions, 1)
 	var err error
 	seqctx.ClassDefs[0], err = parseContextClassDef(b, 4)
+	sub.Support = seqctx
 	return sub, err
 }
 

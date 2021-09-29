@@ -133,7 +133,7 @@ Calibri:
 				<LigatureSet glyph="glyph03776">
 					<Ligature components="glyph03780" glyph="glyph03786"/>
 */
-func TestFeatureCCMP(t *testing.T) {
+func TestFeatureCCMPCalibri(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
@@ -196,6 +196,14 @@ func TestFeatureCCMPGentium(t *testing.T) {
 	t.Logf("index of lookup #0 for 'ccmp' = %d", featCCMP.LookupIndex(0))
 	if featCCMP.LookupIndex(0) != 0 {
 		t.Errorf("expected index of lookup #0 of feature 'ccmp' to be 0, isn't")
+	}
+	_, applied, buf := ApplyFeature(otf, featCCMP, []ot.GlyphIndex{76, 2195}, 0, 0) // glyphs 'i' + '^' (#0069)
+	t.Logf("Application of 'ccmp' returned glyph buffer %v", buf)
+	if !applied {
+		t.Error("feature 'ccmp' not applied")
+	}
+	if buf[0] != 3786 {
+		t.Errorf("expected 'ccmp' to replace (76,2195) with glyph <ihat>, have %d", buf[0])
 	}
 	//t.Fail()
 }

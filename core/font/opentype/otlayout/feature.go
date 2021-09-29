@@ -477,6 +477,23 @@ func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 	if !ok {
 		return pos, false, buf
 	}
+	if lksub.Support == nil {
+		trace().Errorf("expected SequenceContext|ClassDefs in field 'Support', is nil")
+		return pos, false, buf
+	}
+	ctx, ok := lksub.Support.(*ot.SequenceContext)
+	if !ok {
+		trace().Errorf("expected SequenceContext|ClassDefs in field 'Support', type error")
+		return pos, false, buf
+	}
+	trace().Debugf("GSUB lookup type 5|2 has %d ClassDefs", len(ctx.ClassDefs))
+	for i, glyph := range buf {
+		for j, cdef := range ctx.ClassDefs {
+			trace().Debugf(" checking class def #%d for glyph #%d = %d", j, i, glyph)
+			clz := cdef.Lookup(glyph)
+			trace().Debugf(" class def #%d -> class ID %d", j, clz)
+		}
+	}
 	panic("TODO 5/2")
 	// return pos, false, buf
 }

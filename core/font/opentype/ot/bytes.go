@@ -572,7 +572,7 @@ func parseVarArray16(b fontBinSegm, szOffset, gap, indirections int, name string
 	cnt, _ := b.u16(szOffset)
 	va := varArray{name: name, indirections: indirections, base: b}
 	va.ptrs = array{recordSize: 2, length: int(cnt), loc: b[szOffset+gap:]}
-	trace().Debugf("parsing VarArray of size %d = %v", cnt, b[szOffset+gap:20].Glyphs())
+	trace().Debugf("parsing VarArray of size %d = %v", cnt, b[szOffset+gap:szOffset+gap+20].Glyphs())
 	return va
 }
 

@@ -380,6 +380,7 @@ type classDefinitionsFormat2 struct {
 }
 
 func (cdf *classDefinitionsFormat2) Lookup(glyph GlyphIndex) int {
+	//trace().Debugf("lookup up glyph %d in class def format 2", glyph)
 	for i := 0; i < cdf.count; i++ {
 		rec := cdf.classRanges.Get(i)
 		if glyph < GlyphIndex(rec.U16(0)) {
