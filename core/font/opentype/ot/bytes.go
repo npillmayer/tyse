@@ -550,6 +550,7 @@ func (a array) All() []NavLocation {
 // arrays of (variable size) records.
 type VarArray interface {
 	Get(i int, deep bool) (NavLocation, error) // get record at index i; if deep: query nested arrays
+	Size() int                                 // get the number of entries
 }
 
 type varArray struct {
@@ -560,8 +561,8 @@ type varArray struct {
 }
 
 // ParseVarArray interprets a byte sequence as a `VarArray`.
-func ParseVarArray(loc NavLocation, sizeOffset int, name string) VarArray {
-	return parseVarArray16(loc.Bytes(), sizeOffset, 0, 1, name)
+func ParseVarArray(loc NavLocation, sizeOffset, arrayDataGap int, name string) VarArray {
+	return parseVarArray16(loc.Bytes(), sizeOffset, 0, arrayDataGap, name)
 }
 
 func parseVarArray16(b fontBinSegm, szOffset, gap, indirections int, name string) varArray {
@@ -589,6 +590,10 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 		b = a.Get(i) // TODO will this create an infinite loop in case of error?
 		trace().Debugf("varArray->Get(%d|%d), a = %v", i, a.length, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
 		trace().Debugf("b = %d, %d to go", b.U16(0), va.indirections-1-j)
+		if b.U16(0) == 0 {
+			trace().Debugf("link to ptrs-data is NULL, empty array")
+			return fontBinSegm{}, nil
+		}
 		if j+1 < va.indirections {
 			link := makeLink16(b.U16(0), base, "Sequence")
 			b = link.Jump()
@@ -598,6 +603,10 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 	}
 	trace().Debugf("varArray result = %d", b.U16(0))
 	return b, err
+}
+
+func (va varArray) Size() int {
+	return va.ptrs.length
 }
 
 var _ VarArray = varArray{}

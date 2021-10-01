@@ -494,6 +494,23 @@ func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 			trace().Debugf(" class def #%d -> class ID %d", j, clz)
 		}
 	}
+	// => see ot.go: func (lksub LookupSubtable) SequenceRule(b fontBinSegm) sequenceRule
+	seqRuleSetCount := lksub.Index.Size()
+	trace().Debugf("found %d seq rule sets for SequenceContext Type 5-2", seqRuleSetCount)
+	for i := 0; i < seqRuleSetCount; i++ {
+		if ruleSetLoc, err := lksub.Index.Get(i, false); err == nil {
+			// Index[i] may be 0 => no rule set
+			if ruleSetLoc.Size() == 0 {
+				trace().Debugf("rule set #%d is empty", i)
+				continue
+			}
+			ruleSet := ot.ParseVarArray(ruleSetLoc, 0, 2, "SequenceRuleSet")
+			trace().Debugf("rule set #%d has %d rules in it", i, ruleSet.Size())
+		} else {
+			trace().Errorf(err.Error())
+			continue
+		}
+	}
 	panic("TODO 5/2")
 	// return pos, false, buf
 }

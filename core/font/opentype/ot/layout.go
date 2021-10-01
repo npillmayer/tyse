@@ -746,6 +746,10 @@ type LookupSubtable struct {
 // are specified as “nested” lookups, and each is applied to a particular sequence positions
 // within the input sequence.
 // Each sequence position + nested lookup combination is specified in a SequenceLookupRecord.
+/*
+
+=> otlayout/feature.go
+
 func gsubLookupType5Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLocation {
 	inx, ok := lksub.Coverage.GlyphRange.Match(g)
 	if !ok {
@@ -753,6 +757,7 @@ func gsubLookupType5Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLoca
 	}
 	return lookupAndReturn(lksub.Index, inx, true) // returns a LigatureSet
 }
+*/
 
 // lookupAndReturn is a small helper which looks up an index for a glyph (previously
 // returned from a coverage table), checks for errors, and returns the resulting bytes.
