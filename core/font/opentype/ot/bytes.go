@@ -480,6 +480,14 @@ type array struct {
 // 	}
 // }
 
+func ParseList(b fontBinSegm, N int, recordSize int) NavList {
+	return array{
+		recordSize: recordSize,
+		length:     N,
+		loc:        b,
+	}
+}
+
 func viewArray16(b fontBinSegm) array {
 	if b.Size()&0x1 != 0 {
 		trace().Errorf("cannot create array16: size not aligned")
@@ -562,7 +570,7 @@ type varArray struct {
 
 // ParseVarArray interprets a byte sequence as a `VarArray`.
 func ParseVarArray(loc NavLocation, sizeOffset, arrayDataGap int, name string) VarArray {
-	return parseVarArray16(loc.Bytes(), sizeOffset, 0, arrayDataGap, name)
+	return parseVarArray16(loc.Bytes(), sizeOffset, arrayDataGap, 1, name)
 }
 
 func parseVarArray16(b fontBinSegm, szOffset, gap, indirections int, name string) varArray {
@@ -594,14 +602,16 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 			trace().Debugf("link to ptrs-data is NULL, empty array")
 			return fontBinSegm{}, nil
 		}
-		if j+1 < va.indirections {
+		if j < va.indirections {
 			link := makeLink16(b.U16(0), base, "Sequence")
 			b = link.Jump()
-			a, err = parseArray16(b.Bytes(), 0)
-			trace().Debugf("new a has size %d, is %v", a.length, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
+			if j+1 < va.indirections {
+				a, err = parseArray16(b.Bytes(), 0)
+				trace().Debugf("new a has size %d, is %v", a.length, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
+			}
 		}
 	}
-	trace().Debugf("varArray result = %d", b.U16(0))
+	trace().Debugf("varArray result = %v", asU16Slice(fontBinSegm(b.Bytes()[:min(20, 2*b.Size())])))
 	return b, err
 }
 
@@ -800,4 +810,13 @@ func (u16l u16List) All() []NavLocation {
 		r[i] = fontBinSegm([]byte{byte(x >> 8 & 0xff), byte(x & 0xff)})
 	}
 	return r
+}
+
+// ---------------------------------------------------------------------------
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

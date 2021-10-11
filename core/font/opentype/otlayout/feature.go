@@ -498,6 +498,7 @@ func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 	seqRuleSetCount := lksub.Index.Size()
 	trace().Debugf("found %d seq rule sets for SequenceContext Type 5-2", seqRuleSetCount)
 	for i := 0; i < seqRuleSetCount; i++ {
+		trace().Debugf("=== Rule Set =====================")
 		if ruleSetLoc, err := lksub.Index.Get(i, false); err == nil {
 			// Index[i] may be 0 => no rule set
 			if ruleSetLoc.Size() == 0 {
@@ -506,8 +507,23 @@ func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 			}
 			ruleSet := ot.ParseVarArray(ruleSetLoc, 0, 2, "SequenceRuleSet")
 			trace().Debugf("rule set #%d has %d rules in it", i, ruleSet.Size())
+			for j := 0; j < ruleSet.Size(); j++ {
+				trace().Debugf("--- Rule -------------------------")
+				trace().Debugf("checking rule position #%d = %d", j, int(ruleSetLoc.U16(j*2+2)))
+				if ruleData, err := ruleSet.Get(j, false); err == nil {
+					trace().Debugf("rule data = %v", ruleData.Bytes()[:20])
+					glyphCount := ruleData.U16(0)
+					trace().Debugf("rule #%d has glyph count = %d", j, glyphCount)
+					//rule := ot.ParseVarArray(ruleData, 2, 2+(int(glyphCount)-1)*2, "ClassSequenceRule")
+					rule := ot.ParseList(ruleData.Bytes()[4+(int(glyphCount)-1)*2:], int(ruleData.U16(2)), 4)
+					//ot.ParseVarArray(ruleData, 2, 2+(int(glyphCount)-1)*2, "ClassSequenceRule")
+				} else {
+					trace().Errorf("rule #%d: %s", j, err.Error())
+					continue
+				}
+			}
 		} else {
-			trace().Errorf(err.Error())
+			trace().Errorf("rule set #%d: %s", i, err.Error())
 			continue
 		}
 	}
