@@ -2,12 +2,6 @@ module github.com/npillmayer/tyse
 
 go 1.16
 
-replace github.com/npillmayer/uax => /Users/npi/prg/go/uax
-
-replace github.com/npillmayer/schuko => /Users/npi/prg/go/schuko
-
-replace github.com/npillmayer/cords => /Users/npi/prg/go/cords
-
 require (
 	github.com/andybalholm/cascadia v1.1.0
 	github.com/antchfx/xpath v1.1.11
@@ -16,10 +10,10 @@ require (
 	github.com/emirpasic/gods v1.12.0
 	github.com/flopp/go-findfont v0.0.0-20201114153133-e7393a00c15b
 	github.com/gorilla/css v1.0.0 // indirect
-	github.com/npillmayer/arithm v0.0.0-20201205232234-0c0b84ed8d47
-	github.com/npillmayer/cords v0.0.0-00010101000000-000000000000
-	github.com/npillmayer/schuko v0.0.0-20201204202054-953994f422ef
-	github.com/npillmayer/uax v0.0.0-20210211112302-29b15ddc8d46
+	github.com/npillmayer/arithm v0.1.0
+	github.com/npillmayer/cords v0.1.0
+	github.com/npillmayer/schuko v0.1.0
+	github.com/npillmayer/uax v0.1.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb

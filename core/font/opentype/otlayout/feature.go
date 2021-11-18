@@ -517,6 +517,7 @@ func gsubLookupType5Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 					//rule := ot.ParseVarArray(ruleData, 2, 2+(int(glyphCount)-1)*2, "ClassSequenceRule")
 					rule := ot.ParseList(ruleData.Bytes()[4+(int(glyphCount)-1)*2:], int(ruleData.U16(2)), 4)
 					//ot.ParseVarArray(ruleData, 2, 2+(int(glyphCount)-1)*2, "ClassSequenceRule")
+					trace().Debugf("rule = %v\n", rule)
 				} else {
 					trace().Errorf("rule #%d: %s", j, err.Error())
 					continue
