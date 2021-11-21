@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/flopp/go-findfont"
+	"github.com/npillmayer/schuko"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
 	xfont "golang.org/x/image/font"
@@ -170,7 +171,7 @@ func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 // Typecases are not returned synchronously, but rather as a promise
 // of kind TypeCasePromise (async/await-pattern).
 //
-func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
+func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
 	// TODO include a context parameter
 	ch := make(chan fontPlusErr)
 	go func(ch chan<- fontPlusErr) {
@@ -187,7 +188,7 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 		var fname string // path to embedded font, if any
 		for _, f := range fonts {
 			if font.Matches(f.Name(), pattern, style, weight) {
-				trace().Debugf("found embedded font file %s", f.Name())
+				tracer().Debugf("found embedded font file %s", f.Name())
 				fname = f.Name()
 				break
 			}
@@ -211,13 +212,13 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 			}
 		}
 		if f == nil { // next try system fonts
-			if desc, _ := FindLocalFont(pattern, style, weight); desc.Family != "" {
+			if desc, _ := FindLocalFont(conf, pattern, style, weight); desc.Family != "" {
 				f, result.err = font.LoadOpenTypeFont(desc.Path)
 			}
 		}
 		if f == nil { // next try Google font service
 			var fiList []GoogleFontInfo
-			if fiList, result.err = FindGoogleFont(pattern, style, weight); result.err == nil {
+			if fiList, result.err = FindGoogleFont(conf, pattern, style, weight); result.err == nil {
 				var l []font.Descriptor
 				for _, finfo := range fiList { // morph Google font info font font.Descriptor list
 					l = append(l, finfo.Descriptor)
@@ -279,10 +280,10 @@ func ResolveTypeCase(pattern string, style xfont.Style, weight xfont.Weight, siz
 //
 // (Please refer to function `ResolveTypeCase`, too)
 //
-func FindLocalFont(pattern string, style xfont.Style, weight xfont.Weight) (
+func FindLocalFont(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight) (
 	desc font.Descriptor, variant string) {
 	//
-	desc, variant = findFontConfigFont(pattern, style, weight)
+	desc, variant = findFontConfigFont(conf, pattern, style, weight)
 	if desc.Family == "" {
 		if loadedFontConfigListOK { // fontconfig is active, but didn't find a font
 			return // don't do a file system scan
@@ -290,7 +291,7 @@ func FindLocalFont(pattern string, style xfont.Style, weight xfont.Weight) (
 	} // otherwise fontconfig is not active => scan file system
 	fpath, err := findfont.Find(pattern) // lib does not accept style & weight
 	if err == nil && fpath != "" {
-		trace().Debugf("%s is a system font: %s", pattern, fpath)
+		tracer().Debugf("%s is a system font: %s", pattern, fpath)
 		desc = font.Descriptor{
 			Family: font.NormalizeFontname(pattern, style, weight),
 			Path:   fpath,

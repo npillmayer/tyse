@@ -9,27 +9,27 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/npillmayer/schuko/gconf"
+	"github.com/npillmayer/schuko"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
 	xfont "golang.org/x/image/font"
 )
 
-func findFontConfigBinary() (path string, err error) {
-	path = gconf.GetString("fontconfig")
+func findFontConfigBinary(conf schuko.Configuration) (path string, err error) {
+	path = conf.GetString("fontconfig")
 	if path == "" {
-		trace().Infof("fontconfig not configured: key 'fontconfig' should point location of 'fc-list' binary")
+		tracer().Infof("fontconfig not configured: key 'fontconfig' should point location of 'fc-list' binary")
 		err = errors.New("fontconfig not configured")
 	}
 	return
 }
 
-func cacheFontConfigList(update bool) (string, bool) {
-	appkey := gconf.GetString("app-key")
-	trace().Debugf("config[app-key] = %s", appkey)
+func cacheFontConfigList(conf schuko.Configuration, update bool) (string, bool) {
+	appkey := conf.GetString("app-key")
+	tracer().Debugf("config[app-key] = %s", appkey)
 	uconfdir, err := os.UserConfigDir()
 	if appkey == "" || err != nil {
-		trace().Errorf("user config directory not set")
+		tracer().Errorf("user config directory not set")
 		return "", false
 	}
 	fcListFilename := path.Join(uconfdir, appkey, "fontlist.txt")
@@ -50,7 +50,7 @@ func cacheFontConfigList(update bool) (string, bool) {
 			}
 		}
 	}
-	fcpath, err := findFontConfigBinary()
+	fcpath, err := findFontConfigBinary(conf)
 	if err != nil {
 		return "", false
 	}
@@ -80,8 +80,8 @@ func cacheFontConfigList(update bool) (string, bool) {
 	return fcListFilename, true
 }
 
-func loadFontConfigList() ([]font.Descriptor, bool) {
-	fclist, ok := cacheFontConfigList(false)
+func loadFontConfigList(conf schuko.Configuration) ([]font.Descriptor, bool) {
+	fclist, ok := cacheFontConfigList(conf, false)
 	if !ok {
 		return []font.Descriptor{}, false
 	}
@@ -138,7 +138,7 @@ func loadFontConfigList() ([]font.Descriptor, bool) {
 		return fontConfigDescriptors, false
 	}
 	if ttc > 0 {
-		trace().Infof("skipping %d platform fonts: TTC not yet supported", ttc)
+		tracer().Infof("skipping %d platform fonts: TTC not yet supported", ttc)
 	}
 	return fontConfigDescriptors, true
 }
@@ -160,19 +160,19 @@ var fontConfigDescriptors []font.Descriptor
 // issues. If fontconfig is not configured, FindFontConfigFont will silently return an
 // empty font descriptor and an empty variant name.
 //
-func findFontConfigFont(pattern string, style xfont.Style, weight xfont.Weight) (
+func findFontConfigFont(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight) (
 	desc font.Descriptor, variant string) {
 	//
 	loadFontConfigListTask.Do(func() {
-		_, loadedFontConfigListOK = loadFontConfigList()
-		trace().Infof("loaded fontconfig list")
+		_, loadedFontConfigListOK = loadFontConfigList(conf)
+		tracer().Infof("loaded fontconfig list")
 	})
 	if !loadedFontConfigListOK {
 		return
 	}
 	var confidence font.MatchConfidence
 	desc, variant, confidence = font.ClosestMatch(fontConfigDescriptors, pattern, style, weight)
-	trace().Debugf("closest fontconfig match confidence for %s|%s= %d", desc.Family, variant, confidence)
+	tracer().Debugf("closest fontconfig match confidence for %s|%s= %d", desc.Family, variant, confidence)
 	if confidence > font.LowConfidence {
 		return
 	}

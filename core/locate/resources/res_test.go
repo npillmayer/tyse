@@ -4,17 +4,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/schukonf/testconfig"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/font"
 	xfont "golang.org/x/image/font"
 )
 
 func TestLoadImage(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	loader := ResolveImage("placeholder.png", "high")
 	img, err := loader.Image()
@@ -29,11 +27,13 @@ func TestLoadImage(t *testing.T) {
 }
 
 func TestLoadPackagedFont(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	conf := testconfig.Conf{
+		"app-key": "tyse-test",
+	}
 	//
-	loader := ResolveTypeCase("GentiumPlus", xfont.StyleNormal, xfont.WeightNormal, 11.0)
+	loader := ResolveTypeCase(conf, "GentiumPlus", xfont.StyleNormal, xfont.WeightNormal, 11.0)
 	//time.Sleep(500)
 	typecase, err := loader.TypeCase()
 	if err != nil {
@@ -50,13 +50,13 @@ func TestLoadPackagedFont(t *testing.T) {
 }
 
 func TestResolveGoogleFont(t *testing.T) {
-	teardown := testconfig.QuickConfig(t, map[string]string{
-		"app-key": "tyse-test",
-	})
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	conf := testconfig.Conf{
+		"app-key": "tyse-test",
+	}
 	//
-	loader := ResolveTypeCase("Antic", xfont.StyleNormal, xfont.WeightNormal, 11.0)
+	loader := ResolveTypeCase(conf, "Antic", xfont.StyleNormal, xfont.WeightNormal, 11.0)
 	typecase, err := loader.TypeCase()
 	if err != nil {
 		t.Error(err)
@@ -81,13 +81,14 @@ var fclist = `
 `
 
 func TestFCBinary(t *testing.T) {
-	teardown := testconfig.QuickConfig(t, map[string]string{
-		"fontconfig": "/usr/local/bin/fc-list",
-	})
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	conf := testconfig.Conf{
+		"fontconfig": "/usr/local/bin/fc-list",
+		"app-key":    "tyse-test",
+	}
 	//
-	fc, err := findFontConfigBinary()
+	fc, err := findFontConfigBinary(conf)
 	t.Logf("fontconfig binary = %s", fc)
 	if err != nil {
 		t.Error(err)
@@ -98,14 +99,14 @@ func TestFCBinary(t *testing.T) {
 }
 
 func TestFCList(t *testing.T) {
-	teardown := testconfig.QuickConfig(t, map[string]string{
+	teardown := gotestingadapter.QuickConfig(t, "resources")
+	defer teardown()
+	conf := testconfig.Conf{
 		"fontconfig": "/usr/local/bin/fc-list",
 		"app-key":    "tyse-test",
-	})
-	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	}
 	//
-	l, ok := cacheFontConfigList(false)
+	l, ok := cacheFontConfigList(conf, false)
 	if !ok {
 		t.Errorf("cannot cache fontconfig list")
 	}
@@ -113,19 +114,19 @@ func TestFCList(t *testing.T) {
 }
 
 func TestFCLoad(t *testing.T) {
-	teardown := testconfig.QuickConfig(t, map[string]string{
+	teardown := gotestingadapter.QuickConfig(t, "resources")
+	defer teardown()
+	conf := testconfig.Conf{
 		"fontconfig": "/usr/local/bin/fc-list",
 		"app-key":    "tyse-test",
-	})
-	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	}
 	//
-	list, ok := loadFontConfigList()
+	list, ok := loadFontConfigList(conf)
 	if !ok {
 		t.Fatalf("cannot load fontconfig list")
 	}
 	t.Logf("found %d fonts in fontconfig list", len(list))
-	f, v := findFontConfigFont("new york", xfont.StyleItalic, xfont.WeightNormal)
+	f, v := findFontConfigFont(conf, "new york", xfont.StyleItalic, xfont.WeightNormal)
 	t.Logf("found font = %s in variant %s", f.Family, v)
 	if f.Family != "New York" {
 		t.Errorf("expected to find font New York, found %v", f)
@@ -133,14 +134,14 @@ func TestFCLoad(t *testing.T) {
 }
 
 func TestFCFind(t *testing.T) {
-	teardown := testconfig.QuickConfig(t, map[string]string{
+	teardown := gotestingadapter.QuickConfig(t, "resources")
+	defer teardown()
+	conf := testconfig.Conf{
 		"fontconfig": "/usr/local/bin/fc-list",
 		"app-key":    "tyse-test",
-	})
-	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	}
 	//
-	f, v := findFontConfigFont("new york", xfont.StyleItalic, xfont.WeightNormal)
+	f, v := findFontConfigFont(conf, "new york", xfont.StyleItalic, xfont.WeightNormal)
 	t.Logf("found font = (%s) in variant (%s)", f.Family, v)
 	t.Logf("font file = %s", f.Path)
 	if f.Family != "New York" {

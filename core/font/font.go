@@ -28,40 +28,15 @@ Links
 OpenType explained:
 https://docs.microsoft.com/en-us/typography/opentype/
 
-----------------------------------------------------------------------
+______________________________________________________________________
 
-BSD License
+License
 
-Copyright (c) 2017-21, Norbert Pillmayer
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
+Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
+*/
 package font
 
 import (
@@ -74,18 +49,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"golang.org/x/image/font"
 	xfont "golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
 )
 
-// trace traces to a global core-tracer.
-func trace() tracing.Trace {
-	return gtrace.CoreTracer
+// tracer writes to trace with key 'font'
+func tracer() tracing.Trace {
+	return tracing.Select("font")
 }
 
 const (
@@ -112,7 +85,7 @@ type ScalableFont struct {
 //TypeCase represents a font at a specific point size, e.g. "Helvetica bold 10pt".
 type TypeCase struct {
 	scalableFontParent *ScalableFont
-	font               font.Face // Go uses 'face' and 'font' in an inverse manner
+	font               xfont.Face // Go uses 'face' and 'font' in an inverse manner
 	size               float64
 	// script
 	// language
@@ -246,7 +219,7 @@ func NewRegistry() *Registry {
 // key is already associated with a font, that font will not be overridden.
 func (fr *Registry) StoreFont(normalizedName string, f *ScalableFont) {
 	if f == nil {
-		trace().Errorf("registry cannot store null font")
+		tracer().Errorf("registry cannot store null font")
 		return
 	}
 	fr.Lock()
@@ -254,7 +227,7 @@ func (fr *Registry) StoreFont(normalizedName string, f *ScalableFont) {
 	//style, weight := GuessStyleAndWeight(f.Fontname)
 	//fname := NormalizeFontname(f.Fontname, style, weight)
 	if _, ok := fr.fonts[normalizedName]; !ok {
-		trace().Debugf("registry stores font %s as %s", f.Fontname, normalizedName)
+		tracer().Debugf("registry stores font %s as %s", f.Fontname, normalizedName)
 		fr.fonts[normalizedName] = f
 	}
 }
@@ -269,23 +242,23 @@ func (fr *Registry) StoreFont(normalizedName string, f *ScalableFont) {
 //
 func (fr *Registry) TypeCase(normalizedName string, size float64) (*TypeCase, error) {
 	//
-	trace().Debugf("registry searches for font %s at %.2f", normalizedName, size)
+	tracer().Debugf("registry searches for font %s at %.2f", normalizedName, size)
 	//fname := NormalizeFontname(name, style, weight)
 	tname := appendSize(normalizedName, size)
 	fr.Lock()
 	defer fr.Unlock()
 	if t, ok := fr.typecases[tname]; ok {
-		trace().Infof("registry found font %s", tname)
+		tracer().Infof("registry found font %s", tname)
 		return t, nil
 	}
 	if f, ok := fr.fonts[normalizedName]; ok {
 		t, err := f.PrepareCase(size)
-		trace().Infof("font registry has font %s, caches at %.2f", normalizedName, size)
+		tracer().Infof("font registry has font %s, caches at %.2f", normalizedName, size)
 		t.scalableFontParent = f
 		fr.typecases[tname] = t
 		return t, err
 	}
-	trace().Infof("registry does not contain font %s", normalizedName)
+	tracer().Infof("registry does not contain font %s", normalizedName)
 	err := errors.New("font " + normalizedName + " not found in registry")
 	//
 	// store typecase from fallback font, if not present yet, and return it
@@ -296,7 +269,7 @@ func (fr *Registry) TypeCase(normalizedName string, size float64) (*TypeCase, er
 	}
 	f := FallbackFont()
 	t, _ := f.PrepareCase(size)
-	trace().Infof("font registry caches fallback font %s at %.2f", fname, size)
+	tracer().Infof("font registry caches fallback font %s at %.2f", fname, size)
 	fr.fonts[fname] = f
 	fr.typecases[tname] = t
 	return t, err
@@ -305,17 +278,17 @@ func (fr *Registry) TypeCase(normalizedName string, size float64) (*TypeCase, er
 // LogFontList is a helper function to dump the list of known fonts and typecases
 // in a registry to the trace-file (log-level Info).
 func (fr *Registry) LogFontList() {
-	level := trace().GetTraceLevel()
-	trace().SetTraceLevel(tracing.LevelInfo)
-	trace().Infof("--- registered fonts ---")
+	level := tracer().GetTraceLevel()
+	tracer().SetTraceLevel(tracing.LevelInfo)
+	tracer().Infof("--- registered fonts ---")
 	for k, v := range fr.fonts {
-		trace().Infof("font [%s] = %v", k, v.Fontname)
+		tracer().Infof("font [%s] = %v", k, v.Fontname)
 	}
 	for k, v := range fr.typecases {
-		trace().Infof("typecase [%s] = %v", k, v.scalableFontParent.Fontname)
+		tracer().Infof("typecase [%s] = %v", k, v.scalableFontParent.Fontname)
 	}
-	trace().Infof("------------------------")
-	trace().SetTraceLevel(level)
+	tracer().Infof("------------------------")
+	tracer().SetTraceLevel(level)
 }
 
 func NormalizeFontname(fname string, style xfont.Style, weight xfont.Weight) string {
@@ -381,7 +354,7 @@ func Matches(fontfilename, pattern string, style xfont.Style, weight xfont.Weigh
 	basename := path.Base(fontfilename)
 	basename = basename[:len(basename)-len(path.Ext(basename))]
 	basename = strings.ToLower(basename)
-	trace().Debugf("basename of font = %s", basename)
+	tracer().Debugf("basename of font = %s", basename)
 	if !strings.Contains(basename, strings.ToLower(pattern)) {
 		return false
 	}
@@ -418,7 +391,7 @@ func ClosestMatch(fdescs []Descriptor, pattern string, style xfont.Style,
 	//
 	r, err := regexp.Compile(strings.ToLower(pattern))
 	if err != nil {
-		trace().Errorf("invalid font name pattern")
+		tracer().Errorf("invalid font name pattern")
 		return
 	}
 	for _, fdesc := range fdescs {

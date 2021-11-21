@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	xfont "golang.org/x/image/font"
 )
 
@@ -16,9 +14,8 @@ type sw struct {
 }
 
 func TestGuess(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	for k, v := range map[string]sw{
 		"fonts/Clarendon-bold.ttf":               {xfont.StyleNormal, xfont.WeightBold},
@@ -34,9 +31,8 @@ func TestGuess(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	if !Matches("fonts/Clarendon-bold.ttf",
 		"clarendon", xfont.StyleNormal, xfont.WeightBold) {
@@ -53,9 +49,8 @@ func TestMatch(t *testing.T) {
 }
 
 func TestNormalizeFont(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	n := NormalizeFontname("Clarendon", xfont.StyleItalic, xfont.WeightBold)
 	if n != "clarendon-italic-bold" {

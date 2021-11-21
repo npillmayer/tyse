@@ -7,9 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/schukonf/testconfig"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core"
 	xfont "golang.org/x/image/font"
 )
@@ -19,8 +18,11 @@ import (
 // Tests in this file require a Google Font Service API-key to be present.
 // The API-key has to be set with the GOOGLE_API_KEY environment variable.
 
+var hasGoogleAPIKey bool
+
 func TestAPIKeyPresent(t *testing.T) {
 	if os.Getenv("GOOGLE_API_KEY") == "" {
+		hasGoogleAPIKey = false
 		t.Fatalf(`
 
 ATTENTION
@@ -30,6 +32,7 @@ The API-key has to be set with the GOOGLE_API_KEY environment variable.
 
 `)
 	}
+	hasGoogleAPIKey = true
 }
 
 const exampleRespFragm string = `
@@ -82,9 +85,8 @@ const exampleRespFragm string = `
 `
 
 func TestGoogleRespDecode(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	dec := json.NewDecoder(strings.NewReader(exampleRespFragm))
 	var list googleFontsList
@@ -96,9 +98,11 @@ func TestGoogleRespDecode(t *testing.T) {
 }
 
 func TestGoogleAPI(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	if !hasGoogleAPIKey {
+		return
+	}
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	err := setupGoogleFontsDirectory()
 	if err != nil {
@@ -108,9 +112,11 @@ func TestGoogleAPI(t *testing.T) {
 }
 
 func TestMatchFontname(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	if !hasGoogleAPIKey {
+		return
+	}
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	pattern := "Inconsolata"
 	r, err := regexp.Compile(strings.ToLower(pattern))
@@ -123,31 +129,39 @@ func TestMatchFontname(t *testing.T) {
 }
 
 func TestGoogleFindFont(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	if !hasGoogleAPIKey {
+		return
+	}
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	conf := testconfig.Conf{
+		"app-key": "tyse-test",
+	}
 	//
-	fi, err := FindGoogleFont("Inconsolata", xfont.StyleNormal, xfont.WeightNormal)
+	fi, err := FindGoogleFont(conf, "Inconsolata", xfont.StyleNormal, xfont.WeightNormal)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range fi {
 		t.Logf("family = %s, variants = %+v", f.Family, f.Variants)
 	}
-	fi, err = FindGoogleFont("Inconsolata", xfont.StyleItalic, xfont.WeightNormal)
+	_, err = FindGoogleFont(conf, "Inconsolata", xfont.StyleItalic, xfont.WeightNormal)
 	if err == nil {
 		t.Error("expected search for Inconsolata Italic to fail, did not")
 	}
 }
 
 func TestGoogleCacheFont(t *testing.T) {
-	teardown := testconfig.QuickConfig(t, map[string]string{
-		"app-key": "tyse-test",
-	})
+	if !hasGoogleAPIKey {
+		return
+	}
+	teardown := gotestingadapter.QuickConfig(t, "resources")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	conf := testconfig.Conf{
+		"app-key": "tyse-test",
+	}
 	//
-	fi, err := FindGoogleFont("Inconsolata", xfont.StyleNormal, xfont.WeightNormal)
+	fi, err := FindGoogleFont(conf, "Inconsolata", xfont.StyleNormal, xfont.WeightNormal)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -38,7 +38,7 @@ func DownloadCachedFile(filepath string, url string) error {
 // Returns the path to the cache-(sub-)folder or an error.
 //
 func CacheDirPath(subfolders ...string) (string, error) {
-	trace().Debugf("config[%s] = %s", "app-key", gconf.GetString("app-key"))
+	tracer().Debugf("config[%s] = %s", "app-key", gconf.GetString("app-key"))
 	if gconf.GetString("app-key") == "" {
 		return "", core.WrapError(errors.New("application key is not set"), core.EMISSING,
 			"application key is not configured; need to set it for cache access")
@@ -49,7 +49,7 @@ func CacheDirPath(subfolders ...string) (string, error) {
 	}
 	subs := path.Join(subfolders...)
 	cachedir = path.Join(cachedir, gconf.GetString("app-key"), subs)
-	trace().Debugf("caching in %s", cachedir)
+	tracer().Debugf("caching in %s", cachedir)
 	_, err = os.Stat(cachedir)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(cachedir, 0755)
