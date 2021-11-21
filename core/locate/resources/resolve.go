@@ -121,6 +121,7 @@ func (loader imageLoader) Image() (image.Image, error) {
 
 type fontPlusErr struct {
 	font *font.TypeCase
+	desc font.Descriptor
 	err  error
 }
 
@@ -128,14 +129,20 @@ type fontPlusErr struct {
 // A call to `TypeCase()` blocks until font loading is completed.
 type TypeCasePromise interface {
 	TypeCase() (*font.TypeCase, error)
+	Descriptor() font.Descriptor // descriptor of typecase to load, before and after
 }
 
 type fontLoader struct {
 	await func(ctx context.Context) (*font.TypeCase, error)
+	desc  font.Descriptor
 }
 
 func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 	return loader.await(context.Background())
+}
+
+func (loader fontLoader) Descriptor() font.Descriptor {
+	return loader.desc
 }
 
 // ResolveTypeCase resolves a font typecase with a given size.
@@ -173,12 +180,18 @@ func (loader fontLoader) TypeCase() (*font.TypeCase, error) {
 //
 func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
 	// TODO include a context parameter
+	desc := font.Descriptor{
+		Family: pattern,
+	}
 	ch := make(chan fontPlusErr)
 	go func(ch chan<- fontPlusErr) {
-		result := fontPlusErr{}
+		result := fontPlusErr{
+			desc: desc,
+		}
 		name := font.NormalizeFontname(pattern, style, weight)
 		if t, err := font.GlobalRegistry().TypeCase(name, size); err == nil {
 			result.font = t
+			result.desc.Family = t.ScalableFontParent().Fontname
 			ch <- result
 			close(ch)
 			return
@@ -200,6 +213,7 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 				defer file.Close()
 				bytez, _ := ioutil.ReadAll(file)
 				if f, result.err = font.ParseOpenTypeFont(bytez); result.err == nil {
+					result.desc.Family = fname
 					name = fname
 				}
 			}
@@ -235,6 +249,7 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 					if fpath, result.err = CacheGoogleFont(fiList[i], variant); result.err == nil {
 						f, result.err = font.LoadOpenTypeFont(fpath)
 						name = path.Base(fpath)
+						result.desc.Family = name
 					}
 				}
 			}
@@ -243,23 +258,26 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 			f.Fontname = name
 			font.GlobalRegistry().StoreFont(name, f)
 			result.font, result.err = font.GlobalRegistry().TypeCase(name, size)
+			result.desc.Family = name
 			//font.GlobalRegistry().DebugList()
 		} else { // use fallback font
 			result.font, _ = font.GlobalRegistry().TypeCase("fallback", size)
+			result.desc.Family = "fallback"
 		}
 		ch <- result
 		close(ch)
 	}(ch)
-	return fontLoader{
-		await: func(ctx context.Context) (*font.TypeCase, error) {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case r := <-ch:
-				return r.font, r.err
-			}
-		},
+	loader := fontLoader{desc: desc}
+	loader.await = func(ctx context.Context) (*font.TypeCase, error) {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case r := <-ch:
+			loader.desc = r.desc
+			return r.font, r.err
+		}
 	}
+	return loader
 }
 
 // FindLocalFont searches for a locally installed font variant.
