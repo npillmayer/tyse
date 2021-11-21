@@ -56,9 +56,9 @@ import (
 	"golang.org/x/image/font/sfnt"
 )
 
-// tracer writes to trace with key 'font'
+// tracer writes to trace with key 'tyse.font'
 func tracer() tracing.Trace {
-	return tracing.Select("font")
+	return tracing.Select("tyse.font")
 }
 
 const (

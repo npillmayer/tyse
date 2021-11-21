@@ -6,19 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
-func Test0(t *testing.T) {
-	gtrace.EngineTracer = gotestingadapter.New()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-}
-
 func TestAddChild(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	parent := NewNode(-1)
 	parent.AddChild(NewNode(0)).AddChild(NewNode(1))
 	ch4 := NewNode(4)
@@ -46,8 +40,9 @@ func TestAddChild(t *testing.T) {
 }
 
 func TestEmptyWalker(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	w := NewWalker(nil)
 	future := w.Parent().Promise()
@@ -64,8 +59,9 @@ func TestEmptyWalker(t *testing.T) {
 }
 
 func TestParent(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	node1, node2 := NewNode(1), NewNode(2)
 	node1.AddChild(node2) // simple tree: (1)-->(2)
@@ -82,8 +78,9 @@ func TestParent(t *testing.T) {
 }
 
 func TestParentOfRoot(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	node1 := NewNode(1)
 	w := NewWalker(node1)
@@ -99,8 +96,9 @@ func TestParentOfRoot(t *testing.T) {
 }
 
 func TestAncestor(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	node1, node2 := NewNode(1), NewNode(2)
 	node1.AddChild(node2) // simple tree: (1)-->(2)
@@ -120,8 +118,9 @@ func TestAncestor(t *testing.T) {
 }
 
 func TestDescendents(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	node1, node2, node3, node4 := NewNode(1), NewNode(2), NewNode(3), NewNode(4)
 	// build tree:
@@ -191,8 +190,9 @@ func ExampleWalker_Promise() {
 }
 
 func TestTopDown1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
 	//                 (root:1)
@@ -204,7 +204,7 @@ func TestTopDown1(t *testing.T) {
 	n2.AddChild(n3)
 	i := 0
 	myaction := func(n *Node, parent *Node, position int) (*Node, error) {
-		T().Debugf("input node is %v", n)
+		tracer().Debugf("input node is %v", n)
 		i++
 		return n, nil
 	}
@@ -220,8 +220,9 @@ func TestTopDown1(t *testing.T) {
 }
 
 func TestBottomUp1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
 	//                 (root:3)
@@ -234,7 +235,7 @@ func TestBottomUp1(t *testing.T) {
 	i := 0
 	nodevals := make([]int, 4)
 	myaction := func(n *Node, parent *Node, position int) (*Node, error) {
-		T().Debugf("node has value=%v", n.Payload)
+		tracer().Debugf("node has value=%v", n.Payload)
 		nodevals[i] = n.Payload.(int)
 		i++
 		return n, nil
@@ -252,8 +253,9 @@ func TestBottomUp1(t *testing.T) {
 }
 
 func TestBottomUp2(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
 	//                 (root:3)
@@ -266,7 +268,7 @@ func TestBottomUp2(t *testing.T) {
 	i := 0
 	nodevals := make([]int, 6)
 	myaction := func(n *Node, parent *Node, position int) (*Node, error) {
-		T().Debugf("node has value=%v", n.Payload)
+		tracer().Debugf("node has value=%v", n.Payload)
 		nodevals[i] = n.Payload.(int) // this is unreliably
 		i++
 		return n, nil
@@ -284,8 +286,9 @@ func TestBottomUp2(t *testing.T) {
 }
 
 func TestAttribute1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	node1 := NewNode(1)
 	w := NewWalker(node1)
@@ -319,8 +322,9 @@ func (a attr) SetAttribute(payload interface{}, key interface{}, value interface
 }
 
 func TestRank(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
 	//                 (root:3)
@@ -343,8 +347,9 @@ func TestRank(t *testing.T) {
 }
 
 func TestSerial1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
 	//                 (root:6)

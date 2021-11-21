@@ -3,9 +3,9 @@ package ot
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/schukonf/testconfig"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/core/locate/resources"
 )
@@ -26,9 +26,8 @@ func TestLookupRecordTypeString(t *testing.T) {
 }
 
 func TestTags(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	tag := Tag(0x636d6170)
 	if tag.String() != "cmap" {
@@ -45,9 +44,8 @@ func TestTags(t *testing.T) {
 }
 
 func TestTableName(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	tb := tableBase{}
 	tb.name = 0x636d6170
@@ -69,7 +67,11 @@ func loadTestFont(t *testing.T, pattern string) *Font {
 	if pattern == "fallback" {
 		otf.F = font.FallbackFont()
 	} else {
-		loader := resources.ResolveTypeCase(pattern, font.StyleNormal, font.WeightNormal, 10.0)
+		conf := testconfig.Conf{
+			"fontconfig": "/usr/local/bin/fc-list",
+			"app-key":    "tyse-test",
+		}
+		loader := resources.ResolveTypeCase(conf, pattern, font.StyleNormal, font.WeightNormal, 10.0)
 		tyc, err := loader.TypeCase()
 		if err != nil {
 			t.Fatal(err)

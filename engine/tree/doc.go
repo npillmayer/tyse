@@ -74,11 +74,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 package tree
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// T returns a global tracer. We're tracing to the EngineTracer
-func T() tracing.Trace {
-	return gtrace.EngineTracer
+// tracer returns a package tracer.
+func tracer() tracing.Trace {
+	return tracing.Select("tyse.frame.tree")
 }

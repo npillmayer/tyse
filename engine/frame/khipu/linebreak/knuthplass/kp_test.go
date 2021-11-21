@@ -9,7 +9,6 @@ import (
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
@@ -20,9 +19,9 @@ import (
 var graphviz = false // globally switches GraphViz output on/off
 
 func TestGraph1(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	parshape := linebreak.RectangularParShape(10 * 10 * dimen.BP)
 	g := newLinebreaker(parshape, nil)
@@ -58,10 +57,9 @@ func setupKPTest(t *testing.T, paragraph string, hyphens bool) (*khipu.Khipu, li
 }
 
 func TestKPUnderfull(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	kh, cursor, dotfile := setupKPTest(t, " ", false)
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	parshape := linebreak.RectangularParShape(10 * 10 * dimen.BP)
@@ -81,10 +79,9 @@ func TestKPUnderfull(t *testing.T) {
 }
 
 func TestKPExactFit(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	kh, cursor, dotfile := setupKPTest(t, "The quick.", false)
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	parshape := linebreak.RectangularParShape(10 * 10 * dimen.BP)
@@ -104,10 +101,9 @@ func TestKPExactFit(t *testing.T) {
 }
 
 func TestKPOverfull(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	kh, cursor, dotfile := setupKPTest(t, "The quick brown fox.", false)
 	params := NewKPDefaultParameters()
 	params.EmergencyStretch = dimen.Dimen(0)
@@ -133,11 +129,9 @@ var princess = `In olden times when wishing still helped one, there lived a king
 var king = `In olden times when wishing still helped one, there lived a king`
 
 func TestKPParaKing(t *testing.T) {
-	//gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
-	// teardown := gotestingadapter.RedirectTracing(t)
-	// defer teardown()
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
+	defer teardown()
+	//
 	kh, _, dotfile := setupKPTest(t, king, false)
 	cursor := linebreak.NewFixedWidthCursor(khipu.NewCursor(kh), 10*dimen.BP, 3)
 	params := NewKPDefaultParameters()
@@ -159,11 +153,9 @@ func TestKPParaKing(t *testing.T) {
 }
 
 func TestKPParaPrincess(t *testing.T) {
-	//gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
-	// teardown := gotestingadapter.RedirectTracing(t)
-	// defer teardown()
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
+	defer teardown()
+	//
 	kh, _, _ := setupKPTest(t, princess, false)
 	// change to cursor with flexible interword-spacing
 	cursor := linebreak.NewFixedWidthCursor(khipu.NewCursor(kh), 10*dimen.BP, 2)

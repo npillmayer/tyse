@@ -3,9 +3,9 @@ package otlayout
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/schukonf/testconfig"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/core/font/opentype/ot"
@@ -13,9 +13,8 @@ import (
 )
 
 func TestTagRegistry(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	typ, err := identifyFeatureTag(ot.T("liga"))
 	if err != nil {
@@ -27,9 +26,8 @@ func TestTagRegistry(t *testing.T) {
 }
 
 func TestCalibriCMap(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
 	t.Logf("Using font %s for test", otf.F.Fontname)
@@ -43,9 +41,8 @@ func TestCalibriCMap(t *testing.T) {
 }
 
 func TestFeatureList(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
 	t.Logf("Using font %s for test", otf.F.Fontname)
@@ -77,9 +74,8 @@ func TestFeatureList(t *testing.T) {
 }
 
 func TestFeatureCase(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
 	t.Logf("Using font %s for test", otf.F.Fontname)
@@ -134,9 +130,8 @@ Calibri:
 					<Ligature components="glyph03780" glyph="glyph03786"/>
 */
 func TestFeatureCCMPCalibri(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
 	t.Logf("Using font %s for test", otf.F.Fontname)
@@ -171,9 +166,8 @@ func TestFeatureCCMPCalibri(t *testing.T) {
 }
 
 func TestFeatureCCMPGentium(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "GentiumPlus-R")
 	t.Logf("Using font %s for test", otf.F.Fontname)
@@ -244,7 +238,11 @@ func loadTestFont(t *testing.T, pattern string) *ot.Font {
 	if pattern == "fallback" {
 		otf.F = font.FallbackFont()
 	} else {
-		loader := resources.ResolveTypeCase(pattern, font.StyleNormal, font.WeightNormal, 10.0)
+		conf := testconfig.Conf{
+			"fontconfig": "/usr/local/bin/fc-list",
+			"app-key":    "tyse-test",
+		}
+		loader := resources.ResolveTypeCase(conf, pattern, font.StyleNormal, font.WeightNormal, 10.0)
 		tyc, err := loader.TypeCase()
 		if err != nil {
 			t.Fatal(err)

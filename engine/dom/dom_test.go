@@ -5,9 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
@@ -16,15 +13,6 @@ import (
 )
 
 var graphviz = false
-
-func T() tracing.Trace {
-	return gtrace.EngineTracer
-}
-
-func Test0(t *testing.T) {
-	gtrace.EngineTracer = gotestingadapter.New()
-	//gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-}
 
 var myhtml = `
 <html><head>
@@ -52,9 +40,8 @@ func buildDOM(t *testing.T) *dom.W3CNode {
 }
 
 func TestW3CDoc(t *testing.T) {
-	gtrace.EngineTracer = gologadapter.New()
-	gtrace.CommandTracer.SetTraceLevel(tracing.LevelDebug)
-	//defer teardown()
+	teardown := gotestingadapter.QuickConfig(t, "tyse.engine")
+	defer teardown()
 	//
 	root := buildDOM(t)
 	//
@@ -68,8 +55,9 @@ func TestW3CDoc(t *testing.T) {
 }
 
 func TestW3CDom1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.engine")
 	defer teardown()
+	//
 	root := buildDOM(t)
 	if graphviz {
 		gvz, _ := ioutil.TempFile(".", "w3c-*.dot")
@@ -83,8 +71,9 @@ func TestW3CDom1(t *testing.T) {
 }
 
 func TestW3CTextContent1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.engine")
 	defer teardown()
+	//
 	root := buildDOM(t)
 	root.Walk().DescendentsWith(tree.NodeIsLeaf).BottomUp(tree.CalcRank).Promise()()
 	n, _ := dom.NodeAsTreeNode(root)
@@ -97,8 +86,9 @@ func TestW3CTextContent1(t *testing.T) {
 }
 
 func TestW3CStyles1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.engine")
 	defer teardown()
+	//
 	root := buildDOM(t)
 	body := root.FirstChild().FirstChild().NextSibling().(*dom.W3CNode)
 	props := body.ComputedStyles()

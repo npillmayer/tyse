@@ -25,7 +25,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// tracer traces to tracing key 'resources'.
+// tracer traces to tracing key 'tyse.resources'.
 func tracer() tracing.Trace {
-	return tracing.Select("resources")
+	return tracing.Select("tyse.resources")
 }

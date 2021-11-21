@@ -3,15 +3,12 @@ package dimen
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestParseDimen(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.core")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	d, _, err := ParseDimen("12px")
 	if err != nil {

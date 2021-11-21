@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
@@ -19,10 +18,9 @@ import (
 var graphviz = false // global switch for GraphViz DOT output
 
 func TestBuffer(t *testing.T) {
-	//gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	lb, _ := newTestLinebreaker(t, "Hello World!", 20)
 	k, ok := lb.peek()
 	if !ok || k.Type() != khipu.KTTextBox {
@@ -36,10 +34,9 @@ func TestBuffer(t *testing.T) {
 }
 
 func TestBacktrack(t *testing.T) {
-	//gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	lb, _ := newTestLinebreaker(t, "the quick brown fox jumps over the lazy dog.", 30)
 	k := lb.next()
 	lb.checkpoint()
@@ -58,10 +55,9 @@ func TestBacktrack(t *testing.T) {
 	}
 }
 func TestLinebreak(t *testing.T) {
-	// gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	lb, kh := newTestLinebreaker(t, "the quick brown fox jumps over the lazy dog.", 30)
 	breakpoints, err := lb.FindBreakpoints()
 	if err != nil {
@@ -84,10 +80,9 @@ func TestLinebreak(t *testing.T) {
 var princess = `In olden times when wishing still helped one, there lived a king whose daughters were all beautiful; and the youngest was so beautiful that the sun itself, which has seen so much, was astonished whenever it shone in her face. Close by the king's castle lay a great dark forest, and under an old lime-tree in the forest was a well, and when the day was very warm, the king's child went out into the forest and sat down by the side of the cool fountain; and when she was bored she took a golden ball, and threw it up on high and caught it; and this ball was her favorite plaything.`
 
 func TestPrincess(t *testing.T) {
-	// gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	//
 	lb, kh := newTestLinebreaker(t, princess, 45)
 	kh.AppendKnot(khipu.Penalty(-10000)) // TODO: add parfillskip
 	breakpoints, err := lb.FindBreakpoints()
@@ -121,7 +116,7 @@ func newTestLinebreaker(t *testing.T, text string, len int) (*linebreaker, *khip
 }
 
 func setupFFTest(t *testing.T, paragraph string, hyphens bool) (*khipu.Khipu, linebreak.Cursor, io.Writer) {
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
+	tracing.Select("tyse.frame").SetTraceLevel(tracing.LevelError)
 	regs := parameters.NewTypesettingRegisters()
 	if hyphens {
 		regs.Push(parameters.P_MINHYPHENLENGTH, 3) // allow hyphenation
@@ -142,7 +137,7 @@ func setupFFTest(t *testing.T, paragraph string, hyphens bool) (*khipu.Khipu, li
 			t.Errorf(err.Error())
 		}
 	}
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	tracing.Select("tyse.frame").SetTraceLevel(tracing.LevelDebug)
 	return kh, cursor, dotfile
 }
 

@@ -5,13 +5,8 @@ import (
 	"testing"
 
 	"github.com/npillmayer/schuko/gconf"
-	"github.com/npillmayer/schuko/testadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
-
-func init() {
-	gconf.Initialize(testadapter.New())
-}
 
 var germanDict, usDict *Dictionary
 
@@ -34,8 +29,9 @@ func TestDEPatterns(t *testing.T) {
 }
 
 func TestDEPatterns2(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.core.hyphenation")
 	defer teardown()
+	//
 	s := germanDict.Hyphenate("Ausnahme")
 	t.Logf("Ausnahme = %v (%d)\n", s, len(s))
 	if len(s) != 3 || s[0] != "Aus" {
@@ -44,8 +40,9 @@ func TestDEPatterns2(t *testing.T) {
 }
 
 func TestUSPatterns(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.core.hyphenation")
 	defer teardown()
+	//
 	h := usDict.HyphenationString("hello")
 	if h != "hel-lo" {
 		t.Logf("hello should be hel-lo, is %s", h)

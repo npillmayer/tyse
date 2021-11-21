@@ -228,7 +228,7 @@ func (w *Walker) Parent() *Walker {
 		return nil
 	}
 	if err := w.appendFilterForTask(parent, nil, 0); err != nil {
-		T().Errorf(err.Error())
+		tracer().Errorf(err.Error())
 		panic(err)
 	}
 	return w
@@ -260,7 +260,7 @@ func (w *Walker) AncestorWith(predicate Predicate) *Walker {
 	} else {
 		err := w.appendFilterForTask(ancestorWith, predicate, 0) // hook in this filter
 		if err != nil {
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			panic(err)
 		}
 	}
@@ -305,7 +305,7 @@ func (w *Walker) DescendentsWith(predicate Predicate) *Walker {
 	} else {
 		err := w.appendFilterForTask(descendentsWith, predicate, 5) // need a helper queue
 		if err != nil {                                             // this should never happen here
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			panic(err) // for debugging as long as this is unstable
 		}
 	}
@@ -322,7 +322,7 @@ func descendentsWith(node *Node, isBuffered bool, udata userdata, push func(*Nod
 		if serial == 0 {
 			serial = node.Rank
 		}
-		T().Debugf("Predicate for node %s returned: %v, err=%v", node, matchedNode, err)
+		tracer().Debugf("Predicate for node %s returned: %v, err=%v", node, matchedNode, err)
 		if err != nil {
 			return err // do not descend further
 		}
@@ -381,7 +381,7 @@ func (w *Walker) AttributeIs(key interface{}, value interface{}) *Walker {
 		attr := attrInfo{w.attributeHandler, key, value}
 		err := w.appendFilterForTask(attributeIs, attr, 0) // hook in this filter
 		if err != nil {
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			panic(err)
 		}
 	}
@@ -428,7 +428,7 @@ func (w *Walker) SetAttribute(key interface{}, value interface{}) *Walker {
 		attr := attrInfo{w.attributeHandler, key, value}
 		err := w.appendFilterForTask(attributeIs, attr, 0) // hook in this filter
 		if err != nil {
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			panic(err)
 		}
 	}
@@ -467,7 +467,7 @@ func (w *Walker) Filter(f Predicate) *Walker {
 	} else {
 		err := w.appendFilterForTask(clientFilter, f, 0) // hook in this filter
 		if err != nil {
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			panic(err)
 		}
 	}
@@ -509,7 +509,7 @@ func (w *Walker) TopDown(action Action) *Walker {
 	} else {
 		err := w.appendFilterForTask(topDown, action, 5) // need a helper queue
 		if err != nil {
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			panic(err) // TODO for debugging purposes until more mature
 		}
 	}
@@ -538,7 +538,7 @@ func topDown(node *Node, isBuffered bool, udata userdata, push func(*Node, uint3
 			serial = node.Rank
 		}
 		result, err := action(node, parent, position)
-		T().Debugf("Action for node %s returned: %v, err=%v", node, result, err)
+		tracer().Debugf("Action for node %s returned: %v, err=%v", node, result, err)
 		if err != nil {
 			return err // do not descend further
 		}
@@ -580,7 +580,7 @@ func (w *Walker) BottomUp(action Action) *Walker {
 		}
 		err := w.appendFilterForTask(bottomUp, filterdata, 5) // need a helper queue
 		if err != nil {
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			panic(err) // TODO for debugging purposes until more mature
 		}
 	}

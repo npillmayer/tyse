@@ -3,9 +3,9 @@ package otquery
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/schukonf/testconfig"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/core/font/opentype/ot"
@@ -14,9 +14,8 @@ import (
 )
 
 func TestScriptMatch(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	f := loadTestFont(t, "calibri")
 	otf, err := ot.Parse(f.F.Binary)
@@ -44,7 +43,11 @@ func loadTestFont(t *testing.T, pattern string) *ot.Font {
 	if pattern == "fallback" {
 		otf.F = font.FallbackFont()
 	} else {
-		loader := resources.ResolveTypeCase(pattern, font.StyleNormal, font.WeightNormal, 10.0)
+		conf := testconfig.Conf{
+			"fontconfig": "/usr/local/bin/fc-list",
+			"app-key":    "tyse-test",
+		}
+		loader := resources.ResolveTypeCase(conf, pattern, font.StyleNormal, font.WeightNormal, 10.0)
 		tyc, err := loader.TypeCase()
 		if err != nil {
 			t.Fatal(err)
