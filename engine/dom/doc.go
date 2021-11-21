@@ -66,11 +66,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
 package dom
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// T will return a tracer. We are tracing to the EngineTracer
-func T() tracing.Trace {
-	return gtrace.EngineTracer
+// tracer will return a tracer. We are tracing to 'tyse.engine'
+func tracer() tracing.Trace {
+	return tracing.Select("tyse.tracing")
 }

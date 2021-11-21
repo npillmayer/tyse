@@ -63,7 +63,7 @@ func NodeAsTreeNode(domnode w3cdom.Node) (*tree.Node, bool) {
 	}
 	w, ok := domnode.(*W3CNode)
 	if !ok {
-		T().Errorf("DOM node has not been created from w3cdom.go")
+		tracer().Errorf("DOM node has not been created from w3cdom.go")
 		return nil, false
 	}
 	//return &w.stylednode.Node, true
@@ -274,7 +274,7 @@ func (w *W3CNode) TextContent() (string, error) {
 	future := w.Walk().DescendentsWith(NodeIsText).Promise()
 	textnodes, err := future()
 	if err != nil {
-		T().Errorf(err.Error())
+		tracer().Errorf(err.Error())
 		return "(ERROR: " + err.Error() + " )", err
 	}
 	var b bytes.Buffer
@@ -348,7 +348,7 @@ func (cstyles *computedStyles) GetPropertyValue(key string) style.Property {
 	}
 	p, err := css.GetProperty(cstyles.domnode.AsStyler(), key)
 	if err != nil {
-		T().Errorf("W3C node styles: %v", err)
+		tracer().Errorf("W3C node styles: %v", err)
 		node := &cstyles.domnode.Node
 		return cstyles.propsMap.GetPropertyValue(key, node, styler)
 	}
@@ -544,11 +544,11 @@ func (wl *W3CNodeList) String() string {
 // FromHTMLParseTree returns a W3C DOM from parsed HTML and an optional style sheet.
 func FromHTMLParseTree(h *html.Node, css cssom.StyleSheet) *W3CNode {
 	if h == nil {
-		T().Infof("Cannot create DOM for null-HTML")
+		tracer().Infof("Cannot create DOM for null-HTML")
 		return nil
 	}
 	styles := douceuradapter.ExtractStyleElements(h)
-	T().Debugf("Extracted %d <style> elements", len(styles))
+	tracer().Debugf("Extracted %d <style> elements", len(styles))
 	s := cssom.NewCSSOM(nil) // nil = no additional properties
 	for _, sty := range styles {
 		s.AddStylesForScope(nil, sty, cssom.Script)
@@ -558,7 +558,7 @@ func FromHTMLParseTree(h *html.Node, css cssom.StyleSheet) *W3CNode {
 	}
 	stytree, err := s.Style(h, styledtree.Creator())
 	if err != nil {
-		T().Errorf("Cannot style test document: %s", err.Error())
+		tracer().Errorf("Cannot style test document: %s", err.Error())
 		return nil
 	}
 	d := domify(stytree)
@@ -573,7 +573,7 @@ func (w *W3CNode) XPath() *xpath.XPath {
 	nav := xpathadapter.NewNavigator(w.StyNode)
 	xp, err := xpath.NewXPath(nav, xpathadapter.CurrentNode)
 	if err != nil {
-		T().Errorf("dom xpath: %v", err.Error())
+		tracer().Errorf("dom xpath: %v", err.Error())
 		return nil
 	}
 	return xp

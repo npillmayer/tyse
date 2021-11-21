@@ -58,11 +58,11 @@ func Match(o Type, choices interface{}) (value interface{}, err error) {
 }
 
 func (of Of) Match(o Type) (value interface{}, err error) {
-	Tracer().Debugf("Match(Type=%T) for %T", of, o)
+	tracer().Debugf("Match(Type=%T) for %T", of, o)
 	if o.IsNone() {
-		Tracer().Debugf("o is None")
+		tracer().Debugf("o is None")
 		if expr, ok := of[None]; ok {
-			Tracer().Debugf("matched nil expr=%T %v", expr, expr)
+			tracer().Debugf("matched nil expr=%T %v", expr, expr)
 			value, err = valueOrExpr(expr, o, None)
 		} else {
 			err = ErrCannotMatchUnsetValue
@@ -73,61 +73,61 @@ func (of Of) Match(o Type) (value interface{}, err error) {
 		for k, expr := range of {
 			if o.Equals(k) {
 				matched = true
-				Tracer().Debugf("matched expr=%T %v", expr, expr)
+				tracer().Debugf("matched expr=%T %v", expr, expr)
 				value, err = valueOrExpr(expr, o, Some)
 			}
 		}
 		if !matched {
 			if expr, ok := of[Some]; ok {
-				Tracer().Debugf("matched some expr=%T %v", expr, expr)
+				tracer().Debugf("matched some expr=%T %v", expr, expr)
 				value, err = valueOrExpr(expr, o, Some)
 			}
 		}
 		if err != nil {
-			Tracer().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			if expr, ok := of[Error]; ok {
 				value, err = valueOrExpr(expr, o, Error)
 			}
 		}
 	}
-	Tracer().Debugf("===> return %v (%T) with error=%v", value, value, err)
+	tracer().Debugf("===> return %v (%T) with error=%v", value, value, err)
 	return value, err
 }
 
 func (maybe Maybe) Match(o Type) (value interface{}, err error) {
-	Tracer().Debugf("Match(Type=%T) for %T", maybe, o)
+	tracer().Debugf("Match(Type=%T) for %T", maybe, o)
 	if o.IsNone() {
-		Tracer().Debugf("o is None")
+		tracer().Debugf("o is None")
 		if expr, ok := maybe[None]; ok {
-			Tracer().Debugf("matched nil expr=%T %v", expr, expr)
+			tracer().Debugf("matched nil expr=%T %v", expr, expr)
 			value, err = valueOrExpr(expr, o, None)
 		} else {
 			err = ErrCannotMatchUnsetValue
 		}
 	} else {
 		if expr, ok := maybe[Some]; ok {
-			Tracer().Debugf("matched some expr=%T %v", expr, expr)
+			tracer().Debugf("matched some expr=%T %v", expr, expr)
 			value, err = valueOrExpr(expr, o, Some)
 		}
 		if err != nil {
-			Tracer().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			if expr, ok := maybe[Error]; ok {
 				value, err = valueOrExpr(expr, o, Error)
 			}
 		}
 	}
-	Tracer().Debugf("===> return %v (%T) with error=%v", value, value, err)
+	tracer().Debugf("===> return %v (%T) with error=%v", value, value, err)
 	return value, err
 }
 
 func valueOrExpr(op interface{}, value Type, t MaybeOption) (interface{}, error) {
-	Tracer().Debugf("value or expr %v(%v), t=%v", op, value, t)
+	tracer().Debugf("value or expr %v(%v), t=%v", op, value, t)
 	switch x := op.(type) {
 	case func(interface{}, MaybeOption) (interface{}, error):
-		Tracer().Debugf("calling func(value, type)")
+		tracer().Debugf("calling func(value, type)")
 		return x(value, t)
 	case func(interface{}) (interface{}, error):
-		Tracer().Debugf("calling func(value)")
+		tracer().Debugf("calling func(value)")
 		return x(value)
 	}
 	return op, nil
@@ -193,7 +193,7 @@ func (o Int64T) Match(choices interface{}) (value interface{}, err error) {
 }
 
 func (o Int64T) Equals(other interface{}) bool {
-	Tracer().Debugf("EQUALS %v ? %v", o, other)
+	tracer().Debugf("EQUALS %v ? %v", o, other)
 	switch i := other.(type) {
 	case int64:
 		return int64(o) == i

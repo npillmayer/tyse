@@ -77,11 +77,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package option
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// Tracer traces to the core tracer.
-func Tracer() tracing.Trace {
-	return gtrace.CoreTracer
+// tracer traces to 'tyse.core'.
+func tracer() tracing.Trace {
+	return tracing.Select("tyse.core")
 }
