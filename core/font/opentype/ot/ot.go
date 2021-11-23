@@ -212,12 +212,16 @@ func (self TableSelf) NameTag() Tag {
 	return self.tableBase.name
 }
 
+func safeSelf(self TableSelf) interface{} {
+	if self.tableBase == nil || self.tableBase.self == nil {
+		return TableSelf{}
+	}
+	return self.tableBase.self
+}
+
 // AsCMap returns this table as a cmap table, or nil.
 func (self TableSelf) AsCMap() *CMapTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if k, ok := self.tableBase.self.(*CMapTable); ok {
+	if k, ok := safeSelf(self).(*CMapTable); ok {
 		return k
 	}
 	return nil
@@ -225,10 +229,7 @@ func (self TableSelf) AsCMap() *CMapTable {
 
 // AsGPos returns this table as a GPOS table, or nil.
 func (self TableSelf) AsGPos() *GPosTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if g, ok := self.tableBase.self.(*GPosTable); ok {
+	if g, ok := safeSelf(self).(*GPosTable); ok {
 		return g
 	}
 	return nil
@@ -236,10 +237,7 @@ func (self TableSelf) AsGPos() *GPosTable {
 
 // AsGSub returns this table as a GSUB table, or nil.
 func (self TableSelf) AsGSub() *GSubTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if g, ok := self.tableBase.self.(*GSubTable); ok {
+	if g, ok := safeSelf(self).(*GSubTable); ok {
 		return g
 	}
 	return nil
@@ -247,10 +245,7 @@ func (self TableSelf) AsGSub() *GSubTable {
 
 // AsGDef returns this table as a GDEF table, or nil.
 func (self TableSelf) AsGDef() *GDefTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if g, ok := self.tableBase.self.(*GDefTable); ok {
+	if g, ok := safeSelf(self).(*GDefTable); ok {
 		return g
 	}
 	return nil
@@ -258,10 +253,7 @@ func (self TableSelf) AsGDef() *GDefTable {
 
 // AsLoca returns this table as a kern table, or nil.
 func (self TableSelf) AsLoca() *LocaTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if k, ok := self.tableBase.self.(*LocaTable); ok {
+	if k, ok := safeSelf(self).(*LocaTable); ok {
 		return k
 	}
 	return nil
@@ -269,10 +261,7 @@ func (self TableSelf) AsLoca() *LocaTable {
 
 // AsMaxP returns this table as a kern table, or nil.
 func (self TableSelf) AsMaxP() *MaxPTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if k, ok := self.tableBase.self.(*MaxPTable); ok {
+	if k, ok := safeSelf(self).(*MaxPTable); ok {
 		return k
 	}
 	return nil
@@ -280,21 +269,15 @@ func (self TableSelf) AsMaxP() *MaxPTable {
 
 // AsKern returns this table as a kern table, or nil.
 func (self TableSelf) AsKern() *KernTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if k, ok := self.tableBase.self.(*KernTable); ok {
+	if k, ok := safeSelf(self).(*KernTable); ok {
 		return k
 	}
 	return nil
 }
 
-// AsHead returns this table as a hhea table, or nil.
+// AsHead returns this table as a head table, or nil.
 func (self TableSelf) AsHead() *HeadTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if k, ok := self.tableBase.self.(*HeadTable); ok {
+	if k, ok := safeSelf(self).(*HeadTable); ok {
 		return k
 	}
 	return nil
@@ -302,21 +285,15 @@ func (self TableSelf) AsHead() *HeadTable {
 
 // AsHHea returns this table as a hhea table, or nil.
 func (self TableSelf) AsHHea() *HHeaTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if k, ok := self.tableBase.self.(*HHeaTable); ok {
+	if k, ok := safeSelf(self).(*HHeaTable); ok {
 		return k
 	}
 	return nil
 }
 
-// AsHMtx returns this table as a hhea table, or nil.
+// AsHMtx returns this table as a hmtx table, or nil.
 func (self TableSelf) AsHMtx() *HMtxTable {
-	if self.tableBase == nil || self.tableBase.self == nil {
-		return nil
-	}
-	if k, ok := self.tableBase.self.(*HMtxTable); ok {
+	if k, ok := safeSelf(self).(*HMtxTable); ok {
 		return k
 	}
 	return nil

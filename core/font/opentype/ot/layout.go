@@ -61,7 +61,7 @@ func (h *LayoutHeader) offsetFor(which layoutTableSectionName) int {
 	case layoutFeatureVariationsSection:
 		return int(h.offsets.FeatureVariationsOffset)
 	}
-	trace().Errorf("illegal section offset type into layout table: %d", which)
+	tracer().Errorf("illegal section offset type into layout table: %d", which)
 	return 0 // illegal call, nothing sensible to return
 }
 
@@ -240,7 +240,7 @@ func (h GDefHeader) offsetFor(which string) int {
 	case GDefItemVarStoreSection:
 		return int(h.ItemVarStoreOffset)
 	}
-	trace().Errorf("illegal section offset type into GDEF table: %d", which)
+	tracer().Errorf("illegal section offset type into GDEF table: %d", which)
 	return 0 // illegal call, nothing sensible to return
 }
 
@@ -298,7 +298,7 @@ type coverageHeader struct {
 }
 
 func buildGlyphRangeFromCoverage(chead coverageHeader, b fontBinSegm) GlyphRange {
-	trace().Debugf("coverage format = %d, count = %d", chead.CoverageFormat, chead.Count)
+	tracer().Debugf("coverage format = %d, count = %d", chead.CoverageFormat, chead.Count)
 	if chead.CoverageFormat == 1 {
 		return &glyphRangeArray{
 			is32:     false,                  // entries are uint16
@@ -405,7 +405,7 @@ func (cdef *ClassDefinitions) makeArray(b fontBinSegm, numEntries int, format ui
 		size = 4 + numEntries*recsize
 		b = b[4:size]
 	default:
-		trace().Errorf("illegal format %d of class definition table", format)
+		tracer().Errorf("illegal format %d of class definition table", format)
 		return array{}
 	}
 	return array{recordSize: recsize, length: numEntries, loc: b}
@@ -580,7 +580,7 @@ func (ll LookupList) Navigate(i int) Lookup {
 	lookupPtr := ll.Get(i)
 	lookup := ll.base[lookupPtr.U16(0):]
 	ll.lookupsCache[i] = viewLookup(lookup)
-	trace().Debugf("cached new lookup #%d of type %d", i, ll.lookupsCache[i].Type)
+	tracer().Debugf("cached new lookup #%d of type %d", i, ll.lookupsCache[i].Type)
 	return ll.lookupsCache[i]
 }
 
@@ -633,22 +633,22 @@ type lookupInfo struct {
 // viewLookup reads a Lookup from the bytes of a NavLocation. It first parses the
 // lookupInfo and after that parses the subtable record list.
 func viewLookup(b NavLocation) Lookup {
-	trace().Debugf("lookup location has size %d", b.Size())
+	tracer().Debugf("lookup location has size %d", b.Size())
 	if b.Size() < 10 {
 		return Lookup{}
 	}
 	r := b.Reader()
 	lookup := Lookup{loc: b}
 	if err := binary.Read(r, binary.BigEndian, &lookup.lookupInfo); err != nil {
-		trace().Errorf("corrupt Lookup table")
+		tracer().Errorf("corrupt Lookup table")
 		return Lookup{} // nothing sensible to to except to return empty table
 	}
-	trace().Debugf("Lookup has %d sub-tables", lookup.SubTableCount)
+	tracer().Debugf("Lookup has %d sub-tables", lookup.SubTableCount)
 	//
 	var err error
 	lookup.subTables, err = parseArray16(b.Bytes(), 4)
 	if err != nil {
-		trace().Errorf("corrupt Lookup table")
+		tracer().Errorf("corrupt Lookup table")
 		return Lookup{} // nothing sensible to to except to return empty table
 	}
 	if b.Size() >= 4+lookup.subTables.Size()+2 {
@@ -666,7 +666,7 @@ func (l Lookup) Subtable(i int) *LookupSubtable {
 		l.subTablesCache = make([]LookupSubtable, l.SubTableCount)
 		for i := 0; i < l.subTables.length; i++ {
 			n := l.subTables.Get(i).U16(0) // offset to subtable[i]
-			trace().Debugf("lookup subtable at offset %d", n)
+			tracer().Debugf("lookup subtable at offset %d", n)
 			link := makeLink16(n, l.loc.Bytes(), "LookupSubtable") // wrap offset into link
 			loc := link.Jump()
 			b := fontBinSegm(loc.Bytes())

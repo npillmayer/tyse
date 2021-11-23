@@ -37,7 +37,7 @@ type NavMap interface {
 }
 
 func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
-	trace().Debugf("navigator factory for %s", obj)
+	tracer().Debugf("navigator factory for %s", obj)
 	switch obj {
 	case "Script":
 		l, err := parseLink16(loc.Bytes(), 0, loc.Bytes(), "LangSys")
@@ -49,8 +49,8 @@ func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
 			tmap: parseTagRecordMap16(loc.Bytes(), 2, loc.Bytes(), "Script", "LangSys"),
 		}
 	case "LangSys":
-		trace().Debugf("%s[0] = %x", obj, u16(loc.Bytes()))
-		trace().Debugf("%s[2] = %x", obj, u16(loc.Bytes()[2:]))
+		tracer().Debugf("%s[0] = %x", obj, u16(loc.Bytes()))
+		tracer().Debugf("%s[2] = %x", obj, u16(loc.Bytes()[2:]))
 		lsys, err := parseLangSys(loc.Bytes(), 2, "Feature-Index")
 		if err != nil {
 			return null(err)
@@ -83,12 +83,12 @@ func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
 		return navName{name: name}
 	}
 	if fields, ok := tableFields[obj]; ok {
-		trace().Debugf("object %s has fields %v", obj, fields)
+		tracer().Debugf("object %s has fields %v", obj, fields)
 		size := int(fields[0]) // total byte size of fields
 		f := otFields{pattern: fields[1:], b: base[:size]}
 		return list{navName: navName{name: obj}, f: f}
 	}
-	trace().Debugf("no navigator found -> null navigator")
+	tracer().Debugf("no navigator found -> null navigator")
 	return null(errDanglingLink(obj))
 }
 

@@ -94,7 +94,7 @@ func platformEncodingWidth(pid, psid uint16) int {
 // https://github.com/fontforge/fontforge/issues/2728
 //
 func supportedCmapFormat(format, pid, psid uint16) bool {
-	trace().Debugf("checking supported cmap format (%d | %d | %d)", pid, psid, format)
+	tracer().Debugf("checking supported cmap format (%d | %d | %d)", pid, psid, format)
 	return (pid == 0 && psid == 3 && format == 4) ||
 		(pid == 0 && psid == 4 && format == 12) ||
 		(pid == 3 && psid == 1 && format == 4) ||
@@ -155,7 +155,7 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 		} else if entry.end < c {
 			i = h + 1
 		} else if entry.offset == 0 {
-			trace().Debugf("direct access of glyph ID as delta = %d", c+entry.delta)
+			tracer().Debugf("direct access of glyph ID as delta = %d", c+entry.delta)
 			return GlyphIndex(c + entry.delta)
 		} else {
 			// The spec describes the calculation the find the link into the glyph ID array
@@ -223,7 +223,7 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 	size, _ := b.u16(2)
 	segCount, _ := b.u16(6)
 	if segCount&1 != 0 {
-		trace().Debugf("cmap format 4 segment count is %d", segCount)
+		tracer().Debugf("cmap format 4 segment count is %d", segCount)
 		return nil, errFontFormat("cmap table format, illegal segment count")
 	}
 	segCount /= 2
@@ -253,7 +253,7 @@ func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
 		}
 	}
 	glyphTable := viewArray16(b[next:])
-	trace().Debugf("cmap format 4 glyph table starts at offset %d", next)
+	tracer().Debugf("cmap format 4 glyph table starts at offset %d", next)
 	return format4GlyphIndex{
 		segCnt:   int(segCount),
 		entries:  entries,

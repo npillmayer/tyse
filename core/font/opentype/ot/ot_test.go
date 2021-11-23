@@ -58,9 +58,9 @@ func TestTableName(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func loadTestFont(t *testing.T, pattern string) *Font {
-	level := trace().GetTraceLevel()
-	trace().SetTraceLevel(tracing.LevelInfo)
-	defer trace().SetTraceLevel(level)
+	level := tracer().GetTraceLevel()
+	tracer().SetTraceLevel(tracing.LevelInfo)
+	defer tracer().SetTraceLevel(level)
 	//
 	//var err error
 	otf := &Font{}

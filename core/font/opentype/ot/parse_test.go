@@ -3,16 +3,13 @@ package ot
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core"
 )
 
 func TestParseHeader(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	f := loadTestFont(t, "gentiumplus")
 	otf, err := Parse(f.F.Binary)
@@ -28,9 +25,8 @@ func TestParseHeader(t *testing.T) {
 
 // TODO TODO
 func TestCMapTableGlyphIndex(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
 	t.Logf("otf.header.tag = %x", otf.Header.FontType)
@@ -51,9 +47,8 @@ func TestCMapTableGlyphIndex(t *testing.T) {
 }
 
 func TestParseGPos(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	f := loadTestFont(t, "calibri")
 	otf, err := Parse(f.F.Binary)
@@ -97,9 +92,8 @@ func TestParseGPos(t *testing.T) {
 }
 
 func TestParseGSub(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	f := loadTestFont(t, "gentiumplus")
 	otf, err := Parse(f.F.Binary)
@@ -141,9 +135,8 @@ func TestParseGSub(t *testing.T) {
 }
 
 func TestParseKern(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	f := loadTestFont(t, "calibri")
 	otf, err := Parse(f.F.Binary)
@@ -169,9 +162,8 @@ func TestParseKern(t *testing.T) {
 }
 
 func TestParseOtherTables(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	f := loadTestFont(t, "calibri")
 	otf, err := Parse(f.F.Binary)
@@ -202,9 +194,8 @@ func TestParseOtherTables(t *testing.T) {
 }
 
 func TestParseGDef(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
 	table := getTable(otf, "GDEF", t)
@@ -223,9 +214,8 @@ func TestParseGDef(t *testing.T) {
 }
 
 func TestParseGSubLookups(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := parseFont(t, "calibri")
 	table := getTable(otf, "GSUB", t)

@@ -23,7 +23,7 @@ func Parse(font []byte) (*Font, error) {
 	if err := binary.Read(r, binary.BigEndian, &h); err != nil {
 		return nil, err
 	}
-	trace().Debugf("header = %v, tag = %x|%s", h, h.FontType, Tag(h.FontType).String())
+	tracer().Debugf("header = %v, tag = %x|%s", h, h.FontType, Tag(h.FontType).String())
 	if !(h.FontType == 0x4f54544f || // OTTO
 		h.FontType == 0x00010000 || // TrueType
 		h.FontType == 0x74727565) { // true
@@ -87,7 +87,7 @@ func parseTable(t Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	case T("maxp"):
 		return parseMaxP(t, b, offset, size)
 	}
-	trace().Infof("font contains table (%s), will not be interpreted", t)
+	tracer().Infof("font contains table (%s), will not be interpreted", t)
 	return newTable(t, b, offset, size), nil
 }
 
@@ -125,7 +125,7 @@ func parseBase(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	err = parseBaseAxis(base, 0, xaxis, err)
 	err = parseBaseAxis(base, 1, yaxis, err)
 	if err != nil {
-		trace().Errorf("error parsing BASE table: %v", err)
+		tracer().Errorf("error parsing BASE table: %v", err)
 		return base, err
 	}
 	return base, err
@@ -150,7 +150,7 @@ func parseBaseAxis(base *BaseTable, hOrV int, link NavLink, err error) error {
 	if basetags, err := parseLink16(axisbase, 0, axisbase, "BaseTagList"); err == nil {
 		b := basetags.Jump()
 		base.axisTables[hOrV].baselineTags = parseTagList(b.Bytes())
-		trace().Debugf("axis table %d has %d entries", hOrV,
+		tracer().Debugf("axis table %d has %d entries", hOrV,
 			base.axisTables[hOrV].baselineTags.Count)
 	}
 	// For each script listed in the BaseScriptList table, a BaseScriptRecord must be
@@ -162,10 +162,10 @@ func parseBaseAxis(base *BaseTable, hOrV int, link NavLink, err error) error {
 		base.axisTables[hOrV].baseScriptRecords = parseTagRecordMap16(b.Bytes(),
 			0, b.Bytes(), "BaseScriptList", "BaseScript")
 
-		trace().Debugf("axis table %d has %d entries", hOrV,
+		tracer().Debugf("axis table %d has %d entries", hOrV,
 			base.axisTables[hOrV].baselineTags.Count)
 	}
-	trace().Infof("BASE axis %d has no/unreadable entires", hOrV)
+	tracer().Infof("BASE axis %d has no/unreadable entires", hOrV)
 	return nil
 }
 
@@ -204,7 +204,7 @@ func parseBaseAxis(base *BaseTable, hOrV int, link NavLink, err error) error {
 //
 func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	n, _ := b.u16(2) // number of sub-tables
-	trace().Debugf("font cmap has %d sub-tables in %d|%d bytes", n, len(b), size)
+	tracer().Debugf("font cmap has %d sub-tables in %d|%d bytes", n, len(b), size)
 	t := newCMapTable(tag, b, offset, size)
 	const headerSize, entrySize = 4, 8
 	if size < headerSize+entrySize*uint32(n) {
@@ -220,12 +220,12 @@ func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		}
 		link, err := parseLink32(rec, 4, b, "cmap.Subtable")
 		if err != nil {
-			trace().Infof("cmap sub-table cannot be parsed")
+			tracer().Infof("cmap sub-table cannot be parsed")
 			continue
 		}
 		subtable := link.Jump()
 		format := subtable.U16(0)
-		trace().Debugf("cmap table contains subtable with format %d", format)
+		tracer().Debugf("cmap table contains subtable with format %d", format)
 		if supportedCmapFormat(format, pid, psid) {
 			enc.width = width
 			enc.format = format
@@ -275,15 +275,15 @@ func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	}
 	var N, suboffset, subheaderlen int
 	if version := u32(b); version == 0x00010000 {
-		trace().Debugf("font has Apple TTF kern table format")
+		tracer().Debugf("font has Apple TTF kern table format")
 		n, _ := b.u32(4) // number of kerning tables is uint32
 		N, suboffset, subheaderlen = int(n), 8, 16
 	} else {
-		trace().Debugf("font has OTF (MS) kern table format")
+		tracer().Debugf("font has OTF (MS) kern table format")
 		n, _ := b.u16(2) // number of kerning tables is uint16
 		N, suboffset, subheaderlen = int(n), 4, 14
 	}
-	trace().Debugf("kern table has %d sub-tables", N)
+	tracer().Debugf("kern table has %d sub-tables", N)
 	t := newKernTable(tag, b, offset, size)
 	for i := 0; i < N; i++ { // read in N sub-tables
 		if suboffset+subheaderlen >= int(size) { // check for sub-table header size
@@ -296,7 +296,7 @@ func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 			coverage: u16(b[suboffset+4:]),
 		}
 		if format := h.coverage >> 8; format != 0 {
-			trace().Infof("kern sub-table format %d not supported, ignoring sub-table", format)
+			tracer().Infof("kern sub-table format %d not supported, ignoring sub-table", format)
 			continue // we only support format 0 kerning tables; skip this one
 		}
 		h.directory = [4]uint16{
@@ -306,13 +306,13 @@ func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 			u16(b[suboffset+subheaderlen-2:]),
 		}
 		kerncnt := uint32(h.directory[0])
-		trace().Debugf("kern sub-table has %d entries", kerncnt)
+		tracer().Debugf("kern sub-table has %d entries", kerncnt)
 		// For some fonts, size calculation of kern sub-tables is off; see
 		// https://github.com/fonttools/fonttools/issues/314#issuecomment-118116527
 		// Testable with the Calibri font.
 		sz := kerncnt * 6 // kern pair is of size 6
 		if sz != h.length {
-			trace().Infof("kern sub-table size should be 0x%x, but given as 0x%x; fixing",
+			tracer().Infof("kern sub-table size should be 0x%x, but given as 0x%x; fixing",
 				sz, h.length)
 		}
 		if uint32(suboffset)+sz >= size {
@@ -321,7 +321,7 @@ func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 		t.headers = append(t.headers, h)
 		suboffset += int(subheaderlen + int(h.length))
 	}
-	trace().Debugf("table kern has %d sub-table(s)", len(t.headers))
+	tracer().Debugf("table kern has %d sub-table(s)", len(t.headers))
 	return t, nil
 }
 
@@ -362,7 +362,7 @@ func parseHHea(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	if size == 0 {
 		return nil, nil
 	}
-	trace().Debugf("HHea table has size %d", size)
+	tracer().Debugf("HHea table has size %d", size)
 	if size < 36 {
 		return nil, errFontFormat("hhea table incomplete")
 	}
@@ -401,7 +401,7 @@ func parseNames(b fontBinSegm) (nameNames, error) {
 	names := nameNames{}
 	strOffset, _ := b.u16(4)
 	names.strbuf = b[strOffset:]
-	trace().Debugf("name table has %d strings, starting at %d", N, strOffset)
+	tracer().Debugf("name table has %d strings, starting at %d", N, strOffset)
 	if len(b) < 6+12*int(N) {
 		return nameNames{}, errFontFormat("name section corrupt")
 	}
@@ -424,11 +424,11 @@ func parseGDef(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	err = parseMarkAttachmentClassDef(gdef, b, err)
 	err = parseMarkGlyphSets(gdef, b, err)
 	if err != nil {
-		trace().Errorf("error parsing GDEF table: %v", err)
+		tracer().Errorf("error parsing GDEF table: %v", err)
 		return gdef, err
 	}
 	mj, mn := gdef.Header().Version()
-	trace().Debugf("GDEF table has version %d.%d", mj, mn)
+	tracer().Debugf("GDEF table has version %d.%d", mj, mn)
 	return gdef, err
 }
 
@@ -574,12 +574,12 @@ func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	err = parseFeatureList(&gpos.LayoutTable, b, err)
 	err = parseScriptList(&gpos.LayoutTable, b, err)
 	if err != nil {
-		trace().Errorf("error parsing GPOS table: %v", err)
+		tracer().Errorf("error parsing GPOS table: %v", err)
 		return gpos, err
 	}
 	mj, mn := gpos.header.Version()
-	trace().Debugf("GPOS table has version %d.%d", mj, mn)
-	trace().Debugf("GPOS table has %d lookup list entries", gpos.LookupList.length)
+	tracer().Debugf("GPOS table has version %d.%d", mj, mn)
+	tracer().Debugf("GPOS table has %d lookup list entries", gpos.LookupList.length)
 	return gpos, err
 }
 
@@ -596,12 +596,12 @@ func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 	err = parseFeatureList(&gsub.LayoutTable, b, err)
 	err = parseScriptList(&gsub.LayoutTable, b, err)
 	if err != nil {
-		trace().Errorf("error parsing GSUB table: %v", err)
+		tracer().Errorf("error parsing GSUB table: %v", err)
 		return gsub, err
 	}
 	mj, mn := gsub.header.Version()
-	trace().Debugf("GSUB table has version %d.%d", mj, mn)
-	trace().Debugf("GSUB table has %d lookup list entries", gsub.LookupList.length)
+	tracer().Debugf("GSUB table has version %d.%d", mj, mn)
+	tracer().Debugf("GSUB table has %d lookup list entries", gsub.LookupList.length)
 	return gsub, err
 }
 
@@ -689,7 +689,7 @@ func parseLangSys(b fontBinSegm, offset int, target string) (langSys, error) {
 	if len(b) < offset+4 {
 		return lsys, errBufferBounds
 	}
-	trace().Debugf("parsing LangSys (%s)", target)
+	tracer().Debugf("parsing LangSys (%s)", target)
 	b = b[offset:]
 	lsys.mandatory, _ = b.u16(0)
 	features, err := parseArray16(b, 2)
@@ -697,7 +697,7 @@ func parseLangSys(b fontBinSegm, offset int, target string) (langSys, error) {
 		return lsys, err
 	}
 	lsys.featureIndices = features
-	trace().Debugf("LangSys points to %d features", features.length)
+	tracer().Debugf("LangSys points to %d features", features.length)
 	return lsys, nil
 }
 
@@ -722,7 +722,7 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 }
 
 func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
-	trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
+	tracer().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	if len(b) < 4 {
 		return LookupSubtable{}
 	}
@@ -737,7 +737,7 @@ func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lookup
 func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
 	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	format := b.U16(0)
-	trace().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
+	tracer().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
 	sub := LookupSubtable{LookupType: lookupType, Format: format}
 	// Most of the subtable formats use a coverage table in some form to decide on which glyphs to
 	// operate on. parseGSubLookupSubtable will parse this coverage table and put it into
@@ -758,7 +758,7 @@ func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 	case 7:
 		return parseGSubLookupSubtableType7(b, sub)
 	}
-	trace().Errorf("unknown GSUB lookup type: %d", lookupType)
+	tracer().Errorf("unknown GSUB lookup type: %d", lookupType)
 	return LookupSubtable{}
 }
 
@@ -818,7 +818,7 @@ func parseGSubLookupSubtableType5(b fontBinSegm, sub LookupSubtable) LookupSubta
 	var err error
 	sub, err = parseSequenceContext(b, sub)
 	if err != nil {
-		trace().Errorf(err.Error()) // nothing we can/will do about it
+		tracer().Errorf(err.Error()) // nothing we can/will do about it
 	}
 	return sub
 }
@@ -834,7 +834,7 @@ func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubta
 	var err error
 	sub, err = parseChainedSequenceContext(b, sub)
 	if err != nil {
-		trace().Errorf(err.Error()) // nothing we can/will do about it
+		tracer().Errorf(err.Error()) // nothing we can/will do about it
 	}
 	switch sub.Format {
 	case 1:
@@ -859,14 +859,14 @@ func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubta
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-7-extension-substitution
 func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubtable {
 	if b.Size() < 8 {
-		trace().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.LookupType)
+		tracer().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.LookupType)
 		return LookupSubtable{}
 	}
 	if sub.LookupType = LayoutTableLookupType(b.U16(2)); sub.LookupType == GSubLookupTypeExtensionSubs {
-		trace().Errorf("OpenType GSUB lookup subtable type 7 recursion detected")
+		tracer().Errorf("OpenType GSUB lookup subtable type 7 recursion detected")
 		return LookupSubtable{}
 	}
-	trace().Debugf("OpenType GSUB extension subtable is of type %s", sub.LookupType.GSubString())
+	tracer().Debugf("OpenType GSUB extension subtable is of type %s", sub.LookupType.GSubString())
 	link, _ := parseLink32(b, 4, b, "ext.LookupSubtable")
 	loc := link.Jump()
 	return parseGSubLookupSubtable(loc.Bytes(), sub.LookupType)
@@ -874,7 +874,7 @@ func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubta
 
 func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
 	format := b.U16(0)
-	trace().Debugf("parsing GPOS sub-table type %s, format %d", lookupType.GPosString(), format)
+	tracer().Debugf("parsing GPOS sub-table type %s, format %d", lookupType.GPosString(), format)
 	panic("TODO GPOS Lookup Subtable")
 	//return LookupSubtable{}
 }
@@ -885,7 +885,7 @@ func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 // consecutive glyph indices to different classes, or one that puts groups of consecutive
 // glyph indices into the same class.
 func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
-	trace().Debugf("HELLO, parsing a ClassDef")
+	tracer().Debugf("HELLO, parsing a ClassDef")
 	cdef := ClassDefinitions{}
 	r := bytes.NewReader(b)
 	if err := binary.Read(r, binary.BigEndian, &cdef.format); err != nil {
@@ -893,11 +893,11 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
 	}
 	var n, g uint16
 	if cdef.format == 1 {
-		trace().Debugf("parsing a ClassDef of format 1")
+		tracer().Debugf("parsing a ClassDef of format 1")
 		n, _ = b.u16(4) // number of glyph IDs in table
 		g, _ = b.u16(2) // start glyph ID
 	} else if cdef.format == 2 {
-		trace().Debugf("parsing a ClassDef of format 2")
+		tracer().Debugf("parsing a ClassDef of format 2")
 		n, _ = b.u16(2) // number of glyph ID ranges in table
 	} else {
 		return cdef, errFontFormat(fmt.Sprintf("unknown ClassDef format %d", n))
@@ -913,7 +913,7 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
 // A Coverage table defines a unique index value, the Coverage Index, for each
 // covered glyph.
 func parseCoverage(b fontBinSegm) Coverage {
-	trace().Debugf("parsing Coverage")
+	tracer().Debugf("parsing Coverage")
 	h := coverageHeader{}
 	h.CoverageFormat = b.U16(0)
 	h.Count = b.U16(2)
@@ -921,7 +921,7 @@ func parseCoverage(b fontBinSegm) Coverage {
 	// if err := binary.Read(r, binary.BigEndian, &h); err != nil {
 	// 	return Coverage{}
 	// }
-	trace().Debugf("coverage header format %d has count = %d ", h.CoverageFormat, h.Count)
+	tracer().Debugf("coverage header format %d has count = %d ", h.CoverageFormat, h.Count)
 	//trace().Debugf("cont = %v", asU16Slice(b[:20]))
 	return Coverage{
 		coverageHeader: h,
@@ -1060,8 +1060,8 @@ func parseChainedSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (Look
 }
 
 func parseChainedSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
-	trace().Debugf("chained sequence context format 3 ........................")
-	trace().Debugf("b = %v", b[:26].Glyphs())
+	tracer().Debugf("chained sequence context format 3 ........................")
+	tracer().Debugf("b = %v", b[:26].Glyphs())
 	offset := 2
 	backtrack, err1 := parseChainedSeqContextCoverages(b, offset, nil)
 	offset += 2 + len(backtrack)*2
@@ -1097,11 +1097,11 @@ func parseChainedSeqContextCoverages(b fontBinSegm, at int, err error) ([]Covera
 	}
 	count := int(b.U16(at))
 	coverages := make([]Coverage, count)
-	trace().Debugf("chained seq context with %d coverages", count)
+	tracer().Debugf("chained seq context with %d coverages", count)
 	for i := 0; i < count; i++ {
 		link, err := parseLink16(b, at+2+i*2, b, "ChainedSequenceContext Coverage")
 		if err != nil {
-			trace().Errorf("error parsing coverages' offset")
+			tracer().Errorf("error parsing coverages' offset")
 			return []Coverage{}, err
 		}
 		coverages[i] = parseCoverage(link.Jump().Bytes())

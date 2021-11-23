@@ -80,6 +80,6 @@ func loadCalibri(t *testing.T) *Font {
 		core.UserError(err)
 		t.Fatal(err)
 	}
-	trace().Infof("========= loading done =================")
+	tracer().Infof("========= loading done =================")
 	return otf
 }
