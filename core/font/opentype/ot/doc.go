@@ -202,9 +202,9 @@ import (
 // Valuable resource:
 // http://opentypecookbook.com/
 
-// tracer writes to trace with key 'tyse.font'
+// tracer writes to trace with key 'tyse.fonts'
 func tracer() tracing.Trace {
-	return tracing.Select("tyse.font")
+	return tracing.Select("tyse.fonts")
 }
 
 // errFontFormat produces user level errors for font parsing.

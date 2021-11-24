@@ -305,7 +305,7 @@ func (self TableSelf) AsHMtx() *HMtxTable {
 // Only a small subset of fields are made public by HeadTable, as they are
 // needed for consistency-checks. To read any of the other fields of table 'head' use:
 //
-//     head   := otf.Table[T["head"]]
+//     head   := otf.Table(T("head"))
 //     fields := head.Fields().Get(n)     // get nth field value
 //     fields := head.Fields().All()      // get a slice with all field values
 //

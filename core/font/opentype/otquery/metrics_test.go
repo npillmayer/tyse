@@ -23,7 +23,7 @@ func TestScriptMatch(t *testing.T) {
 		core.UserError(err)
 		t.Fatal(err)
 	}
-	trace().Infof("========= loading done =================")
+	tracer().Infof("========= loading done =================")
 	scr, err := language.ParseScript("Latn")
 	if err != nil {
 		t.Fatal(err)
@@ -35,9 +35,9 @@ func TestScriptMatch(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func loadTestFont(t *testing.T, pattern string) *ot.Font {
-	level := trace().GetTraceLevel()
-	trace().SetTraceLevel(tracing.LevelInfo)
-	defer trace().SetTraceLevel(level)
+	level := tracer().GetTraceLevel()
+	tracer().SetTraceLevel(tracing.LevelInfo)
+	defer tracer().SetTraceLevel(level)
 	//
 	otf := &ot.Font{}
 	if pattern == "fallback" {

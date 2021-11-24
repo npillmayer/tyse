@@ -3,16 +3,13 @@ package ot
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core"
 )
 
 func TestNavLink(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := loadCalibri(t)
 	table := otf.Table(T("GSUB"))
@@ -31,9 +28,8 @@ func TestNavLink(t *testing.T) {
 }
 
 func TestTableNav(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := loadCalibri(t)
 	table := otf.Table(T("name"))
@@ -52,9 +48,8 @@ func TestTableNav(t *testing.T) {
 }
 
 func TestTableNavOS2(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	otf := loadCalibri(t)
 	table := otf.Table(T("OS/2"))
