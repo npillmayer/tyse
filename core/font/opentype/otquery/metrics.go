@@ -46,6 +46,7 @@ func GlyphIndex(otf *ot.Font, codepoint rune) ot.GlyphIndex {
 
 // FontMetricsInfo contains selected metric information for a font.
 type FontMetricsInfo struct {
+	UnitsPerEm      int    // ad-hoc units per em
 	Ascent, Descent int16  // ascender and descender
 	MaxAdvance      uint16 // maximum advance width value in 'hmtx' table
 	LineGap         int16  // typographic line gap
@@ -77,6 +78,11 @@ func FontMetrics(otf *ot.Font) (FontMetricsInfo, error) {
 				metrics.Descent = d
 			}
 		}
+	}
+	h := otf.Table(ot.T("head"))
+	if h != nil {
+		head := h.Self().AsHead()
+		metrics.UnitsPerEm = int(head.UnitsPerEm)
 	}
 	if metrics.Ascent == 0 && metrics.Descent == 0 {
 		return metrics, errors.New("cannot find metric information in font")
