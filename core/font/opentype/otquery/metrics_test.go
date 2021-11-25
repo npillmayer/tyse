@@ -13,6 +13,34 @@ import (
 	"golang.org/x/text/language"
 )
 
+func TestGlyphIndex(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
+	defer teardown()
+	//
+	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelError)
+	otf := loadCalibri(t)
+	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelDebug)
+	gid := GlyphIndex(otf, 'A')
+	if gid != 4 {
+		t.Errorf("expected glyph index of 'A' to be 4, is %d", gid)
+	}
+}
+
+func TestGlyphMetrics(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
+	defer teardown()
+	//
+	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelError)
+	otf := loadCalibri(t)
+	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelDebug)
+	gid := GlyphIndex(otf, 'A')
+	m, err := GlyphMetrics(otf, gid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("metrics = %v", m)
+}
+
 func TestScriptMatch(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()

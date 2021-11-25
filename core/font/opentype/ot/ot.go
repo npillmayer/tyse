@@ -393,7 +393,14 @@ func (t *KernTable) SubTableInfo(n int) KernSubTableInfo {
 // commonly represented by a blank box or a space.
 type LocaTable struct {
 	tableBase
-	loca func(t *LocaTable, n int) uint32 // returns glyph location for glyph n
+	inx2loc func(t *LocaTable, gid GlyphIndex) uint32 // returns glyph location for glyph gid
+	locCnt  int                                       // number of locations
+}
+
+// IndexToLocation offsets, indexed by glyph IDs, which provide the location of each
+// glyph data block within the 'glyf' table.
+func (t *LocaTable) IndexToLocation(gid GlyphIndex) uint32 {
+	return t.inx2loc(t, gid)
 }
 
 func newLocaTable(tag Tag, b fontBinSegm, offset, size uint32) *LocaTable {
@@ -405,25 +412,32 @@ func newLocaTable(tag Tag, b fontBinSegm, offset, size uint32) *LocaTable {
 		length: size,
 	}
 	t.tableBase = base
-	t.loca = shortLocaVersion // may get changed by font consistency check
+	t.inx2loc = shortLocaVersion // may get changed by font consistency check
+	t.locCnt = 0                 // has to be set during consistency check
 	t.self = t
 	return t
 }
 
-func shortLocaVersion(t *LocaTable, n int) uint32 {
-	loc, err := t.data.u16(n * 2)
+func shortLocaVersion(t *LocaTable, gid GlyphIndex) uint32 {
+	// in case of error link to 'missing character' at location 0
+	if gid >= GlyphIndex(t.locCnt) {
+		return 0
+	}
+	loc, err := t.data.u16(int(gid) * 2)
 	if err != nil {
-		// should have been catched by font consistency check
-		panic("access to non-existent loca offset")
+		return 0
 	}
 	return uint32(loc) * 2
 }
 
-func longLocaVersion(t *LocaTable, n int) uint32 {
-	loc, err := t.data.u32(n * 4)
+func longLocaVersion(t *LocaTable, gid GlyphIndex) uint32 {
+	// in case of error link to 'missing character' at location 0
+	if gid >= GlyphIndex(t.locCnt) {
+		return 0
+	}
+	loc, err := t.data.u32(int(gid) * 4)
 	if err != nil {
-		// should have been catched by font consistency check
-		panic("access to non-existent loca offset")
+		return 0
 	}
 	return loc
 }

@@ -57,6 +57,26 @@ func Parse(font []byte) (*Font, error) {
 	// The number of glyphs in the font is restricted only by the value stated in the 'head' table. The order in which glyphs are placed in a font is arbitrary.
 	// Note that a font must have at least two glyphs, and that glyph index 0 musthave an outline. See Glyph Mappings for details.
 	//
+	if hh := otf.tables[T("hhea")]; hh != nil {
+		hhead := hh.Self().AsHHea()
+		if mx := otf.tables[T("hmtx")]; mx != nil {
+			hmtx := mx.Self().AsHMtx()
+			hmtx.NumberOfHMetrics = hhead.NumberOfHMetrics
+		}
+	}
+	if he := otf.Table(T("head")); he != nil {
+		head := he.Self().AsHead()
+		if lo := otf.Table(T("loca")); lo != nil {
+			loca := lo.Self().AsLoca()
+			if head.IndexToLocFormat == 1 {
+				loca.inx2loc = longLocaVersion
+			}
+			if ma := otf.Table(T("maxp")); ma != nil {
+				maxp := ma.Self().AsMaxP()
+				loca.locCnt = maxp.NumGlyphs
+			}
+		}
+	}
 	return otf, nil
 }
 
