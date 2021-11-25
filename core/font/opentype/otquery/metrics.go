@@ -52,7 +52,7 @@ type FontMetricsInfo struct {
 }
 
 // FontMetrics retrieves selected metrics of a font.
-func FontMetrics(otf *ot.Font, gid ot.GlyphIndex) (FontMetricsInfo, error) {
+func FontMetrics(otf *ot.Font) (FontMetricsInfo, error) {
 	metrics := FontMetricsInfo{}
 	if hhea := otf.Table(ot.T("hhea")); hhea != nil {
 		tracer().Debugf("hhea")
