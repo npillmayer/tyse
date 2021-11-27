@@ -1,5 +1,5 @@
 /*
-Package fontregistry manages a registry for loade fonts.
+Package fontregistry manages a registry for loaded fonts.
 
 License
 
