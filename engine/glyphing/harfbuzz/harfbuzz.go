@@ -1,146 +1,227 @@
 /*
-Package harfbuzz is a CGo wrapper for the Harfbuzz text shaping library.
+Package harfbuzz uses HarfBuzz converts text to sequencees of glyphs.
 
-----------------------------------------------------------------------
+License
 
-BSD License
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-Copyright (c) 2017-2018, Norbert Pillmayer
+Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of Norbert Pillmayer nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-----------------------------------------------------------------------
 */
 package harfbuzz
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/binary"
+	"io"
+	"unicode"
 
-	"github.com/npillmayer/tyse/core/font"
+	hbtt "github.com/benoitkugler/textlayout/fonts/truetype"
+	hb "github.com/benoitkugler/textlayout/harfbuzz"
+	hblang "github.com/benoitkugler/textlayout/language"
+	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/tyse/core/dimen"
+	"github.com/npillmayer/tyse/core/font/opentype/ot"
 	"github.com/npillmayer/tyse/engine/glyphing"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/sfnt"
+	"golang.org/x/image/math/fixed"
+	"golang.org/x/text/language"
 )
 
-// https://harfbuzz.github.io/shaping-and-shape-plans.html
-
-// Harfbuzz is the de-facto standard for text shaping.
-// For further information see
-// https://www.freedesktop.org/wiki/Software/HarfBuzz .
-//
-// A remark to the use of pointers to Harfbuzz-objects: Harfbuzz
-// does its own memory management and we must avoid interfering with it.
-// The Go garbage collector will therefore be unaware of the memory
-// managed by Harfbuzz (in the worst of cases, a fancy Go garbage collector
-// may re-locate memory). To hide Harfbuzz-memory from Go, we will use
-// 'uintptr' variables instead of 'unsafe.Pointer's.
-//
-// The downside of this is the need to free() memory whenever we
-// hand a Harfbuzz-shaper to GC.
-type Harfbuzz struct {
-	buffer    uintptr            // central data structure for Harfbuzz
-	direction glyphing.Direction // L-to-R, R-to-L, T-to-B
-	script    glyphing.ScriptID  // i.e., Latin, Arabic, Korean, ...
+// tracer traces with key 'tyse.glyphs'.
+func tracer() tracing.Trace {
+	return tracing.Select("tyse.glyphs")
 }
 
-// NewHarfbuzz creates a new Harfbuzz text shaper, fully initialized.
-// Defaults are for Latin script, left-to-right.
-func NewHarfbuzz() *Harfbuzz {
-	hb := &Harfbuzz{}
-	hb.buffer = allocHBBuffer()
-	hb.direction = glyphing.LeftToRight
-	setHBBufferDirection(hb.buffer, hb.direction)
-	hb.script = glyphing.Latin
-	setHBBufferScript(hb.buffer, hb.script)
-	return hb
+// --- Type conversion -------------------------------------------------------
+
+// Lang4HB returns a language tag as a HarfBuzz language.
+func Lang4HB(l language.Tag) hblang.Language {
+	return hblang.NewLanguage(l.String())
 }
 
-// Cache for font structures prepared for Harfbuzz.
-// Harfbuzz uses its own font structure, different from ours.
-// Unfortunately this duplicates the binary data of the font.
-var harfbuzzFontCache map[*font.TypeCase]uintptr
+// Lang4HB returns a script as a HarfBuzz script.
+func Script4HB(s language.Script) hblang.Script {
+	b := []byte(s.String())
+	b[0] = byte(unicode.ToLower(rune(b[0])))
+	h := binary.BigEndian.Uint32(b)
+	return hblang.Script(h)
+}
 
-// TODO: make cache thread-safe
-// TODO: return error
-func (hb *Harfbuzz) findFont(typecase *font.TypeCase) uintptr {
-	var hbfont uintptr
-	if harfbuzzFontCache == nil {
-		harfbuzzFontCache = make(map[*font.TypeCase]uintptr)
+// Direction4HB translates a direction to a HarfBuzz direction.
+func Direction4HB(d glyphing.Direction) hb.Direction {
+	switch d {
+	case glyphing.LeftToRight:
+		return hb.LeftToRight
+	case glyphing.RightToLeft:
+		return hb.RightToLeft
+	case glyphing.TopToBottom:
+		return hb.TopToBottom
+	case glyphing.BottomToTop:
+		return hb.BottomToTop
 	}
-	if hbfont = harfbuzzFontCache[typecase]; hbfont == 0 {
-		if hbfont = makeHBFont(typecase); hbfont != 0 {
-			harfbuzzFontCache[typecase] = hbfont
+	return hb.LeftToRight
+}
+
+// Feature4HB makes a typecast from an OpenType feature tag to a HarfBuzz truetype tag.
+func Feature4HB(t ot.Tag) hbtt.Tag {
+	return hbtt.Tag(t)
+}
+
+// FeatureRange4HB converts a feature range struct to a HarbBuzz Feature switch.
+func FeatureRange4HB(frng glyphing.FeatureRange) hb.Feature {
+	f := hb.Feature{
+		Tag:   Feature4HB(frng.Feature),
+		Start: frng.Start,
+		End:   frng.End,
+	}
+	if frng.On {
+		if frng.Arg > 0 {
+			f.Value = uint32(frng.Arg)
+		} else {
+			f.Value = 1
 		}
 	}
-	return hbfont
+	return f
 }
 
-// SetScript is part of TextShaper interface.
-func (hb *Harfbuzz) SetScript(scr glyphing.ScriptID) {
-	setHBBufferScript(hb.buffer, scr)
-}
+// --- Shape -----------------------------------------------------------------
 
-// SetDirection is part of TextShaper interface.
-func (hb *Harfbuzz) SetDirection(dir glyphing.Direction) {
-	setHBBufferDirection(hb.buffer, dir)
-}
-
-// SetLanguage is part of interface TextShaper.
-// Harfbuzz doesn't evaluate a language parameter; method is a NOP.
-func (hb *Harfbuzz) SetLanguage(string) {
-}
-
-// Shape is part of the  TextShaper interface.
+// Shape calls the HarfBuzz shaper.
 //
-// This is where all the heavy lifting is done. We input a font and a
-// string of Unicode code-points, and receive a list of glyphs.
-func (hb *Harfbuzz) Shape(text string, typecase *font.TypeCase) glyphing.GlyphSequence {
-	var hbfont uintptr
-	hbfont = hb.findFont(typecase)
-	if hbfont == 0 {
-		panic(fmt.Sprintf("*** cannot find/create Harfbuzz font for [%s]\n",
-			typecase.ScalableFontParent().Fontname))
+// Shape shapes a sequence of code-points (runes), turning its Unicode characters to
+// positioned glyphs. It will select a shape plan based on params, including the
+// selected font, and the properties of the input text.
+//
+// If `params.Features` is not empty, it will be used to control the
+// features applied during shaping. If two features have the same tag but
+// overlapping ranges the value of the feature with the higher index takes
+// precedence.
+//
+// params.Font must be set, otherwise no output is created.
+//
+// Clients may provide `buf` to avoid allocating memory by Shape. Shape will wrap it
+// into the GlyphSequence returned.
+//
+func Shape(text io.RuneReader, buf []glyphing.ShapedGlyph, context [][]rune, params glyphing.Params) (glyphing.GlyphSequence, error) {
+	if text == nil || params.Font == nil {
+		return glyphing.GlyphSequence{}, nil
 	}
-	harfbuzzShape(hb.buffer, text, hbfont)
-	seq := getHBGlyphInfo(hb.buffer)
-	seq.font = typecase
-	return seq
+	// Prepare font
+	f := bytes.NewReader(params.Font.ScalableFontParent().Binary)
+	hb_face, err := hbtt.Parse(f, true)
+	if err != nil {
+		return glyphing.GlyphSequence{}, err
+	}
+	hb_font := hb.NewFont(hb_face)
+	hb_font.Ptem = params.Font.PtSize()
+	// Prepare shaping parameters
+	var hb_seqProps hb.SegmentProperties
+	convertParams(&hb_seqProps, params)
+	var features []hb.Feature = make([]hb.Feature, len(params.Features))
+	for _, feat := range params.Features {
+		features = append(features, FeatureRange4HB(feat))
+	}
+	// Prepare HarfBuzz buffer
+	hb_buf := hb.NewBuffer()
+	hb_buf.Props = hb_seqProps
+	bytesBuf, offset, length := bufferText(text, context)
+	runes := bytes.Runes(bytesBuf.Bytes())
+	tracer().Debugf("going to HarfBuzz-shape %v", runes)
+	hb_buf.AddRunes(runes, offset, length)
+	hb_buf.Shape(hb_font, features)
+	// Prepare shaped output
+	if buf == nil || len(buf) < len(hb_buf.Info) {
+		buf = make([]glyphing.ShapedGlyph, len(hb_buf.Info))
+	}
+	seq := glyphing.GlyphSequence{
+		Glyphs: buf,
+	}
+	// move HarfBuzz output to glyph sequence output
+	sfont := params.Font.ScalableFontParent().SFNT
+	var sfntBuf sfnt.Buffer
+	for i, ginfo := range hb_buf.Info {
+		gpos := &hb_buf.Pos[i]
+		tracer().Debugf("[%3d] %q", i, ginfo.String())
+		g := &buf[i]
+		g.ClusterID = ginfo.Cluster
+		g.GID = ot.GlyphIndex(ginfo.Glyph)
+		g.XAdvance = dimen.DU(gpos.XAdvance) // TODO convert / caluculate
+		g.YAdvance = dimen.DU(gpos.YAdvance)
+		g.XOffset = dimen.DU(gpos.XOffset)
+		g.YOffset = dimen.DU(gpos.YOffset)
+		g.CodePoint = runes[g.ClusterID]
+		bounds, adv, err := sfont.GlyphBounds(&sfntBuf, sfnt.GlyphIndex(g.GID), fixed.Int26_6(sfont.UnitsPerEm()), font.HintingNone)
+		if err != nil {
+			g.RawMetrics.Advance = sfnt.Units(adv)
+			g.RawMetrics.BBox.MinX = sfnt.Units(bounds.Min.X)
+			g.RawMetrics.BBox.MinY = sfnt.Units(bounds.Min.Y)
+			g.RawMetrics.BBox.MaxX = sfnt.Units(bounds.Max.X)
+			g.RawMetrics.BBox.MaxY = sfnt.Units(bounds.Max.Y)
+			g.RawMetrics.LSB = g.RawMetrics.BBox.MinX
+			g.RawMetrics.RSB = g.RawMetrics.Advance - g.RawMetrics.BBox.MaxX
+		}
+	}
+	return seq, nil
 }
 
-func (hb *Harfbuzz) GlyphSequenceString(typecase *font.TypeCase, seq glyphing.GlyphSequence) string {
-	var hbfont uintptr
-	hbfont = hb.findFont(typecase)
-	if hbfont == 0 {
-		panic(fmt.Sprintf("*** cannot find/create Harfbuzz font for [%s]\n",
-			typecase.ScalableFontParent().Fontname))
+// convertParams is a helper function to convert glyphing parameters to
+// HarfBuzz's format.
+func convertParams(hb_seqProps *hb.SegmentProperties, params glyphing.Params) {
+	if params.Language != language.Und {
+		hb_seqProps.Language = Lang4HB(params.Language)
 	}
-	s := hbGlyphString(hbfont, seq.(*hbGlyphSequence))
-	return s
+	var none language.Script
+	if params.Script != none {
+		hb_seqProps.Script = Script4HB(params.Script)
+	}
+	hb_seqProps.Direction = Direction4HB(params.Direction)
 }
 
-var _ glyphing.Shaper = &Harfbuzz{}
+// bufferText buffers the input text of a call to Shape(…) as a bytes.Buffer.
+// To conform to HarfBuzz's API, context is pre-/appended to the input runes.
+//
+// bufferText returns the start position of the input within the returned buffer,
+// together with the input's length (= rune count).
+func bufferText(text io.RuneReader, context [][]rune) (buf bytes.Buffer, off int, length int) {
+	var bytesBuf bytes.Buffer
+	var r rune
+	if len(context) > 0 && len(context[0]) > 0 {
+		for off, r = range context[0] {
+			bytesBuf.WriteRune(r)
+		}
+	}
+	var sz int
+	var err error
+	for {
+		if r, sz, err = text.ReadRune(); sz == 0 || err != nil {
+			break
+		}
+		length++
+		bytesBuf.WriteRune(r)
+	}
+	if len(context) > 1 && len(context[1]) > 0 {
+		for _, r = range context[1] {
+			bytesBuf.WriteRune(r)
+		}
+	}
+	return bytesBuf, off, length
+}
+
+/*
+// Params collects shaping parameters.
+type Params struct {
+	Direction Direction       // writing direction
+	Script    language.Script // 4-letter ISO 15924
+	Language  language.Tag    // BCP 47 tag
+	Font      *font.TypeCase  // font at a given point-size
+}
+
+// GlyphSequence contains a sequence of shaped glyphs.
+type GlyphSequence struct {
+	Glyphs  []ShapedGlyph // resulting sequence of glyphs
+	W, H, D dimen.DU      // width, height, depth of bounding box
+}
+*/

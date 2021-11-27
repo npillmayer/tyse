@@ -1,8 +1,10 @@
 package glypher
 
 import (
-	"github.com/npillmayer/tyse/core/font"
+	"io"
+
 	"github.com/npillmayer/tyse/engine/glyphing"
+	"golang.org/x/text/language"
 )
 
 // Package intended for a home-grown shaper for easy cases where we can
@@ -10,28 +12,18 @@ import (
 
 type glypher struct {
 	dir    glyphing.Direction
-	script glyphing.ScriptID
+	script language.Script
+	lang   language.Tag
 }
 
-func Instance(dir glyphing.Direction, script glyphing.ScriptID) glyphing.Shaper {
+func Instance(dir glyphing.Direction, script language.Script, lang language.Tag) glyphing.Shaper {
 	return &glypher{
 		dir:    dir,
 		script: script,
+		lang:   lang,
 	}
 }
 
-func (g *glypher) Shape(text string, typecase *font.TypeCase) glyphing.GlyphSequence {
+func (g *glypher) Shape(io.RuneReader, []glyphing.ShapedGlyph, [][]rune, glyphing.Params) (glyphing.GlyphSequence, error) {
 	panic("Glyphing Shape: TODO")
-}
-
-func (g *glypher) SetScript(scr glyphing.ScriptID) {
-	g.script = scr
-}
-
-func (g *glypher) SetDirection(dir glyphing.Direction) {
-	g.dir = dir
-}
-
-func (g *glypher) SetLanguage(string) {
-	//
 }

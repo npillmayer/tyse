@@ -1,26 +1,31 @@
 package monospace
 
 import (
-	"fmt"
+	"io"
+	"unicode/utf8"
 
 	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/engine/glyphing"
 	"github.com/npillmayer/uax/grapheme"
+	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax11"
+	"golang.org/x/text/language"
 )
 
 type msshape struct {
-	em  dimen.Dimen
-	dir glyphing.Direction
-	// graphemeSplitter *segment.Segmenter
-	context *uax11.Context
+	em               dimen.DU
+	dir              glyphing.Direction
+	graphemeSplitter *segment.Segmenter
+	context          *uax11.Context
 }
 
 // Shaper creates a shaper for monospace typesetting.
 // An em-dimension may be given which will then be used for shaping text.
-// If is is zero, a monospace must be provided with Shape(…).
-func Shaper(em dimen.Dimen, context *uax11.Context) glyphing.Shaper {
+// If is is zero, it will be set to 10pt.
+func Shaper(em dimen.DU, context *uax11.Context) glyphing.Shaper {
+	if em == 0 {
+		em = 10 * dimen.PT
+	}
 	sh := &msshape{
 		em:  em,
 		dir: glyphing.LeftToRight,
@@ -28,46 +33,43 @@ func Shaper(em dimen.Dimen, context *uax11.Context) glyphing.Shaper {
 	if context == nil {
 		sh.context = uax11.LatinContext
 	}
-	// onGraphemes := grapheme.NewBreaker()
-	// sh.graphemeSplitter = segment.NewSegmenter(onGraphemes)
+	onGraphemes := grapheme.NewBreaker(1)
+	sh.graphemeSplitter = segment.NewSegmenter(onGraphemes)
 	grapheme.SetupGraphemeClasses()
 	return sh
 }
 
 // Shape creates a glyph sequence from a text.
-func (ms msshape) Shape(text string, typecase *font.TypeCase) glyphing.GlyphSequence {
-	if ms.em == 0 && typecase == nil {
-		T().Errorf("monospace shaper has em=0 and not font provided => no output")
-		return msglyphseq{}
+func (ms msshape) Shape(text io.RuneReader, buf []glyphing.ShapedGlyph, ctx [][]rune, p glyphing.Params) (glyphing.GlyphSequence, error) {
+	if text == nil {
+		return glyphing.GlyphSequence{}, nil
 	}
-	if ms.em == 0 {
-		panic("TODO shaping with monospace font not yet implemented")
+	seq := glyphing.GlyphSequence{Glyphs: buf}
+	if seq.Glyphs == nil {
+		seq.Glyphs = make([]glyphing.ShapedGlyph, 0, 256)
 	}
-	//
-	gstr := grapheme.StringFromString(text)
-	if gstr.Len() == 0 {
-		return msglyphseq{}
-	}
-	seq := msglyphseq{}
-	l := gstr.Len()
-	for i := 0; i < l; i++ {
-		grphm := []byte(gstr.Nth(i))
+	ms.graphemeSplitter.Init(text)
+	i := 0
+	for ms.graphemeSplitter.Next() {
+		grphm := ms.graphemeSplitter.Bytes()
 		w := uax11.Width(grphm, ms.context)
-		g := msglyph{
-			grapheme: grphm,
-			pos:      i,
-			w:        dimen.Dimen(w) * ms.em,
+		codepoint, _ := utf8.DecodeRune(grphm)
+		g := glyphing.ShapedGlyph{
+			XAdvance:  dimen.DU(w) * ms.em,
+			ClusterID: i,
+			CodePoint: codepoint,
 		}
-		seq.glyphs = append(seq.glyphs, g)
-		seq.w += g.w
+		seq.Glyphs = append(seq.Glyphs, g)
+		seq.W += g.XAdvance
+		i++
 	}
-	seq.h = 3 / 5 * ms.em
-	seq.d = 2 / 5 * ms.em
-	return seq
+	seq.H = 3 / 5 * ms.em
+	seq.D = 2 / 5 * ms.em
+	return seq, nil
 }
 
 // SetScript does not do anything for monospace shapers.
-func (ms msshape) SetScript(scr glyphing.ScriptID) {
+func (ms msshape) SetScript(scr language.Script) {
 	//
 }
 
@@ -77,91 +79,4 @@ func (ms *msshape) SetDirection(dir glyphing.Direction) {
 }
 
 // SetLanguage does not do anything for monospace shapers.
-func (ms msshape) SetLanguage(string) {}
-
-// --- Glyphs ----------------------------------------------------------------
-
-type msglyphseq struct {
-	glyphs  []msglyph
-	w, h, d dimen.Dimen
-}
-
-func (gseq msglyphseq) GlyphCount() int {
-	return len(gseq.glyphs)
-}
-
-func (gseq msglyphseq) GetGlyphInfoAt(pos int) glyphing.GlyphInfo {
-	return gseq.glyphs[pos]
-}
-
-func (gseq msglyphseq) BBoxDimens() (dimen.Dimen, dimen.Dimen, dimen.Dimen) {
-	return gseq.w, gseq.h, gseq.d
-}
-
-func (gseq msglyphseq) Font() *font.TypeCase {
-	return nil
-}
-
-func (gseq msglyphseq) String() string {
-	s := ""
-	for _, g := range gseq.glyphs {
-		s += g.String()
-	}
-	return s
-}
-
-var _ glyphing.GlyphSequence = msglyphseq{}
-
-type msglyph struct {
-	glyph    rune
-	grapheme []byte
-	pos      int
-	w        dimen.Dimen
-}
-
-func (g msglyph) Glyph() rune {
-	return g.glyph
-}
-
-func (g msglyph) Cluster() int {
-	return g.pos
-}
-
-func (g msglyph) XAdvance() dimen.Dimen {
-	return g.w
-}
-
-func (g msglyph) YAdvance() dimen.Dimen {
-	return 0
-}
-
-func (g msglyph) XPosition() dimen.Dimen {
-	return 0
-}
-
-func (g msglyph) YPosition() dimen.Dimen {
-	return 0
-}
-
-func (g msglyph) String() string {
-	return fmt.Sprintf("['%#U' %d]", g.glyph, g.w)
-}
-
-var _ glyphing.GlyphInfo = msglyph{}
-
-// ---------------------------------------------------------------------------
-
-// type rr struct {
-// 	runes []rune
-// 	pos   int
-// }
-
-// func (reader *rr) ReadRune() (r rune, size int, err error) {
-// 	if reader.pos == len(reader.runes) {
-// 		return utf8.RuneError, 0, io.EOF
-// 	}
-// 	r = reader.runes[reader.pos]
-// 	size = utf8.RuneLen(r)
-// 	reader.pos++
-// 	return
-// }
+func (ms msshape) SetLanguage(language.Tag) {}

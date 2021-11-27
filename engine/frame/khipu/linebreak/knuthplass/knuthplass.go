@@ -79,7 +79,7 @@ func NewKPDefaultParameters() *linebreak.Parameters {
 		ExHyphenPenalty:      50,
 		DoubleHyphenDemerits: 2000,
 		FinalHyphenDemerits:  10000,
-		EmergencyStretch:     dimen.Dimen(dimen.BP * 20),
+		EmergencyStretch:     dimen.DU(dimen.BP * 20),
 		LeftSkip:             khipu.NewGlue(0, 0, 0),
 		RightSkip:            khipu.NewGlue(0, 0, 0),
 		ParFillSkip:          khipu.NewFill(2),
@@ -398,7 +398,7 @@ func (fb *feasibleBreakpoint) segmentWidth(linecnt int32, params *linebreak.Para
 }
 
 // Currently we try to replicated logic of TeX.
-func calculateDemerits(segwss linebreak.WSS, stretch dimen.Dimen, penalty khipu.Penalty,
+func calculateDemerits(segwss linebreak.WSS, stretch dimen.DU, penalty khipu.Penalty,
 	params *linebreak.Parameters) (d linebreak.Merits, b linebreak.Merits) {
 	//
 	p := linebreak.CapDemerits(linebreak.Merits(penalty.Demerits()))
@@ -657,7 +657,7 @@ func (kp *linebreaker) collectFeasibleBreakpoints(last *feasibleBreakpoint) (
 
 // --- Helpers ----------------------------------------------------------
 
-func absD(n dimen.Dimen) dimen.Dimen {
+func absD(n dimen.DU) dimen.DU {
 	if n < 0 {
 		return -n
 	}

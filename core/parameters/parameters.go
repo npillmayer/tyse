@@ -153,6 +153,6 @@ func (regs *TypesettingRegisters) N(key TypesettingParameter) int {
 	return regs.Get(key).(int)
 }
 
-func (regs *TypesettingRegisters) D(key TypesettingParameter) dimen.Dimen {
-	return regs.Get(key).(dimen.Dimen)
+func (regs *TypesettingRegisters) D(key TypesettingParameter) dimen.DU {
+	return regs.Get(key).(dimen.DU)
 }

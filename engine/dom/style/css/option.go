@@ -65,12 +65,12 @@ const (
 
 // DimenT is an option type for CSS dimensions.
 type DimenT struct {
-	d     dimen.Dimen
+	d     dimen.DU
 	flags uint32
 }
 
 // SomeDimen creates an optional dimen with an initial value of x.
-func SomeDimen(x dimen.Dimen) DimenT {
+func SomeDimen(x dimen.DU) DimenT {
 	return DimenT{d: x, flags: dimenAbsolute}
 }
 
@@ -89,7 +89,7 @@ var errResultInvalidDimension error = errors.New("match-result is invalid dimens
 // MatchToDimen performs a match and returnes the match-result as a dimen.Dimen.
 // If the match-result is not a legal dimension, dimen.Zero will be returned,
 // together with an error.
-func (o DimenT) MatchToDimen(choices interface{}) (value dimen.Dimen, err error) {
+func (o DimenT) MatchToDimen(choices interface{}) (value dimen.DU, err error) {
 	v, err := option.Match(o, choices)
 	if err != nil {
 		return dimen.Zero, err
@@ -97,7 +97,7 @@ func (o DimenT) MatchToDimen(choices interface{}) (value dimen.Dimen, err error)
 		return dimen.Zero, errResultInvalidDimension
 	}
 	switch d := v.(type) {
-	case dimen.Dimen:
+	case dimen.DU:
 		value = d
 	default:
 		value = dimen.Zero
@@ -112,12 +112,12 @@ func (o DimenT) Equals(other interface{}) bool {
 	switch i := other.(type) {
 	case DimenT:
 		return o.d == i.d && o.flags == i.flags
-	case dimen.Dimen:
+	case dimen.DU:
 		return o.Unwrap() == i
 	case int32:
-		return o.Unwrap() == dimen.Dimen(i)
+		return o.Unwrap() == dimen.DU(i)
 	case int:
-		return o.Unwrap() == dimen.Dimen(i)
+		return o.Unwrap() == dimen.DU(i)
 	case PropertyType:
 		switch i {
 		case Auto:
@@ -147,7 +147,7 @@ func (o DimenT) Equals(other interface{}) bool {
 }
 
 // Unwrap returns the underlying dimension of o.
-func (o DimenT) Unwrap() dimen.Dimen {
+func (o DimenT) Unwrap() dimen.DU {
 	return o.d
 }
 
@@ -186,7 +186,7 @@ func (o DimenT) ScaleFromFont(font string) DimenT {
 	return o
 }
 
-func (o DimenT) ScaleFromViewport(w, h dimen.Dimen) DimenT {
+func (o DimenT) ScaleFromViewport(w, h dimen.DU) DimenT {
 	if o.IsRelative() {
 		switch o.UnitString() {
 		case "VW":
@@ -344,7 +344,7 @@ func ParseDimen(s string) (DimenT, error) {
 	if err != nil { // this cannot happen
 		return Dimen(), errors.New("format error parsing dimension")
 	}
-	dim.d = dimen.Dimen(n) * scale
+	dim.d = dimen.DU(n) * scale
 	return dim, nil
 }
 

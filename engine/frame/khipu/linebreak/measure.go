@@ -10,7 +10,7 @@ import (
 // It is intended to wrap a khipu.Cursor or another linebreak.Cursor.
 type FixedWidthCursor struct {
 	cursor     Cursor
-	glyphWidth dimen.Dimen
+	glyphWidth dimen.DU
 	stretch    int
 }
 
@@ -18,7 +18,7 @@ var _ Cursor = &FixedWidthCursor{}
 
 // NewFixedWidthCursor creates a FixedWidthCursor, given a width dimension for
 // every glyph it will read.
-func NewFixedWidthCursor(cursor Cursor, glyphWidth dimen.Dimen, stretchFactor int) FixedWidthCursor {
+func NewFixedWidthCursor(cursor Cursor, glyphWidth dimen.DU, stretchFactor int) FixedWidthCursor {
 	return FixedWidthCursor{
 		cursor:     cursor,
 		glyphWidth: glyphWidth,
@@ -74,7 +74,7 @@ func (fwc FixedWidthCursor) setTextDimens(knot khipu.Knot) (khipu.Knot, bool) {
 		d.Width = fwc.glyphWidth
 	case khipu.KTTextBox:
 		b := knot.(*khipu.TextBox)
-		newW := dimen.Dimen(len(b.Text())) * fwc.glyphWidth
+		newW := dimen.DU(len(b.Text())) * fwc.glyphWidth
 		isChanged = (b.Width != newW || b.Height != fwc.glyphWidth)
 		b.Width = newW
 		b.Height = fwc.glyphWidth
@@ -82,13 +82,13 @@ func (fwc FixedWidthCursor) setTextDimens(knot khipu.Knot) (khipu.Knot, bool) {
 		g := knot.(khipu.Glue)
 		g[0] = max(1, fwc.glyphWidth)
 		g[1] = 0
-		g[2] = max(1, fwc.glyphWidth*dimen.Dimen(fwc.stretch))
+		g[2] = max(1, fwc.glyphWidth*dimen.DU(fwc.stretch))
 		return g, true
 	}
 	return knot, isChanged
 }
 
-func max(d1, d2 dimen.Dimen) dimen.Dimen {
+func max(d1, d2 dimen.DU) dimen.DU {
 	if d1 > d2 {
 		return d1
 	}

@@ -1,38 +1,14 @@
-// Package dimen implements dimensions and units.
-//
 /*
-BSD License
+Package dimen implements dimensions and units.
 
-Copyright (c) 2017–21, Norbert Pillmayer (norbert@pillmayer.com)
+License
 
-All rights reserved.
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
+*/
 package dimen
 
 import (
@@ -46,29 +22,29 @@ import (
 // Online dimension conversion for print:
 // http://www.unitconversion.org/unit_converter/typography-ex.html
 
-// Dimen is a dimension type.
+// DU is a 'design unit' typ.
 // Values are in scaled big points (different from TeX).
-type Dimen int32
+type DU int32
 
 // Some pre-defined dimensions
 const (
-	Zero Dimen = 0
-	SP   Dimen = 1       // scaled point = BP / 65536
-	BP   Dimen = 65536   // big point (PDF) = 1/72 inch
-	PX   Dimen = 65536   // "pixels"
-	PT   Dimen = 65291   // printers point 1/72.27 inch
-	MM   Dimen = 185771  // millimeters
-	CM   Dimen = 1857710 // centimeters
-	IN   Dimen = 4718592 // inch
+	Zero DU = 0
+	SP   DU = 1       // scaled point = BP / 65536
+	BP   DU = 65536   // big point (PDF) = 1/72 inch
+	PX   DU = 65536   // "pixels"
+	PT   DU = 65291   // printers point 1/72.27 inch
+	MM   DU = 185771  // millimeters
+	CM   DU = 1857710 // centimeters
+	IN   DU = 4718592 // inch
 )
 
 // Infinity is the largest possible dimension
 const Infinity = math.MaxInt32
 
 // Some very stretchable dimensions
-const Fil Dimen = Infinity - 3
-const Fill Dimen = Infinity - 2
-const Filll Dimen = Infinity - 1
+const Fil DU = Infinity - 3
+const Fill DU = Infinity - 2
+const Filll DU = Infinity - 1
 
 // Some common paper sizes
 var DINA4 = Point{210 * MM, 297 * MM}
@@ -77,12 +53,12 @@ var USLetter = Point{216 * MM, 279 * MM}
 var USLegal = Point{216 * MM, 357 * MM}
 
 // Stringer implementation.
-func (d Dimen) String() string {
+func (d DU) String() string {
 	return fmt.Sprintf("%dsp", int32(d))
 }
 
 // Points returns a dimension in big (PDF) points.
-func (d Dimen) Points() float64 {
+func (d DU) Points() float64 {
 	return float64(d) / float64(BP)
 }
 
@@ -90,7 +66,7 @@ func (d Dimen) Points() float64 {
 //
 // TODO see methods in https://golang.org/pkg/image/#Point
 type Point struct {
-	X, Y Dimen
+	X, Y DU
 }
 
 // Origin is origin
@@ -110,13 +86,13 @@ type Rect struct {
 
 // Width returns the width of a rectangle, i.e. the difference between x-coordinates
 // of bottom-right and top-left corner.
-func (r Rect) Width() Dimen {
+func (r Rect) Width() DU {
 	return r.BotR.X - r.TopL.X
 }
 
 // Height returns the height of a rectangle, i.e. the difference between y-coordinates
 // of bottom-right and top-left corner.
-func (r Rect) Height() Dimen {
+func (r Rect) Height() DU {
 	return r.BotR.Y - r.TopL.Y
 }
 
@@ -127,7 +103,7 @@ var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[cminpxtc]{2})?$`)
 // ParseDimen parses a string to return a dimension. Syntax is CSS Unit.
 // If a percentage value is given (`80%`), the second return value will be true.
 //
-func ParseDimen(s string) (Dimen, bool, error) {
+func ParseDimen(s string) (DU, bool, error) {
 	d := dimenPattern.FindStringSubmatch(s)
 	if len(d) < 2 {
 		return 0, false, errors.New("format error parsing dimension")
@@ -158,13 +134,13 @@ func ParseDimen(s string) (Dimen, bool, error) {
 	if err != nil {
 		return 0, false, errors.New("format error parsing dimension")
 	}
-	return Dimen(n) * scale, ispcnt, nil
+	return DU(n) * scale, ispcnt, nil
 }
 
 // ---------------------------------------------------------------------------
 
 // Min returns the smaller of two dimensions.
-func Min(a, b Dimen) Dimen {
+func Min(a, b DU) DU {
 	if a < b {
 		return a
 	}
@@ -172,7 +148,7 @@ func Min(a, b Dimen) Dimen {
 }
 
 // Max returns the greater of two dimensions.
-func Max(a, b Dimen) Dimen {
+func Max(a, b DU) DU {
 	if a > b {
 		return a
 	}

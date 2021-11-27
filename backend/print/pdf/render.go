@@ -74,7 +74,7 @@ func makeConv(papersize pdfapi.Point, pagegeom pdfapi.Rectangle, scale float64) 
 }
 
 // Scaled points ➝ PDF units
-func (cv *conv) ScaledUnit(d dimen.Dimen) pdfapi.Unit {
+func (cv *conv) ScaledUnit(d dimen.DU) pdfapi.Unit {
 	u := dimen2unit(d) * cv.scale
 	return u
 }

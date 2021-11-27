@@ -2,10 +2,11 @@ package otquery
 
 import (
 	"errors"
-	"image"
 	"strings"
 
+	"github.com/npillmayer/tyse/core/font/opentype"
 	"github.com/npillmayer/tyse/core/font/opentype/ot"
+	"golang.org/x/image/font/sfnt"
 	"golang.org/x/text/language"
 )
 
@@ -44,45 +45,37 @@ func GlyphIndex(otf *ot.Font, codepoint rune) ot.GlyphIndex {
 	}
 }
 
-// FontMetricsInfo contains selected metric information for a font.
-type FontMetricsInfo struct {
-	UnitsPerEm      int    // ad-hoc units per em
-	Ascent, Descent int16  // ascender and descender
-	MaxAdvance      uint16 // maximum advance width value in 'hmtx' table
-	LineGap         int16  // typographic line gap
-}
-
 // FontMetrics retrieves selected metrics of a font.
-func FontMetrics(otf *ot.Font) (FontMetricsInfo, error) {
-	metrics := FontMetricsInfo{}
+func FontMetrics(otf *ot.Font) (opentype.FontMetricsInfo, error) {
+	metrics := opentype.FontMetricsInfo{}
 	if hhea := otf.Table(ot.T("hhea")); hhea != nil {
 		tracer().Debugf("hhea")
 		b := hhea.Binary()
-		metrics.Ascent = i16(b[4:])
-		metrics.Descent = i16(b[6:])
-		metrics.LineGap = i16(b[8:])
-		metrics.MaxAdvance = u16(b[8:])
+		metrics.Ascent = sfnt.Units(i16(b[4:]))
+		metrics.Descent = sfnt.Units(i16(b[6:]))
+		metrics.LineGap = sfnt.Units(i16(b[8:]))
+		metrics.MaxAdvance = sfnt.Units(u16(b[8:]))
 	}
 	if metrics.Ascent == 0 && metrics.Descent == 0 {
 		if os2 := otf.Table(ot.T("OS/2")); os2 != nil {
 			tracer().Debugf("OS/2")
 			b := os2.Binary()
-			a := i16(b[68:])
+			a := sfnt.Units(i16(b[68:]))
 			if a > metrics.Ascent {
 				tracer().Debugf("override of ascent: %d -> %d", metrics.Ascent, a)
-				metrics.Ascent = a
+				metrics.Ascent = sfnt.Units(a)
 			}
-			d := i16(b[70:])
+			d := sfnt.Units(i16(b[70:]))
 			if d < metrics.Descent {
 				tracer().Debugf("override of descent: %d -> %d", metrics.Descent, d)
-				metrics.Descent = d
+				metrics.Descent = sfnt.Units(d)
 			}
 		}
 	}
 	h := otf.Table(ot.T("head"))
 	if h != nil {
 		head := h.Self().AsHead()
-		metrics.UnitsPerEm = int(head.UnitsPerEm)
+		metrics.UnitsPerEm = sfnt.Units(head.UnitsPerEm)
 	}
 	if metrics.Ascent == 0 && metrics.Descent == 0 {
 		return metrics, errors.New("cannot find metric information in font")
@@ -90,16 +83,9 @@ func FontMetrics(otf *ot.Font) (FontMetricsInfo, error) {
 	return metrics, nil
 }
 
-// GlyphMetricsInfo contains all the metric information for a glyph.
-type GlyphMetricsInfo struct {
-	Advance  uint16          // advance width
-	LSB, RSB int16           // side bearings
-	BBox     image.Rectangle // bounding box
-}
-
 // GlyphMetrics retrieves metrics for a given glyph.
-func GlyphMetrics(otf *ot.Font, gid ot.GlyphIndex) (GlyphMetricsInfo, error) {
-	metrics := GlyphMetricsInfo{}
+func GlyphMetrics(otf *ot.Font, gid ot.GlyphIndex) (opentype.GlyphMetricsInfo, error) {
+	metrics := opentype.GlyphMetricsInfo{}
 	//
 	// table HMtx: advance width and left side bearing
 	var hmtx *ot.HMtxTable
@@ -119,15 +105,15 @@ func GlyphMetrics(otf *ot.Font, gid ot.GlyphIndex) (GlyphMetricsInfo, error) {
 	if gid < ot.GlyphIndex(mtxcnt) {
 		l := ot.ParseList(hmtx.Binary(), mtxcnt, 4)
 		entry := l.Get(int(gid))
-		metrics.Advance = u16(entry.Bytes())
-		metrics.LSB = i16(entry.Bytes()[2:])
+		metrics.Advance = sfnt.Units(u16(entry.Bytes()))
+		metrics.LSB = sfnt.Units(i16(entry.Bytes()[2:]))
 	} else { // advance repetition of last advance in hmtx
 		l := ot.ParseList(hmtx.Binary(), mtxcnt, 4)
 		lastEntry := l.Get(mtxcnt - 1)
-		metrics.Advance = u16(lastEntry.Bytes())
+		metrics.Advance = sfnt.Units(u16(lastEntry.Bytes()))
 		l = ot.ParseList(hmtx.Binary()[mtxcnt*4:], diff, 2)
 		entry := l.Get(int(gid) - mtxcnt)
-		metrics.LSB = i16(entry.Bytes())
+		metrics.LSB = sfnt.Units(i16(entry.Bytes()))
 	}
 	//
 	// table glyf: bounding box
@@ -136,12 +122,12 @@ func GlyphMetrics(otf *ot.Font, gid ot.GlyphIndex) (GlyphMetricsInfo, error) {
 			loca := lo.Self().AsLoca()
 			loc := loca.IndexToLocation(gid)
 			b := glyf.Binary()[loc:]
-			metrics.BBox = image.Rect(
-				int(i16(b[2:])),
-				int(i16(b[4:])),
-				int(i16(b[6:])),
-				int(i16(b[8:])),
-			)
+			metrics.BBox = opentype.BoundingBox{
+				MinX: sfnt.Units(i16(b[2:])),
+				MinY: sfnt.Units(i16(b[4:])),
+				MaxX: sfnt.Units(i16(b[6:])),
+				MaxY: sfnt.Units(i16(b[8:])),
+			}
 		}
 	}
 	//
@@ -150,7 +136,7 @@ func GlyphMetrics(otf *ot.Font, gid ot.GlyphIndex) (GlyphMetricsInfo, error) {
 	// If a glyph has no contours, xMax/xMin are not defined. The left side bearing indicated
 	// in the 'hmtx' table for such glyphs should be zero.
 	if !metrics.BBox.Empty() { // leave RSB for empty bboxes
-		metrics.RSB = int16(metrics.Advance) - (metrics.LSB + int16(metrics.BBox.Dx()))
+		metrics.RSB = metrics.Advance - (metrics.LSB + metrics.BBox.Dx())
 	}
 	return metrics, nil
 }

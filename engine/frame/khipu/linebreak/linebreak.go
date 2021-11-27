@@ -58,17 +58,17 @@ type CharPos int64
 
 // Parameters is a collection of configuration parameters for line-breaking.
 type Parameters struct {
-	Tolerance            Merits      // acceptable demerits
-	PreTolerance         Merits      // acceptabale demerits for first (rough) pass
-	LinePenalty          Merits      // penalty for an additional line
-	HyphenPenalty        Merits      // penalty for hyphenating words
-	ExHyphenPenalty      Merits      // penalty for explicit words
-	DoubleHyphenDemerits Merits      // demerits for consecutive hyphens
-	FinalHyphenDemerits  Merits      // demerits for hyphen in the last line
-	EmergencyStretch     dimen.Dimen // stretching acceptable when desperate
-	LeftSkip             khipu.Glue  // glue at left edge of paragraphs
-	RightSkip            khipu.Glue  // glue at right edge of paragraphs
-	ParFillSkip          khipu.Glue  // glue at the end of a paragraph
+	Tolerance            Merits     // acceptable demerits
+	PreTolerance         Merits     // acceptabale demerits for first (rough) pass
+	LinePenalty          Merits     // penalty for an additional line
+	HyphenPenalty        Merits     // penalty for hyphenating words
+	ExHyphenPenalty      Merits     // penalty for explicit words
+	DoubleHyphenDemerits Merits     // demerits for consecutive hyphens
+	FinalHyphenDemerits  Merits     // demerits for hyphen in the last line
+	EmergencyStretch     dimen.DU   // stretching acceptable when desperate
+	LeftSkip             khipu.Glue // glue at left edge of paragraphs
+	RightSkip            khipu.Glue // glue at right edge of paragraphs
+	ParFillSkip          khipu.Glue // glue at the end of a paragraph
 }
 
 // DefaultParameters are the standard line-breaking parameters.
@@ -82,7 +82,7 @@ var DefaultParameters = &Parameters{
 	ExHyphenPenalty:      50,
 	DoubleHyphenDemerits: 0,
 	FinalHyphenDemerits:  50,
-	EmergencyStretch:     dimen.Dimen(dimen.BP * 50),
+	EmergencyStretch:     dimen.DU(dimen.BP * 50),
 	LeftSkip:             khipu.NewGlue(0, 0, 0),
 	RightSkip:            khipu.NewGlue(0, 0, 0),
 	ParFillSkip:          khipu.NewGlue(0, 0, 0),
@@ -92,13 +92,13 @@ var DefaultParameters = &Parameters{
 
 // WSS (width stretch & shrink) is a type to hold an elastic width (of text).
 type WSS struct {
-	W   dimen.Dimen
-	Min dimen.Dimen
-	Max dimen.Dimen
+	W   dimen.DU
+	Min dimen.DU
+	Max dimen.DU
 }
 
 // Spread returns the width's of an elastic WSS.
-func (wss WSS) Spread() (w dimen.Dimen, min dimen.Dimen, max dimen.Dimen) {
+func (wss WSS) Spread() (w dimen.DU, min dimen.DU, max dimen.DU) {
 	return wss.W, wss.Min, wss.Max
 }
 
@@ -169,16 +169,16 @@ type Cursor interface {
 
 // ParShape is a type to return the line length for a given line number.
 type ParShape interface {
-	LineLength(int32) dimen.Dimen
+	LineLength(int32) dimen.DU
 }
 
-type rectParShape dimen.Dimen
+type rectParShape dimen.DU
 
-func (r rectParShape) LineLength(int32) dimen.Dimen {
-	return dimen.Dimen(r)
+func (r rectParShape) LineLength(int32) dimen.DU {
+	return dimen.DU(r)
 }
 
 // RectangularParShape returns a Parshape for paragraphs of constant line length.
-func RectangularParShape(linelen dimen.Dimen) ParShape {
+func RectangularParShape(linelen dimen.DU) ParShape {
 	return rectParShape(linelen)
 }

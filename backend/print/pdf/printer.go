@@ -441,10 +441,10 @@ func dpt2upt(p dimen.Point) pdfapi.Point {
 	}
 }
 
-func dimen2unit(d dimen.Dimen) pdfapi.Unit {
+func dimen2unit(d dimen.DU) pdfapi.Unit {
 	return pdfapi.Unit(d) / pdfapi.Unit(dimen.BP)
 }
 
-func unit2dimen(u pdfapi.Unit) dimen.Dimen {
-	return dimen.Dimen(float64(u) * float64(dimen.BP))
+func unit2dimen(u pdfapi.Unit) dimen.DU {
+	return dimen.DU(float64(u) * float64(dimen.BP))
 }

@@ -240,7 +240,7 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 		box.glyphs = env.shaper.Shape(word, styleset.Font())
 		//
 		// 5. measure text of glyph sequence
-		box.Width, box.Height, box.Depth = box.glyphs.BBoxDimens()
+		box.Width, box.Height, box.Depth = box.glyphs.BBox()
 		pos = end
 		wordsKhipu.AppendKnot(box)
 	}

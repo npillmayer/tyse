@@ -149,7 +149,7 @@ func (box *Box) ContentHeight() css.DimenT {
 // dimensions as well.
 // If box has box-sizing set to `border-box` and one of the width dimensions is
 // of unknown value, false is returned and the content width is not set.
-func (box *Box) FixContentWidth(w dimen.Dimen) bool {
+func (box *Box) FixContentWidth(w dimen.DU) bool {
 	W, ok := fixPaddingAndBorderWidthFromContentWidth(box, w)
 	if !ok {
 		return false
@@ -254,7 +254,7 @@ func (box *Box) BorderBoxHeight() css.DimenT {
 //
 // Will return true if all inner horizontal dimensions (i.e., excluding
 // margins) are fixed.
-func (box *Box) FixBorderBoxWidth(w dimen.Dimen) {
+func (box *Box) FixBorderBoxWidth(w dimen.DU) {
 	if box.BorderBoxSizing {
 		box.W = css.SomeDimen(w)
 		_, ok := fixPaddingAndBorderWidthFromBorderBoxWidth(box, w)
@@ -345,7 +345,7 @@ func (box *Box) DecorationWidth(includeMargins bool) css.DimenT {
 	// return css.SomeDimen(w)
 }
 
-func (box *Box) FixPercentages(enclosingWidth dimen.Dimen) bool {
+func (box *Box) FixPercentages(enclosingWidth dimen.DU) bool {
 	fixed := true
 	for dir := Top; dir <= Left; dir++ {
 		if box.Padding[dir].IsPercent() {
@@ -447,7 +447,7 @@ func CollapseMargins(box1, box2 *Box) (css.DimenT, css.DimenT) {
 // So, if your <h1> is 500px wide, 10% padding = 0.1 × 500 pixels = 50 pixels.
 // Note that top and bottom padding will also be 10% of the _width_ of the element,
 // not 10% of the height of the element.
-func (box *Box) fixPaddingAndBorderWidth(w dimen.Dimen) bool {
+func (box *Box) fixPaddingAndBorderWidth(w dimen.DU) bool {
 	fixed := true
 	for dir := Top; dir <= Left; dir++ {
 		if box.Padding[dir].UnitString() == "%" {
@@ -465,13 +465,13 @@ func (box *Box) fixPaddingAndBorderWidth(w dimen.Dimen) bool {
 	return fixed
 }
 
-func setWFromEnclosing(box *Box, enclw dimen.Dimen) {
+func setWFromEnclosing(box *Box, enclw dimen.DU) {
 	if !box.W.IsPercent() {
 		return
 	}
 	box.W = css.SomeDimen(box.W.Unwrap() * enclw)
 }
-func fixPaddingAndBorderWidthFromBorderBoxWidth(box *Box, w dimen.Dimen) (css.DimenT, bool) {
+func fixPaddingAndBorderWidthFromBorderBoxWidth(box *Box, w dimen.DU) (css.DimenT, bool) {
 	T().Debugf("fix padding from bbox")
 	var hundredPcntW int64
 	var W css.DimenT
@@ -495,7 +495,7 @@ func fixPaddingAndBorderWidthFromBorderBoxWidth(box *Box, w dimen.Dimen) (css.Di
 		}
 		hundredPcntW = int64(total) * 100 / pcnt
 		T().Debugf("100%% = %v", hundredPcntW)
-		W = css.SomeDimen(dimen.Dimen(hundredPcntW))
+		W = css.SomeDimen(dimen.DU(hundredPcntW))
 	} else {
 		hundredPcntW = int64(w)
 		W = css.SomeDimen(w)
@@ -504,7 +504,7 @@ func fixPaddingAndBorderWidthFromBorderBoxWidth(box *Box, w dimen.Dimen) (css.Di
 	return W, true
 }
 
-func fixPaddingAndBorderWidthFromContentWidth(box *Box, w dimen.Dimen) (css.DimenT, bool) {
+func fixPaddingAndBorderWidthFromContentWidth(box *Box, w dimen.DU) (css.DimenT, bool) {
 	var hundredPcntW int64
 	var W css.DimenT
 	if box.BorderBoxSizing {
@@ -526,7 +526,7 @@ func fixPaddingAndBorderWidthFromContentWidth(box *Box, w dimen.Dimen) (css.Dime
 			}
 		}
 		hundredPcntW = int64(total) * 100 / pcnt
-		W = css.SomeDimen(dimen.Dimen(hundredPcntW))
+		W = css.SomeDimen(dimen.DU(hundredPcntW))
 	} else {
 		hundredPcntW = int64(w)
 		W = css.SomeDimen(w)
@@ -539,16 +539,16 @@ func setPcntPaddingAndBorder(box *Box, hundredPcntW int64) {
 	for dir := Top; dir <= Left; dir++ {
 		if box.Padding[dir].IsPercent() {
 			p := box.Padding[dir].Unwrap()
-			box.Padding[dir] = css.SomeDimen(dimen.Dimen(int64(p) * hundredPcntW / 100))
+			box.Padding[dir] = css.SomeDimen(dimen.DU(int64(p) * hundredPcntW / 100))
 		}
 		if box.BorderWidth[dir].IsPercent() {
 			p := box.BorderWidth[dir].Unwrap()
-			box.BorderWidth[dir] = css.SomeDimen(dimen.Dimen(int64(p) * hundredPcntW / 100))
+			box.BorderWidth[dir] = css.SomeDimen(dimen.DU(int64(p) * hundredPcntW / 100))
 		}
 	}
 }
 
-func (box *Box) fixPaddingAndBorderWidthFromBorderBox(w dimen.Dimen) css.DimenT {
+func (box *Box) fixPaddingAndBorderWidthFromBorderBox(w dimen.DU) css.DimenT {
 	// if !box.BorderBoxSizing {
 	// 	panic("content box sizing set, cannot fix border box")
 	// }
@@ -590,7 +590,7 @@ func (box *Box) fixPaddingAndBorderWidthFromBorderBox(w dimen.Dimen) css.DimenT 
 		return css.Dimen()
 	}
 	unit := total / pcnt
-	return css.SomeDimen(dimen.Dimen(unit * 100))
+	return css.SomeDimen(dimen.DU(unit * 100))
 	//return box.FixPaddingAndBorderWidth(dimen.Dimen(unit * 100))
 }
 
@@ -620,7 +620,7 @@ var ErrUnderspecified error = errors.New("box width dimensions are underspecifie
 // Returns a flag denoting whether there was enough information to specify each width
 // dimension.
 //
-func FixDimensionsFromEnclosingWidth(box *Box, enclosingWidth dimen.Dimen) (bool, error) {
+func FixDimensionsFromEnclosingWidth(box *Box, enclosingWidth dimen.DU) (bool, error) {
 	T().Debugf("fix contraint dimensions, enclosing = %v", enclosingWidth)
 	fixIllegalDimensionSpecifications(box)
 	box.FixPercentages(enclosingWidth)
@@ -651,13 +651,13 @@ func FixDimensionsFromEnclosingWidth(box *Box, enclosingWidth dimen.Dimen) (bool
 	return true, nil
 }
 
-type calcFn func(box *Box, enclosing dimen.Dimen) (css.DimenT, error)
+type calcFn func(box *Box, enclosing dimen.DU) (css.DimenT, error)
 
 func asCalcFn(f interface{}) calcFn {
-	return f.(func(box *Box, enclosing dimen.Dimen) (css.DimenT, error))
+	return f.(func(box *Box, enclosing dimen.DU) (css.DimenT, error))
 }
 
-func takeWidth(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
+func takeWidth(box *Box, enclosing dimen.DU) (css.DimenT, error) {
 	T().Debugf("calculating width: simply take is as is = %v", box.W)
 	fixed := distributeHorizontalMarginSpace(box, enclosing)
 	if !fixed {
@@ -668,7 +668,7 @@ func takeWidth(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
 
 // Spec: If 'width' is set to 'auto', any other 'auto' values become '0'
 // and 'width' follows from the resulting equality.
-func calcWidthAsRest(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
+func calcWidthAsRest(box *Box, enclosing dimen.DU) (css.DimenT, error) {
 	//T().Debugf("calculate width as rest for box %s", box.DebugString())
 	left, err := box.Margins[Left].MatchToDimen(option.Of{
 		option.None: dimen.Zero,
@@ -705,7 +705,7 @@ func calcWidthAsRest(box *Box, enclosing dimen.Dimen) (css.DimenT, error) {
 
 // distributeHorizontalMarginSpace distributes space into left and right margins
 // after the border-box has been fixed.
-func distributeHorizontalMarginSpace(box *Box, enclosing dimen.Dimen) bool {
+func distributeHorizontalMarginSpace(box *Box, enclosing dimen.DU) bool {
 	if !box.HasFixedBorderBoxWidth(false) {
 		return false
 	}
@@ -722,8 +722,8 @@ func distributeHorizontalMarginSpace(box *Box, enclosing dimen.Dimen) bool {
 		T().Errorf("distribute h-margins: %s", err.Error())
 		return false
 	}
-	r := remaining - l.(dimen.Dimen)
-	box.Margins[Left] = css.SomeDimen(l.(dimen.Dimen))
+	r := remaining - l.(dimen.DU)
+	box.Margins[Left] = css.SomeDimen(l.(dimen.DU))
 	box.Margins[Right] = css.SomeDimen(r)
 	return true
 }

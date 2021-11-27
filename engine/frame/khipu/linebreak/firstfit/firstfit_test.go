@@ -107,7 +107,7 @@ func TestPrincess(t *testing.T) {
 
 func newTestLinebreaker(t *testing.T, text string, len int) (*linebreaker, *khipu.Khipu) {
 	kh, cursor, _ := setupFFTest(t, text, false)
-	parshape := linebreak.RectangularParShape(dimen.Dimen(len) * 10 * dimen.BP)
+	parshape := linebreak.RectangularParShape(dimen.DU(len) * 10 * dimen.BP)
 	lb, err := newLinebreaker(cursor, parshape, nil)
 	if err != nil {
 		t.Error(err)

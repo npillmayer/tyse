@@ -106,7 +106,7 @@ func TestKPOverfull(t *testing.T) {
 	//
 	kh, cursor, dotfile := setupKPTest(t, "The quick brown fox.", false)
 	params := NewKPDefaultParameters()
-	params.EmergencyStretch = dimen.Dimen(0)
+	params.EmergencyStretch = dimen.DU(0)
 	params.Tolerance = 400
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	parshape := linebreak.RectangularParShape(10 * 10 * dimen.BP)

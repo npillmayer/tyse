@@ -86,7 +86,7 @@ type ScalableFont struct {
 type TypeCase struct {
 	scalableFontParent *ScalableFont
 	font               xfont.Face // Go uses 'face' and 'font' in an inverse manner
-	size               float64
+	size               float32
 	// script
 	// language
 }
@@ -120,7 +120,7 @@ func ParseOpenTypeFont(fbytes []byte) (f *ScalableFont, err error) {
 
 // PrepareCase prepares a typecase in a given point size, e.g. "Helvetica bold 10pt"
 // from an existing font "Helvetiva bold", which has been previously loaded.
-func (sf *ScalableFont) PrepareCase(fontsize float64) (*TypeCase, error) {
+func (sf *ScalableFont) PrepareCase(fontsize float32) (*TypeCase, error) {
 	// TODO: check if language fits to script
 	// TODO: check if font supports script
 	typecase := &TypeCase{}
@@ -130,7 +130,7 @@ func (sf *ScalableFont) PrepareCase(fontsize float64) (*TypeCase, error) {
 		fontsize = 10.0
 	}
 	options := &opentype.FaceOptions{
-		Size: fontsize,
+		Size: float64(fontsize),
 		DPI:  600,
 	}
 	f, err := opentype.NewFace(sf.SFNT, options)
@@ -147,7 +147,7 @@ func (tc *TypeCase) ScalableFontParent() *ScalableFont {
 }
 
 // PtSize returns the point-size of a typecase.
-func (tc *TypeCase) PtSize() float64 {
+func (tc *TypeCase) PtSize() float32 {
 	return tc.size
 }
 
@@ -240,7 +240,7 @@ func (fr *Registry) StoreFont(normalizedName string, f *ScalableFont) {
 // If not typecase can be produced, TypeCase will derive one from a system-wide
 // fallback font and return it, together with an error message.
 //
-func (fr *Registry) TypeCase(normalizedName string, size float64) (*TypeCase, error) {
+func (fr *Registry) TypeCase(normalizedName string, size float32) (*TypeCase, error) {
 	//
 	tracer().Debugf("registry searches for font %s at %.2f", normalizedName, size)
 	//fname := NormalizeFontname(name, style, weight)
@@ -311,7 +311,7 @@ func NormalizeFontname(fname string, style xfont.Style, weight xfont.Weight) str
 	return fname
 }
 
-func appendSize(fname string, size float64) string {
+func appendSize(fname string, size float32) string {
 	fname = fmt.Sprintf("%s-%.2f", fname, size)
 	return fname
 }

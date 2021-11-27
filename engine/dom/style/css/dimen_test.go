@@ -18,7 +18,7 @@ func TestDimen(t *testing.T) {
 	//
 	p := style.Property("100pt")
 	d := DimenOption(p)
-	if d.Unwrap() != dimen.Dimen(100)*dimen.PT {
+	if d.Unwrap() != dimen.DU(100)*dimen.PT {
 		t.Errorf("expected 100 PT (%d), have %d", 100*dimen.PT, d)
 	}
 	//

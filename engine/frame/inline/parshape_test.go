@@ -48,7 +48,7 @@ func TestParaPolygon(t *testing.T) {
 
 // --- Helpers ----------------------------------------------------------
 
-func makeIsoBox(a, b, c, d dimen.Dimen) isoBox {
+func makeIsoBox(a, b, c, d dimen.DU) isoBox {
 	return isoBox{
 		TopL: dimen.Point{X: a, Y: b},
 		BotR: dimen.Point{X: c, Y: d},

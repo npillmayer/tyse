@@ -28,14 +28,14 @@ type LineBox struct {
 	//tree.Node
 	Box     *frame.Box
 	khipu   *khipu.Khipu
-	indent  dimen.Dimen   // horizontal offset of the text within the line box
+	indent  dimen.DU      // horizontal offset of the text within the line box
 	pos     int64         // start position within the khipu
 	length  int64         // length of the segment for this line
 	context frame.Context // formatting context
 	//ChildInx uint32      // this box represents a text node at #ChildInx of the principal box
 }
 
-func NewLineBox(k *khipu.Khipu, start, length int64, indent dimen.Dimen) *LineBox {
+func NewLineBox(k *khipu.Khipu, start, length int64, indent dimen.DU) *LineBox {
 	lbox := &LineBox{
 		Box:    frame.InitEmptyBox(&frame.Box{}),
 		khipu:  k,
@@ -152,7 +152,7 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]frame.Container, error) 
 		pos := breakpoints[i].Position()
 		T().Debugf("%3d: %s", i, para.Khipu.Text(j, pos))
 		l := pos - j
-		indent := dimen.Dimen(0) // TODO derive from parshape
+		indent := dimen.DU(0) // TODO derive from parshape
 		linebox := NewLineBox(para.Khipu, breakpoints[i].Position(), l, indent)
 		linebox.Box.W = box.W
 		lines = append(lines, linebox)
@@ -231,8 +231,8 @@ func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, c frame.Co
 	return regs
 }
 
-func addLineHeights(pbox *boxtree.PrincipalBox) dimen.Dimen {
-	var height dimen.Dimen
+func addLineHeights(pbox *boxtree.PrincipalBox) dimen.DU {
+	var height dimen.DU
 	// ctx := pbox.Context()
 	// children := ctx.TreeNode().Children()
 	// var lastLine *frame.Box

@@ -46,17 +46,17 @@ type inheritedParams struct {
 	flowRoot   *frame.FlowRoot
 	view       *View
 	W          css.DimenT // enclosing width    fixed ?
-	MinW, MaxW dimen.Dimen
+	MinW, MaxW dimen.DU
 }
 
 type synthesizedParams struct {
-	W       dimen.Dimen
-	H       dimen.Dimen
+	W       dimen.DU
+	H       dimen.DU
 	lastErr error
 }
 
 type View struct {
-	Width dimen.Dimen
+	Width dimen.DU
 }
 
 func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthesizedParams) {
@@ -261,7 +261,7 @@ func solveWidthForContent(c frame.Container, inherited inheritedParams) (syn syn
 	panic("TODO")
 }
 
-func SolveWidthBottomUp(c frame.Container, enclosing dimen.Dimen) (*frame.Box, error) {
+func SolveWidthBottomUp(c frame.Container, enclosing dimen.DU) (*frame.Box, error) {
 	panic("TODO")
 }
 

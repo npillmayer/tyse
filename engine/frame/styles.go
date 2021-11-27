@@ -89,7 +89,7 @@ type TextStyle struct {
 type BorderStyle struct {
 	LineColor    color.Color
 	LineStyle    int8
-	CornerRadius dimen.Dimen
+	CornerRadius dimen.DU
 }
 
 // LineStyle is a type for border line styles.
@@ -172,11 +172,11 @@ func (set StyleSet) Styles() *style.PropertyMap {
 	return set.Props
 }
 
-func (set StyleSet) Parindent() dimen.Dimen {
+func (set StyleSet) Parindent() dimen.DU {
 	return 0
 }
 
-func (set StyleSet) Space() (dimen.Dimen, dimen.Dimen, dimen.Dimen) {
+func (set StyleSet) Space() (dimen.DU, dimen.DU, dimen.DU) {
 	// respect pre WS formatting
 	return 5 * dimen.BP, 8 * dimen.BP, 4 * dimen.BP
 }

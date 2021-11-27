@@ -178,7 +178,7 @@ func (loader fontLoader) Descriptor() font.Descriptor {
 // Typecases are not returned synchronously, but rather as a promise
 // of kind TypeCasePromise (async/await-pattern).
 //
-func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight, size float64) TypeCasePromise {
+func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight, size float32) TypeCasePromise {
 	// TODO include a context parameter
 	desc := font.Descriptor{
 		Family: pattern,

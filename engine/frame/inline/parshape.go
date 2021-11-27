@@ -27,15 +27,15 @@ func OutlineParshape(box *frame.Box, leftAlign, rightAlign []*frame.Box) linebre
 }
 
 type polygonParshape struct {
-	lineskip dimen.Dimen
-	width    dimen.Dimen
+	lineskip dimen.DU
+	width    dimen.DU
 	polygon  *isoPolygon
 }
 
 // LineLength is part of interface ParShape. It returns the line width for line
 // number l.
 // TODO To calculate correctly, lineskip has to be variable. How?
-func (pp polygonParshape) LineLength(l int32) dimen.Dimen {
+func (pp polygonParshape) LineLength(l int32) dimen.DU {
 	w := pp.width
 	for _, b := range pp.polygon.stack {
 		if int32(b.TopL.Y) > l*int32(pp.lineskip) {
@@ -302,14 +302,14 @@ func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 
 // --- Helpers ----------------------------------------------------------
 
-func min(a, b dimen.Dimen) dimen.Dimen {
+func min(a, b dimen.DU) dimen.DU {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func max(a, b dimen.Dimen) dimen.Dimen {
+func max(a, b dimen.DU) dimen.DU {
 	if a > b {
 		return a
 	}
