@@ -1,10 +1,11 @@
-package font
+package fontregistry
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/tyse/core/font"
 	xfont "golang.org/x/image/font"
 )
 
@@ -61,7 +62,7 @@ func TestNormalizeFont(t *testing.T) {
 func TestOpenOpenTypeCaseCreation(t *testing.T) {
 	//fontpath := locate.FileResource("GentiumPlus-R.ttf", "font")
 	fontpath := "../locate/resources/packaged/fonts/GentiumPlus-R.ttf"
-	f, err := LoadOpenTypeFont(fontpath)
+	f, err := font.LoadOpenTypeFont(fontpath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,6 +71,6 @@ func TestOpenOpenTypeCaseCreation(t *testing.T) {
 		t.Logf("cannot create OT face for [%s]\n", f.Fontname)
 		t.Fatal(err)
 	}
-	metrics := tc.font.Metrics()
-	fmt.Printf("interline spacing for [%s]@%.1fpt is %s\n", f.Fontname, tc.size, metrics.Height)
+	metrics := tc.Metrics()
+	fmt.Printf("interline spacing for [%s]@%.1fpt is %s\n", f.Fontname, tc.PtSize(), metrics.Height)
 }

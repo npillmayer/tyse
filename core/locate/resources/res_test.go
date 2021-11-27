@@ -6,7 +6,7 @@ import (
 
 	"github.com/npillmayer/schuko/schukonf/testconfig"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
-	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/core/font/fontregistry"
 	xfont "golang.org/x/image/font"
 )
 
@@ -66,7 +66,7 @@ func TestResolveGoogleFont(t *testing.T) {
 	}
 	t.Logf("pt-size of typecase = %f", typecase.PtSize())
 	t.Logf("name of typecase = %s", typecase.ScalableFontParent().Fontname)
-	font.GlobalRegistry().LogFontList()
+	fontregistry.GlobalRegistry().LogFontList()
 }
 
 var fclist = `

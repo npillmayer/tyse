@@ -15,6 +15,7 @@ import (
 	"github.com/npillmayer/schuko"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/core/font/fontregistry"
 	xfont "golang.org/x/image/font"
 )
 
@@ -188,8 +189,8 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 		result := fontPlusErr{
 			desc: desc,
 		}
-		name := font.NormalizeFontname(pattern, style, weight)
-		if t, err := font.GlobalRegistry().TypeCase(name, size); err == nil {
+		name := fontregistry.NormalizeFontname(pattern, style, weight)
+		if t, err := fontregistry.GlobalRegistry().TypeCase(name, size); err == nil {
 			result.font = t
 			result.desc.Family = t.ScalableFontParent().Fontname
 			ch <- result
@@ -200,7 +201,7 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 		fonts, _ := packaged.ReadDir("packaged/fonts")
 		var fname string // path to embedded font, if any
 		for _, f := range fonts {
-			if font.Matches(f.Name(), pattern, style, weight) {
+			if fontregistry.Matches(f.Name(), pattern, style, weight) {
 				tracer().Debugf("found embedded font file %s", f.Name())
 				fname = f.Name()
 				break
@@ -237,8 +238,8 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 				for _, finfo := range fiList { // morph Google font info font font.Descriptor list
 					l = append(l, finfo.Descriptor)
 				}
-				desc, variant, confidence := font.ClosestMatch(l, pattern, style, weight)
-				if confidence > font.LowConfidence {
+				desc, variant, confidence := fontregistry.ClosestMatch(l, pattern, style, weight)
+				if confidence > fontregistry.LowConfidence {
 					var fpath string
 					var i int
 					for j, d := range fiList { // find matching variant again
@@ -256,12 +257,12 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 		}
 		if f != nil { // if found, enter into font registry
 			f.Fontname = name
-			font.GlobalRegistry().StoreFont(name, f)
-			result.font, result.err = font.GlobalRegistry().TypeCase(name, size)
+			fontregistry.GlobalRegistry().StoreFont(name, f)
+			result.font, result.err = fontregistry.GlobalRegistry().TypeCase(name, size)
 			result.desc.Family = name
 			//font.GlobalRegistry().DebugList()
 		} else { // use fallback font
-			result.font, _ = font.GlobalRegistry().TypeCase("fallback", size)
+			result.font, _ = fontregistry.GlobalRegistry().TypeCase("fallback", size)
 			result.desc.Family = "fallback"
 		}
 		ch <- result
@@ -311,7 +312,7 @@ func FindLocalFont(conf schuko.Configuration, pattern string, style xfont.Style,
 	if err == nil && fpath != "" {
 		tracer().Debugf("%s is a system font: %s", pattern, fpath)
 		desc = font.Descriptor{
-			Family: font.NormalizeFontname(pattern, style, weight),
+			Family: fontregistry.NormalizeFontname(pattern, style, weight),
 			Path:   fpath,
 		}
 	}

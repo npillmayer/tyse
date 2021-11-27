@@ -17,6 +17,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/core/font/fontregistry"
 	xfont "golang.org/x/image/font"
 )
 
@@ -110,9 +111,9 @@ func FindGoogleFont(conf schuko.Configuration, pattern string, style xfont.Style
 		//trace().Debugf("testing (%s)", strings.ToLower(finfo.Family))
 		if r.MatchString(strings.ToLower(finfo.Family)) {
 			tracer().Debugf("Google font name matches pattern: %s", finfo.Family)
-			_, _, conf := font.ClosestMatch([]font.Descriptor{finfo.Descriptor}, pattern,
+			_, _, conf := fontregistry.ClosestMatch([]font.Descriptor{finfo.Descriptor}, pattern,
 				style, weight)
-			if conf > font.LowConfidence {
+			if conf > fontregistry.LowConfidence {
 				fi = append(fi, finfo)
 				break
 			}

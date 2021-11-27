@@ -12,6 +12,7 @@ import (
 	"github.com/npillmayer/schuko"
 	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
+	"github.com/npillmayer/tyse/core/font/fontregistry"
 	xfont "golang.org/x/image/font"
 )
 
@@ -170,10 +171,10 @@ func findFontConfigFont(conf schuko.Configuration, pattern string, style xfont.S
 	if !loadedFontConfigListOK {
 		return
 	}
-	var confidence font.MatchConfidence
-	desc, variant, confidence = font.ClosestMatch(fontConfigDescriptors, pattern, style, weight)
+	var confidence fontregistry.MatchConfidence
+	desc, variant, confidence = fontregistry.ClosestMatch(fontConfigDescriptors, pattern, style, weight)
 	tracer().Debugf("closest fontconfig match confidence for %s|%s= %d", desc.Family, variant, confidence)
-	if confidence > font.LowConfidence {
+	if confidence > fontregistry.LowConfidence {
 		return
 	}
 	return font.Descriptor{}, ""
