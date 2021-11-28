@@ -151,7 +151,7 @@ type Table interface {
 	Self() TableSelf          // reference to itself
 }
 
-func newTable(tag Tag, b fontBinSegm, offset, size uint32) *genericTable {
+func newTable(tag Tag, b binarySegm, offset, size uint32) *genericTable {
 	t := &genericTable{tableBase{
 		data:   b,
 		name:   tag,
@@ -169,10 +169,10 @@ type genericTable struct {
 
 // tableBase is a common parent for all kinds of OpenType tables.
 type tableBase struct {
-	data   fontBinSegm // a table is a slice of font data
-	name   Tag         // 4-byte name as an integer
-	offset uint32      // from offset
-	length uint32      // to offset + length
+	data   binarySegm // a table is a slice of font data
+	name   Tag        // 4-byte name as an integer
+	offset uint32     // from offset
+	length uint32     // to offset + length
 	self   interface{}
 }
 
@@ -197,7 +197,7 @@ func (tb *tableBase) Self() TableSelf {
 
 func (tb *tableBase) Fields() Navigator {
 	tableTag := tb.name.String()
-	return navFactory(tableTag, tb.data, tb.data)
+	return NavigatorFactory(tableTag, tb.data, tb.data)
 }
 
 // TableSelf is a reference to a table. Its primary use is for converting
@@ -318,7 +318,7 @@ type HeadTable struct {
 	IndexToLocFormat uint16 // needed to interpret loca table
 }
 
-func newHeadTable(tag Tag, b fontBinSegm, offset, size uint32) *HeadTable {
+func newHeadTable(tag Tag, b binarySegm, offset, size uint32) *HeadTable {
 	t := &HeadTable{}
 	base := tableBase{
 		data:   b,
@@ -340,7 +340,7 @@ type KernTable struct {
 	headers []kernSubTableHeader
 }
 
-func newKernTable(tag Tag, b fontBinSegm, offset, size uint32) *KernTable {
+func newKernTable(tag Tag, b binarySegm, offset, size uint32) *KernTable {
 	t := &KernTable{}
 	base := tableBase{
 		data:   b,
@@ -403,7 +403,7 @@ func (t *LocaTable) IndexToLocation(gid GlyphIndex) uint32 {
 	return t.inx2loc(t, gid)
 }
 
-func newLocaTable(tag Tag, b fontBinSegm, offset, size uint32) *LocaTable {
+func newLocaTable(tag Tag, b binarySegm, offset, size uint32) *LocaTable {
 	t := &LocaTable{}
 	base := tableBase{
 		data:   b,
@@ -450,7 +450,7 @@ type MaxPTable struct {
 	NumGlyphs int
 }
 
-func newMaxPTable(tag Tag, b fontBinSegm, offset, size uint32) *MaxPTable {
+func newMaxPTable(tag Tag, b binarySegm, offset, size uint32) *MaxPTable {
 	t := &MaxPTable{}
 	base := tableBase{
 		data:   b,
@@ -469,7 +469,7 @@ type HHeaTable struct {
 	NumberOfHMetrics int
 }
 
-func newHHeaTable(tag Tag, b fontBinSegm, offset, size uint32) *HHeaTable {
+func newHHeaTable(tag Tag, b binarySegm, offset, size uint32) *HHeaTable {
 	t := &HHeaTable{}
 	base := tableBase{
 		data:   b,
@@ -498,7 +498,7 @@ type HMtxTable struct {
 	NumberOfHMetrics int
 }
 
-func newHMtxTable(tag Tag, b fontBinSegm, offset, size uint32) *HMtxTable {
+func newHMtxTable(tag Tag, b binarySegm, offset, size uint32) *HMtxTable {
 	t := &HMtxTable{}
 	base := tableBase{
 		data:   b,
@@ -528,7 +528,7 @@ func (t *HMtxTable) hMetrics(g GlyphIndex) (uint16, int16) {
 // Names struct for table 'name'
 type nameNames struct {
 	navBase
-	strbuf   fontBinSegm
+	strbuf   binarySegm
 	nameRecs array
 }
 

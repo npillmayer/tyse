@@ -27,7 +27,7 @@ type CMapTable struct {
 	GlyphIndexMap CMapGlyphIndex
 }
 
-func newCMapTable(tag Tag, b fontBinSegm, offset, size uint32) *CMapTable {
+func newCMapTable(tag Tag, b binarySegm, offset, size uint32) *CMapTable {
 	t := &CMapTable{}
 	base := tableBase{
 		data:   b,
@@ -102,7 +102,7 @@ func supportedCmapFormat(format, pid, psid uint16) bool {
 }
 
 // Dispatcher to create the correct implementation of a CMapGlyphIndex from a given format.
-func makeGlyphIndex(b fontBinSegm, which encodingRecord) (CMapGlyphIndex, error) {
+func makeGlyphIndex(b binarySegm, which encodingRecord) (CMapGlyphIndex, error) {
 	subtable := which.link.Jump()
 	switch which.format {
 	case 4:
@@ -215,7 +215,7 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 // - Four parallel arrays describe the segments (one segment for each contiguous range of codes);
 // - A variable-length array of glyph IDs (unsigned words).
 //
-func makeGlyphIndexFormat4(b fontBinSegm) (CMapGlyphIndex, error) {
+func makeGlyphIndexFormat4(b binarySegm) (CMapGlyphIndex, error) {
 	const headerSize = 14
 	if headerSize > b.Size() {
 		return nil, errFontFormat("cmap subtable bounds overflow")
@@ -296,7 +296,7 @@ func (f12 format12GlyphIndex) Lookup(r rune) GlyphIndex {
 // It differs, however, in that it uses 32-bit character codes, and Glyph ID lookup
 // and calculation is a lot simpler.
 //
-func makeGlyphIndexFormat12(b fontBinSegm) (CMapGlyphIndex, error) {
+func makeGlyphIndexFormat12(b binarySegm) (CMapGlyphIndex, error) {
 	const headerSize = 16
 	if headerSize > b.Size() {
 		return nil, errFontFormat("cmap subtable bounds overflow")

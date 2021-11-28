@@ -11,7 +11,7 @@ type GSubTable struct {
 	LayoutTable
 }
 
-func newGSubTable(tag Tag, b fontBinSegm, offset, size uint32) *GSubTable {
+func newGSubTable(tag Tag, b binarySegm, offset, size uint32) *GSubTable {
 	t := &GSubTable{}
 	base := tableBase{
 		data:   b,

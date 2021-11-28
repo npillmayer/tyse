@@ -9,7 +9,7 @@ type GPosTable struct {
 	LayoutTable
 }
 
-func newGPosTable(tag Tag, b fontBinSegm, offset, size uint32) *GPosTable {
+func newGPosTable(tag Tag, b binarySegm, offset, size uint32) *GPosTable {
 	t := &GPosTable{}
 	base := tableBase{
 		data:   b,

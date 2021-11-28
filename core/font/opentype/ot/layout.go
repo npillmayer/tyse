@@ -1,9 +1,5 @@
 package ot
 
-import (
-	"encoding/binary"
-)
-
 /*
 From https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2:
 
@@ -150,7 +146,7 @@ type GDefTable struct {
 	MarkGlyphSets          []GlyphRange
 }
 
-func newGDefTable(tag Tag, b fontBinSegm, offset, size uint32) *GDefTable {
+func newGDefTable(tag Tag, b binarySegm, offset, size uint32) *GDefTable {
 	t := &GDefTable{}
 	base := tableBase{
 		data:   b,
@@ -259,7 +255,7 @@ type BaseTable struct {
 	axisTables [2]AxisTable
 }
 
-func newBaseTable(tag Tag, b fontBinSegm, offset, size uint32) *BaseTable {
+func newBaseTable(tag Tag, b binarySegm, offset, size uint32) *BaseTable {
 	t := &BaseTable{}
 	base := tableBase{
 		data:   b,
@@ -297,7 +293,7 @@ type coverageHeader struct {
 	Count          uint16
 }
 
-func buildGlyphRangeFromCoverage(chead coverageHeader, b fontBinSegm) GlyphRange {
+func buildGlyphRangeFromCoverage(chead coverageHeader, b binarySegm) GlyphRange {
 	tracer().Debugf("coverage format = %d, count = %d", chead.CoverageFormat, chead.Count)
 	if chead.CoverageFormat == 1 {
 		return &glyphRangeArray{
@@ -393,7 +389,7 @@ func (cdf *classDefinitionsFormat2) Lookup(glyph GlyphIndex) int {
 	return 0
 }
 
-func (cdef *ClassDefinitions) makeArray(b fontBinSegm, numEntries int, format uint16) array {
+func (cdef *ClassDefinitions) makeArray(b binarySegm, numEntries int, format uint16) array {
 	var size, recsize int
 	switch format {
 	case 1:
@@ -472,7 +468,7 @@ var _ Navigator = langSys{}
 type AttachmentPointList struct {
 	Coverage           GlyphRange
 	Count              int
-	attachPointOffsets fontBinSegm
+	attachPointOffsets binarySegm
 }
 
 // --- Feature ---------------------------------------------------------------
@@ -548,7 +544,7 @@ var _ Navigator = feature{}
 //
 type LookupList struct {
 	array
-	base         fontBinSegm
+	base         binarySegm
 	lookupsCache []Lookup
 	err          error
 }
@@ -637,12 +633,15 @@ func viewLookup(b NavLocation) Lookup {
 	if b.Size() < 10 {
 		return Lookup{}
 	}
-	r := b.Reader()
 	lookup := Lookup{loc: b}
-	if err := binary.Read(r, binary.BigEndian, &lookup.lookupInfo); err != nil {
-		tracer().Errorf("corrupt Lookup table")
-		return Lookup{} // nothing sensible to to except to return empty table
-	}
+	lookup.Type = LayoutTableLookupType(b.U16(0))
+	lookup.Flag = LayoutTableLookupFlag(b.U16(2))
+	lookup.SubTableCount = b.U16(4)
+	// r := b.Reader()
+	// if err := binary.Read(r, binary.BigEndian, &lookup.lookupInfo); err != nil {
+	// 	tracer().Errorf("corrupt Lookup table")
+	// 	return Lookup{} // nothing sensible to to except to return empty table
+	// }
 	tracer().Debugf("Lookup has %d sub-tables", lookup.SubTableCount)
 	//
 	var err error
@@ -669,7 +668,7 @@ func (l Lookup) Subtable(i int) *LookupSubtable {
 			tracer().Debugf("lookup subtable at offset %d", n)
 			link := makeLink16(n, l.loc.Bytes(), "LookupSubtable") // wrap offset into link
 			loc := link.Jump()
-			b := fontBinSegm(loc.Bytes())
+			b := binarySegm(loc.Bytes())
 			l.subTablesCache[i] = parseLookupSubtable(b, l.Type)
 		}
 	}
@@ -688,7 +687,7 @@ func (l Lookup) Lookup(g uint32) NavLocation {
 	// 	return fontBinSegm{}
 	// }
 	// trace().Debugf("lookup of 0x%x -> %d", g, inx)
-	return fontBinSegm{} // TODO
+	return binarySegm{} // TODO
 }
 
 func (l Lookup) Name() string {
@@ -765,7 +764,7 @@ func gsubLookupType5Fmt1(l *Lookup, lksub *LookupSubtable, g GlyphIndex) NavLoca
 func lookupAndReturn(index VarArray, ginx int, deep bool) NavLocation {
 	outglyph, err := index.Get(ginx, deep)
 	if err != nil {
-		return fontBinSegm{}
+		return binarySegm{}
 	}
 	return outglyph
 }

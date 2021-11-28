@@ -12,12 +12,12 @@ import (
 var errBufferBounds = errors.New("internal inconsistency: buffer bounds error")
 
 func u16(b []byte) uint16 {
-	_ = b[1] // Bounds check hint to compiler.
+	_ = b[1] // Bounds check hint to compiler
 	return uint16(b[0])<<8 | uint16(b[1])<<0
 }
 
 func u32(b []byte) uint32 {
-	_ = b[3] // Bounds check hint to compiler.
+	_ = b[3] // Bounds check hint to compiler
 	return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])<<0
 }
 
@@ -36,27 +36,26 @@ type NavLocation interface {
 	Size() int                  // size in bytes
 	Bytes() []byte              // return as a byte slice
 	Slice(int, int) NavLocation // return a sub-segment of this location
-	Reader() io.Reader          // return as a Reader
 	U16(int) uint16             // convenience access to 16 bit data at byte index
 	U32(int) uint32             // convenience access to 32 bit data at byte index
 	Glyphs() []GlyphIndex       // convenience conversion to slice of glyphs
 }
 
-// fontBinSegm is a segment of byte data.
-// It implements the Location interface. We use it throughout in this module to
+// binarySegm is a segment of byte data.
+// It implements the Location interface. We use it throughout this module to
 // naviagte the font's binary data.
-type fontBinSegm []byte
+type binarySegm []byte
 
-func (b fontBinSegm) Size() int {
+func (b binarySegm) Size() int {
 	return len(b)
 }
 
-func (b fontBinSegm) Bytes() []byte {
+func (b binarySegm) Bytes() []byte {
 	return b
 }
 
 // return a sub-segment of this location
-func (b fontBinSegm) Slice(from int, to int) NavLocation {
+func (b binarySegm) Slice(from int, to int) NavLocation {
 	if from < 0 {
 		from = 0
 	}
@@ -66,11 +65,11 @@ func (b fontBinSegm) Slice(from int, to int) NavLocation {
 	return b[from:to]
 }
 
-func (b fontBinSegm) Reader() io.Reader {
+func (b binarySegm) Reader() io.Reader {
 	return bytes.NewReader(b)
 }
 
-func (b fontBinSegm) U16(i int) uint16 {
+func (b binarySegm) U16(i int) uint16 {
 	n, err := b.u16(i)
 	if err != nil {
 		return 0
@@ -78,7 +77,7 @@ func (b fontBinSegm) U16(i int) uint16 {
 	return n
 }
 
-func (b fontBinSegm) U32(i int) uint32 {
+func (b binarySegm) U32(i int) uint32 {
 	n, err := b.u32(i)
 	if err != nil {
 		return 0
@@ -87,7 +86,7 @@ func (b fontBinSegm) U32(i int) uint32 {
 }
 
 // convenience conversion to slice of glyphs
-func (b fontBinSegm) Glyphs() []GlyphIndex {
+func (b binarySegm) Glyphs() []GlyphIndex {
 	l := len(b)
 	if l|0x1 > 0 {
 		l += 1
@@ -102,7 +101,7 @@ func (b fontBinSegm) Glyphs() []GlyphIndex {
 
 }
 
-func asU16Slice(b fontBinSegm) []uint16 {
+func asU16Slice(b binarySegm) []uint16 {
 	r := make([]uint16, len(b)/2+1)
 	j := 0
 	for i := 0; i < len(b); i += 2 {
@@ -113,13 +112,13 @@ func asU16Slice(b fontBinSegm) []uint16 {
 }
 
 // return an unsigned integer as an array of two bytes.
-func uintBytes(n uint16) fontBinSegm {
-	return fontBinSegm{byte(n >> 8 & 0xff), byte(n & 0xff)}
+func uintBytes(n uint16) binarySegm {
+	return binarySegm{byte(n >> 8 & 0xff), byte(n & 0xff)}
 }
 
 // view returns n bytes at the given offset.
 // The byte segment returned is a sub-slice of b.
-func (b fontBinSegm) view(offset, n int) (fontBinSegm, error) {
+func (b binarySegm) view(offset, n int) (binarySegm, error) {
 	if offset < 0 || n <= 0 || offset+n > len(b) {
 		return nil, errBufferBounds
 	}
@@ -127,12 +126,7 @@ func (b fontBinSegm) view(offset, n int) (fontBinSegm, error) {
 }
 
 // u16 returns the uint16 in b at the relative offset i.
-func (b fontBinSegm) u16(i int) (uint16, error) {
-	// //func (b fontBinSegm) u16(t Table, i int) (uint16, error) {
-	// 	if i < 0 || uint(t.Len()) < uint(i+2) {
-	// 		return 0, errBufferBounds
-	// 	}
-	// 	buf, err := b.view(int(t.Offset())+i, 2)
+func (b binarySegm) u16(i int) (uint16, error) {
 	buf, err := b.view(i, 2)
 	if err != nil {
 		return 0, err
@@ -141,12 +135,7 @@ func (b fontBinSegm) u16(i int) (uint16, error) {
 }
 
 // u32 returns the uint32 in b at the relative offset i.
-func (b fontBinSegm) u32(i int) (uint32, error) {
-	//func (b fontBinSegm) u32(t Table, i int) (uint32, error) {
-	// if i < 0 || uint(t.Len()) < uint(i+4) {
-	// 	return 0, errBufferBounds
-	// }
-	// buf, err := b.view(int(t.Offset())+i, 4)
+func (b binarySegm) u32(i int) (uint32, error) {
 	buf, err := b.view(i, 4)
 	if err != nil {
 		return 0, err
@@ -167,7 +156,7 @@ type GlyphRange interface {
 type glyphRangeArray struct {
 	is32     bool // keys are 32 bit
 	count    int  // number of glyph keys
-	data     fontBinSegm
+	data     binarySegm
 	byteSize int
 }
 
@@ -212,7 +201,7 @@ func (r *glyphRangeArray) ByteSize() int {
 type glyphRangeRecords struct {
 	is32     bool // keys are 32 bit
 	count    int  // number of range records
-	data     fontBinSegm
+	data     binarySegm
 	byteSize int
 }
 
@@ -272,7 +261,7 @@ type tagList struct {
 	link  NavLink
 }
 
-func parseTagList(b fontBinSegm) tagList {
+func parseTagList(b binarySegm) tagList {
 	tl := tagList{Count: int(u16(b))}
 	tl.link = link16{
 		base:   b,
@@ -284,7 +273,7 @@ func parseTagList(b fontBinSegm) tagList {
 func (l tagList) Tag(i int) Tag {
 	const taglen = 4
 	if b := l.link.Jump(); len(b.Bytes()) >= (i+1)*taglen {
-		if n, err := fontBinSegm(b.Bytes()).u32(i * taglen); err == nil {
+		if n, err := binarySegm(b.Bytes()).u32(i * taglen); err == nil {
 			return Tag(n)
 		}
 	}
@@ -308,19 +297,7 @@ type NavLink interface {
 	Name() string        // OpenType structure name of destination
 }
 
-func parseLink32(b fontBinSegm, offset int, base fontBinSegm, target string) (NavLink, error) {
-	if len(b) < offset+4 {
-		return link32{}, errBufferBounds
-	}
-	n, _ := b.u32(offset)
-	return link32{
-		target: target,
-		base:   base,
-		offset: n,
-	}, nil
-}
-
-func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (NavLink, error) {
+func parseLink16(b binarySegm, offset int, base binarySegm, target string) (NavLink, error) {
 	if len(b) < offset+2 {
 		return link16{}, errBufferBounds
 	}
@@ -333,7 +310,7 @@ func parseLink16(b fontBinSegm, offset int, base fontBinSegm, target string) (Na
 }
 
 //func makeLink16(b fontBinSegm, offset uint16, base fontBinSegm, target string) Link {
-func makeLink16(offset uint16, base fontBinSegm, target string) NavLink {
+func makeLink16(offset uint16, base binarySegm, target string) NavLink {
 	return link16{
 		target: target,
 		base:   base,
@@ -344,7 +321,7 @@ func makeLink16(offset uint16, base fontBinSegm, target string) NavLink {
 type link16 struct {
 	err    error
 	target string
-	base   fontBinSegm
+	base   binarySegm
 	offset uint16
 }
 
@@ -366,13 +343,13 @@ func (l16 link16) Base() NavLocation {
 func (l16 link16) Jump() NavLocation {
 	tracer().Debugf("jump to %s", l16.target)
 	if l16.err != nil {
-		return fontBinSegm{}
+		return binarySegm{}
 	}
 	if l16.offset > uint16(len(l16.base)) {
 		tracer().Debugf("base has size %d", len(l16.base))
 		tracer().Debugf("link to %d", l16.offset)
 		tracer().Debugf("offset16 location out of table bounds")
-		return fontBinSegm{}
+		return binarySegm{}
 	}
 	return l16.base[l16.offset:]
 }
@@ -381,13 +358,25 @@ func (l16 link16) Navigate() Navigator {
 	if l16.err != nil {
 		return null(l16.err)
 	}
-	return navFactory(l16.target, l16.Jump(), l16.base)
+	return NavigatorFactory(l16.target, l16.Jump(), l16.base)
+}
+
+func parseLink32(b binarySegm, offset int, base binarySegm, target string) (NavLink, error) {
+	if len(b) < offset+4 {
+		return link32{}, errBufferBounds
+	}
+	n, _ := b.u32(offset)
+	return link32{
+		target: target,
+		base:   base,
+		offset: n,
+	}, nil
 }
 
 type link32 struct {
 	err    error
 	target string
-	base   fontBinSegm
+	base   binarySegm
 	offset uint32
 }
 
@@ -406,7 +395,7 @@ func (l32 link32) Base() NavLocation {
 	return l32.base
 }
 
-func makeLink32(offset uint32, base fontBinSegm, target string) NavLink {
+func makeLink32(offset uint32, base binarySegm, target string) NavLink {
 	return link32{
 		target: target,
 		base:   base,
@@ -417,13 +406,13 @@ func makeLink32(offset uint32, base fontBinSegm, target string) NavLink {
 func (l32 link32) Jump() NavLocation {
 	tracer().Debugf("jump to %s", l32.target)
 	if l32.err != nil {
-		return fontBinSegm{}
+		return binarySegm{}
 	}
 	if l32.offset > uint32(len(l32.base)) {
 		tracer().Debugf("base has size %d", len(l32.base))
 		tracer().Debugf("link to %d", l32.offset)
 		tracer().Debugf("offset32 location out of table bounds")
-		return fontBinSegm{}
+		return binarySegm{}
 	}
 	return l32.base[l32.offset:]
 }
@@ -432,19 +421,19 @@ func (l32 link32) Navigate() Navigator {
 	if l32.err != nil {
 		return null(l32.err)
 	}
-	panic("link32 navigation not yet implemented")
-	//return nil
+	return NavigatorFactory(l32.target, l32.Jump(), l32.base)
 }
 
 // --- Arrays ----------------------------------------------------------------
 
+// array is a type for a linear sequence of equal-sized records.
 type array struct {
 	recordSize int
 	length     int
-	loc        fontBinSegm
+	loc        binarySegm
 }
 
-func ParseList(b fontBinSegm, N int, recordSize int) NavList {
+func ParseList(b binarySegm, N int, recordSize int) NavList {
 	return array{
 		recordSize: recordSize,
 		length:     N,
@@ -452,7 +441,7 @@ func ParseList(b fontBinSegm, N int, recordSize int) NavList {
 	}
 }
 
-func viewArray16(b fontBinSegm) array {
+func viewArray16(b binarySegm) array {
 	if b.Size()&0x1 != 0 {
 		tracer().Errorf("cannot create array16: size not aligned")
 		return array{}
@@ -465,7 +454,7 @@ func viewArray16(b fontBinSegm) array {
 	}
 }
 
-func parseArray16(b fontBinSegm, offset int) (array, error) {
+func parseArray16(b binarySegm, offset int) (array, error) {
 	if len(b) < offset {
 		return array{}, errBufferBounds
 	}
@@ -480,7 +469,7 @@ func parseArray16(b fontBinSegm, offset int) (array, error) {
 	}, nil
 }
 
-func viewArray(b fontBinSegm, recordSize int) array {
+func viewArray(b binarySegm, recordSize int) array {
 	N := b.Size() / recordSize
 	tracer().Debugf("view array[%d](%d)", N, recordSize)
 	return array{
@@ -529,7 +518,7 @@ type varArray struct {
 	name         string
 	ptrs         array
 	indirections int
-	base         fontBinSegm
+	base         binarySegm
 }
 
 // ParseVarArray interprets a byte sequence as a `VarArray`.
@@ -537,7 +526,7 @@ func ParseVarArray(loc NavLocation, sizeOffset, arrayDataGap int, name string) V
 	return parseVarArray16(loc.Bytes(), sizeOffset, arrayDataGap, 1, name)
 }
 
-func parseVarArray16(b fontBinSegm, szOffset, gap, indirections int, name string) varArray {
+func parseVarArray16(b binarySegm, szOffset, gap, indirections int, name string) varArray {
 	if len(b) < 6 {
 		tracer().Errorf("byte segment too small to parse variable array")
 		return varArray{}
@@ -560,22 +549,22 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 	base := va.base
 	for j := 0; j < indirect; j++ {
 		b = a.Get(i) // TODO will this create an infinite loop in case of error?
-		tracer().Debugf("varArray->Get(%d|%d), a = %v", i, a.length, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
+		tracer().Debugf("varArray->Get(%d|%d), a = %v", i, a.length, binarySegm(a.loc.Bytes()[:20]).Glyphs())
 		tracer().Debugf("b = %d, %d to go", b.U16(0), va.indirections-1-j)
 		if b.U16(0) == 0 {
 			tracer().Debugf("link to ptrs-data is NULL, empty array")
-			return fontBinSegm{}, nil
+			return binarySegm{}, nil
 		}
 		if j < va.indirections {
 			link := makeLink16(b.U16(0), base, "Sequence")
 			b = link.Jump()
 			if j+1 < va.indirections {
 				a, err = parseArray16(b.Bytes(), 0)
-				tracer().Debugf("new a has size %d, is %v", a.length, fontBinSegm(a.loc.Bytes()[:20]).Glyphs())
+				tracer().Debugf("new a has size %d, is %v", a.length, binarySegm(a.loc.Bytes()[:20]).Glyphs())
 			}
 		}
 	}
-	tracer().Debugf("varArray result = %v", asU16Slice(fontBinSegm(b.Bytes()[:min(20, 2*b.Size())])))
+	tracer().Debugf("varArray result = %v", asU16Slice(binarySegm(b.Bytes()[:min(20, 2*b.Size())])))
 	return b, err
 }
 
@@ -587,23 +576,8 @@ var _ VarArray = varArray{}
 
 // --- Tag record map --------------------------------------------------------
 
-// A TagRecordMap is a dict-type (map) to receive a data record (returned as a link)
-// from a given tag. This kind of map is used within OpenType fonts in several
-// instances, e.g.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
-//
-// For some record maps the (tag) keys are not unique (e.g., the feature-list table),
-// so in this case the first matching entry will be returned.
-type TagRecordMap interface {
-	Name() string           // OpenType specification name of this map
-	LookupTag(Tag) NavLink  // returns the link associated with a given tag
-	Tags() []Tag            // returns all the tags which the map uses as keys
-	Count() int             // number of entries in the map
-	Get(int) (Tag, NavLink) // get entry at position n
-}
-
 // recsize is the byte size of the record entry not including the Tag.
-func parseTagRecordMap16(b fontBinSegm, offset int, base fontBinSegm, name, target string) tagRecordMap16 {
+func parseTagRecordMap16(b binarySegm, offset int, base binarySegm, name, target string) tagRecordMap16 {
 	N, err := b.u16(offset)
 	if err != nil {
 		return tagRecordMap16{}
@@ -623,7 +597,7 @@ func parseTagRecordMap16(b fontBinSegm, offset int, base fontBinSegm, name, targ
 type tagRecordMap16 struct {
 	name    string
 	target  string
-	base    fontBinSegm
+	base    binarySegm
 	records array
 }
 
@@ -747,14 +721,8 @@ func (mw mapWrapper) AsTagRecordMap() TagRecordMap {
 	return mw
 }
 
-// NavList represents a sequence of—possibly unequal sized—items, addressable by
-// position.
-type NavList interface {
-	Len() int            // number of items in the list
-	Get(int) NavLocation // bytes of entry #n
-	All() []NavLocation  // all entries as (possibly variable sized) byte segments
-}
-
+// u16List implements the NavList interface. It represents a list/array of
+// u16 values.
 type u16List []uint16
 
 func (u16l u16List) Len() int {
@@ -763,15 +731,15 @@ func (u16l u16List) Len() int {
 
 func (u16l u16List) Get(i int) NavLocation {
 	if i < 0 || i >= len(u16l) {
-		return fontBinSegm{}
+		return binarySegm{}
 	}
-	return fontBinSegm{byte(u16l[i] >> 8 & 0xff), byte(u16l[i] & 0xff)}
+	return binarySegm{byte(u16l[i] >> 8 & 0xff), byte(u16l[i] & 0xff)}
 }
 
 func (u16l u16List) All() []NavLocation {
 	r := make([]NavLocation, len(u16l))
 	for i, x := range u16l {
-		r[i] = fontBinSegm([]byte{byte(x >> 8 & 0xff), byte(x & 0xff)})
+		r[i] = binarySegm([]byte{byte(x >> 8 & 0xff), byte(x & 0xff)})
 	}
 	return r
 }

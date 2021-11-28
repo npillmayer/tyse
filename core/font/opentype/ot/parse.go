@@ -30,7 +30,7 @@ func Parse(font []byte) (*Font, error) {
 		return nil, errFontFormat(fmt.Sprintf("font type not supported: %x", h.FontType))
 	}
 	otf := &Font{Header: &h, tables: make(map[Tag]Table)}
-	src := fontBinSegm(font)
+	src := binarySegm(font)
 	// "The Offset Table is followed immediately by the Table Record entries …
 	// sorted in ascending order by tag", 16 bytes each.
 	buf, err := src.view(12, 16*int(h.TableCount))
@@ -80,7 +80,7 @@ func Parse(font []byte) (*Font, error) {
 	return otf, nil
 }
 
-func parseTable(t Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseTable(t Tag, b binarySegm, offset, size uint32) (Table, error) {
 	switch t {
 	case T("BASE"):
 		return parseBase(t, b, offset, size)
@@ -113,7 +113,7 @@ func parseTable(t Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 // --- Head table ------------------------------------------------------------
 
-func parseHead(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseHead(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	if size < 54 {
 		return nil, errFontFormat("size of head table")
 	}
@@ -131,7 +131,7 @@ func parseHead(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // The Baseline table (BASE) provides information used to align glyphs of different
 // scripts and sizes in a line of text, whether the glyphs are in the same font or
 // in different fonts.
-func parseBase(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseBase(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	var err error
 	base := newBaseTable(tag, b, offset, size)
 	// The BASE table begins with offsets to Axis tables that describe layout data for
@@ -222,7 +222,7 @@ func parseBaseAxis(base *BaseTable, hOrV int, link NavLink, err error) error {
 //   3 (Win)      1    4   Unicode BMP
 //   3 (Win)      10   12  Unicode full
 //
-func parseCMap(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseCMap(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	n, _ := b.u16(2) // number of sub-tables
 	tracer().Debugf("font cmap has %d sub-tables in %d|%d bytes", n, len(b), size)
 	t := newCMapTable(tag, b, offset, size)
@@ -289,7 +289,7 @@ type kernSubTableHeader struct {
 // We currently only support kern table format 0, which should be supported on any
 // platform. In the real world, fonts usually have just one kern sub-table, and
 // older Windows versions cannot handle more than one.
-func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseKern(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	if size <= 4 {
 		return nil, nil
 	}
@@ -354,7 +354,7 @@ func parseKern(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // The 'loca' table is most intimately dependent upon the contents of the 'glyf' table
 // and vice versa. Changes to the 'loca' table must not be made unless appropriate
 // changes to the 'glyf' table are simultaneously made.
-func parseLoca(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseLoca(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	return newLocaTable(tag, b, offset, size), nil
 }
 
@@ -363,7 +363,7 @@ func parseLoca(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // This table establishes the memory requirements for this font. Fonts with CFF data
 // must use Version 0.5 of this table, specifying only the numGlyphs field. Fonts
 // with TrueType outlines must use Version 1.0 of this table, where all data is required.
-func parseMaxP(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseMaxP(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	if size <= 6 {
 		return nil, nil
 	}
@@ -378,7 +378,7 @@ func parseMaxP(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // This table establishes the memory requirements for this font. Fonts with CFF data
 // must use Version 0.5 of this table, specifying only the numGlyphs field. Fonts
 // with TrueType outlines must use Version 1.0 of this table, where all data is required.
-func parseHHea(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseHHea(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	if size == 0 {
 		return nil, nil
 	}
@@ -403,7 +403,7 @@ func parseHHea(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // the ideal metrics of the 'hmtx' table be perfectly consistent with the device metrics
 // found in other tables, but care should be taken that they are not significantly
 // inconsistent.
-func parseHMtx(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseHMtx(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	if size == 0 {
 		return nil, nil
 	}
@@ -413,7 +413,7 @@ func parseHMtx(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 
 // --- Names -----------------------------------------------------------------
 
-func parseNames(b fontBinSegm) (nameNames, error) {
+func parseNames(b binarySegm) (nameNames, error) {
 	if len(b) < 6 {
 		return nameNames{}, errFontFormat("name section corrupt")
 	}
@@ -434,7 +434,7 @@ func parseNames(b fontBinSegm) (nameNames, error) {
 
 // The Glyph Definition (GDEF) table provides various glyph properties used in
 // OpenType Layout processing.
-func parseGDef(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseGDef(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	var err error
 	gdef := newGDefTable(tag, b, offset, size)
 	err = parseGDefHeader(gdef, b, err)
@@ -459,7 +459,7 @@ func parseGDef(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // Class Definition table (MarkAttachClassDef). Version 1.2 also includes an offset to
 // a Mark Glyph Sets Definition table (MarkGlyphSetsDef). Version 1.3 also includes an
 // offset to an Item Variation Store table.
-func parseGDefHeader(gdef *GDefTable, b fontBinSegm, err error) error {
+func parseGDefHeader(gdef *GDefTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -484,7 +484,7 @@ func parseGDefHeader(gdef *GDefTable, b fontBinSegm, err error) error {
 
 // This table uses the same format as the Class Definition table (defined in the
 // OpenType Layout Common Table Formats chapter).
-func parseGlyphClassDefinitions(gdef *GDefTable, b fontBinSegm, err error) error {
+func parseGlyphClassDefinitions(gdef *GDefTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -510,7 +510,7 @@ uint16    glyphCount                      Number of glyphs with attachment point
 Offset16  attachPointOffsets[glyphCount]  Array of offsets to AttachPoint tables-from beginning of
                                           AttachList table-in Coverage Index order
 */
-func parseAttachmentPointList(gdef *GDefTable, b fontBinSegm, err error) error {
+func parseAttachmentPointList(gdef *GDefTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -541,7 +541,7 @@ func parseAttachmentPointList(gdef *GDefTable, b fontBinSegm, err error) error {
 
 // A Mark Attachment Class Definition Table defines the class to which a mark glyph may
 // belong. This table uses the same format as the Class Definition table.
-func parseMarkAttachmentClassDef(gdef *GDefTable, b fontBinSegm, err error) error {
+func parseMarkAttachmentClassDef(gdef *GDefTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -560,7 +560,7 @@ func parseMarkAttachmentClassDef(gdef *GDefTable, b fontBinSegm, err error) erro
 
 // Mark glyph sets are defined in a MarkGlyphSets table, which contains offsets to
 // individual sets each represented by a standard Coverage table.
-func parseMarkGlyphSets(gdef *GDefTable, b fontBinSegm, err error) error {
+func parseMarkGlyphSets(gdef *GDefTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -586,7 +586,7 @@ func parseMarkGlyphSets(gdef *GDefTable, b fontBinSegm, err error) error {
 // The Glyph Positioning table (GPOS) provides precise control over glyph placement for
 // sophisticated text layout and rendering in each script and language system that a font
 // supports.
-func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseGPos(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	var err error
 	gpos := newGPosTable(tag, b, offset, size)
 	err = parseLayoutHeader(&gpos.LayoutTable, b, err)
@@ -608,7 +608,7 @@ func parseGPos(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // The Glyph Substitution (GSUB) table provides data for substition of glyphs for
 // appropriate rendering of scripts, such as cursively-connecting forms in Arabic script,
 // or for advanced typographic effects, such as ligatures.
-func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
+func parseGSub(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	var err error
 	gsub := newGSubTable(tag, b, offset, size)
 	err = parseLayoutHeader(&gsub.LayoutTable, b, err)
@@ -630,7 +630,7 @@ func parseGSub(tag Tag, b fontBinSegm, offset, size uint32) (Table, error) {
 // parseLayoutHeader parses a layout table header, i.e. reads version information
 // and header information (containing offsets).
 // Supports header versions 1.0 and 1.1
-func parseLayoutHeader(lytt *LayoutTable, b fontBinSegm, err error) error {
+func parseLayoutHeader(lytt *LayoutTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -665,7 +665,7 @@ func parseLayoutHeader(lytt *LayoutTable, b fontBinSegm, err error) error {
 // does not need a ScriptRecord). Each ScriptRecord consists of a ScriptTag that identifies
 // a script, and an offset to a Script table. The ScriptRecord array is stored in
 // alphabetic order of the script tags.
-func parseScriptList(lytt *LayoutTable, b fontBinSegm, err error) error {
+func parseScriptList(lytt *LayoutTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -704,7 +704,7 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 // uint16  featureIndexCount                  Number of feature index values for this language system
 // uint16  featureIndices[featureIndexCount]  Array of indices into the FeatureList, in arbitrary order
 //
-func parseLangSys(b fontBinSegm, offset int, target string) (langSys, error) {
+func parseLangSys(b binarySegm, offset int, target string) (langSys, error) {
 	lsys := langSys{}
 	if len(b) < offset+4 {
 		return lsys, errBufferBounds
@@ -725,7 +725,7 @@ func parseLangSys(b fontBinSegm, offset int, target string) (langSys, error) {
 
 // parseLookupList parses the LookupList.
 // See https://www.microsoft.com/typography/otspec/chapter2.htm#lulTbl
-func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
+func parseLookupList(lytt *LayoutTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
@@ -741,7 +741,7 @@ func parseLookupList(lytt *LayoutTable, b fontBinSegm, err error) error {
 	return nil
 }
 
-func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+func parseLookupSubtable(b binarySegm, lookupType LayoutTableLookupType) LookupSubtable {
 	tracer().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	if len(b) < 4 {
 		return LookupSubtable{}
@@ -754,7 +754,7 @@ func parseLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lookup
 
 // parseGSubLookupSubtable parses a segment of binary data from a font file (NavLocation)
 // and expects to read a lookup subtable.
-func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+func parseGSubLookupSubtable(b binarySegm, lookupType LayoutTableLookupType) LookupSubtable {
 	//trace().Debugf("parse lookup subtable b = %v", asU16Slice(b[:20]))
 	format := b.U16(0)
 	tracer().Debugf("parsing GSUB sub-table type %s, format %d", lookupType.GSubString(), format)
@@ -786,7 +786,7 @@ func parseGSubLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 // Single substitution (SingleSubst) subtables tell a client to replace a single glyph with
 // another glyph.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-1-single-substitution-subtable
-func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+func parseGSubLookupSubtableType1(b binarySegm, sub LookupSubtable) LookupSubtable {
 	if sub.Format == 1 {
 		sub.Support = int16(b.U16(4))
 	} else {
@@ -810,7 +810,7 @@ func parseGSubLookupSubtableType1(b fontBinSegm, sub LookupSubtable) LookupSubta
 // a single glyph replaces multiple glyphs. One LigatureSubst subtable can specify any
 // number of ligature substitutions.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-4-ligature-substitution-subtable
-func parseGSubLookupSubtableType2or3or4(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+func parseGSubLookupSubtableType2or3or4(b binarySegm, sub LookupSubtable) LookupSubtable {
 	sub.Index = parseVarArray16(b, 4, 2, 2, "LookupSubtableGSub2/3/4")
 	return sub
 }
@@ -826,7 +826,7 @@ func parseGSubLookupSubtableType2or3or4(b fontBinSegm, sub LookupSubtable) Looku
 // For contextual substitution subtables we usually will have to parse a rule set. We will put it
 // into the Index field. Additional context data structures may include ClassDefs or other things and
 // will be put into the Support field by calling parseSequenceContext.
-func parseGSubLookupSubtableType5(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+func parseGSubLookupSubtableType5(b binarySegm, sub LookupSubtable) LookupSubtable {
 	switch sub.Format {
 	case 1:
 		sub.Index = parseVarArray16(b, 4, 2, 2, "LookupSubtableGSub5-1")
@@ -850,7 +850,7 @@ func parseGSubLookupSubtableType5(b fontBinSegm, sub LookupSubtable) LookupSubta
 // three formats. Each format can describe one or more chained backtrack, input, and lookahead sequence
 // combinations, and one or more substitutions for glyphs in each input sequence.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
-func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+func parseGSubLookupSubtableType6(b binarySegm, sub LookupSubtable) LookupSubtable {
 	var err error
 	sub, err = parseChainedSequenceContext(b, sub)
 	if err != nil {
@@ -877,7 +877,7 @@ func parseGSubLookupSubtableType6(b fontBinSegm, sub LookupSubtable) LookupSubta
 // This lookup provides a mechanism whereby any other lookup type’s subtables are stored at
 // a 32-bit offset location in the GSUB table.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-7-extension-substitution
-func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubtable {
+func parseGSubLookupSubtableType7(b binarySegm, sub LookupSubtable) LookupSubtable {
 	if b.Size() < 8 {
 		tracer().Errorf("OpenType GSUB lookup subtable type %d corrupt", sub.LookupType)
 		return LookupSubtable{}
@@ -892,7 +892,7 @@ func parseGSubLookupSubtableType7(b fontBinSegm, sub LookupSubtable) LookupSubta
 	return parseGSubLookupSubtable(loc.Bytes(), sub.LookupType)
 }
 
-func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) LookupSubtable {
+func parseGPosLookupSubtable(b binarySegm, lookupType LayoutTableLookupType) LookupSubtable {
 	format := b.U16(0)
 	tracer().Debugf("parsing GPOS sub-table type %s, format %d", lookupType.GPosString(), format)
 	panic("TODO GPOS Lookup Subtable")
@@ -904,7 +904,7 @@ func parseGPosLookupSubtable(b fontBinSegm, lookupType LayoutTableLookupType) Lo
 // The ClassDef table can have either of two formats: one that assigns a range of
 // consecutive glyph indices to different classes, or one that puts groups of consecutive
 // glyph indices into the same class.
-func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
+func parseClassDefinitions(b binarySegm) (ClassDefinitions, error) {
 	tracer().Debugf("HELLO, parsing a ClassDef")
 	cdef := ClassDefinitions{}
 	r := bytes.NewReader(b)
@@ -932,7 +932,7 @@ func parseClassDefinitions(b fontBinSegm) (ClassDefinitions, error) {
 // Read a coverage table-module, which comes in two formats (1 and 2).
 // A Coverage table defines a unique index value, the Coverage Index, for each
 // covered glyph.
-func parseCoverage(b fontBinSegm) Coverage {
+func parseCoverage(b binarySegm) Coverage {
 	tracer().Debugf("parsing Coverage")
 	h := coverageHeader{}
 	h.CoverageFormat = b.U16(0)
@@ -958,7 +958,7 @@ func parseCoverage(b fontBinSegm) Coverage {
 // must be matched, and so the actions are specified in a context-sensitive manner.
 
 // Three subtable formats are defined, which describe the input sequences in different ways.
-func parseSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+func parseSequenceContext(b binarySegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 2 {
 		return sub, errFontFormat("corrupt sequence context")
 	}
@@ -980,7 +980,7 @@ func parseSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubtable, er
 // Offset16 	coverageOffset 	Offset to Coverage table, from beginning of SequenceContextFormat1 table
 // uint16 	seqRuleSetCount 	Number of SequenceRuleSet tables
 // Offset16 	seqRuleSetOffsets[seqRuleSetCount] 	Array of offsets to SequenceRuleSet tables, from beginning of SequenceContextFormat1 table (offsets may be NULL)
-func parseSequenceContextFormat1(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+func parseSequenceContextFormat1(b binarySegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 6 {
 		return sub, errFontFormat("corrupt sequence context")
 	}
@@ -1005,7 +1005,7 @@ func parseSequenceContextFormat1(b fontBinSegm, sub LookupSubtable) (LookupSubta
 // Offset16  classDefOffset         Offset to ClassDef table, from beginning of SequenceContextFormat2 table
 // uint16    classSeqRuleSetCount   Number of ClassSequenceRuleSet tables
 // Offset16  classSeqRuleSetOffsets[classSeqRuleSetCount]    Array of offsets to ClassSequenceRuleSet tables, from beginning of SequenceContextFormat2 table (may be NULL)
-func parseSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+func parseSequenceContextFormat2(b binarySegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 8 {
 		return sub, errFontFormat("corrupt sequence context")
 	}
@@ -1029,7 +1029,7 @@ func parseSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubta
 // uint16 	seqLookupCount 	Number of SequenceLookupRecords
 // Offset16 	coverageOffsets[glyphCount] 	Array of offsets to Coverage tables, from beginning of SequenceContextFormat3 subtable
 // SequenceLookupRecord 	seqLookupRecords[seqLookupCount] 	Array of SequenceLookupRecords
-func parseSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+func parseSequenceContextFormat3(b binarySegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 8 {
 		return sub, errFontFormat("corrupt sequence context")
 	}
@@ -1048,7 +1048,7 @@ func parseSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubta
 	return sub, nil
 }
 
-func parseChainedSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+func parseChainedSequenceContext(b binarySegm, sub LookupSubtable) (LookupSubtable, error) {
 	if len(b) <= 2 {
 		return sub, errFontFormat("corrupt chained sequence context")
 	}
@@ -1066,7 +1066,7 @@ func parseChainedSequenceContext(b fontBinSegm, sub LookupSubtable) (LookupSubta
 	return sub, errFontFormat(fmt.Sprintf("unknown chained sequence context format %d", sub.Format))
 }
 
-func parseChainedSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+func parseChainedSequenceContextFormat2(b binarySegm, sub LookupSubtable) (LookupSubtable, error) {
 	backtrack, err1 := parseContextClassDef(b, 4)
 	input, err2 := parseContextClassDef(b, 6)
 	lookahead, err3 := parseContextClassDef(b, 8)
@@ -1079,7 +1079,7 @@ func parseChainedSequenceContextFormat2(b fontBinSegm, sub LookupSubtable) (Look
 	return sub, nil
 }
 
-func parseChainedSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (LookupSubtable, error) {
+func parseChainedSequenceContextFormat3(b binarySegm, sub LookupSubtable) (LookupSubtable, error) {
 	tracer().Debugf("chained sequence context format 3 ........................")
 	tracer().Debugf("b = %v", b[:26].Glyphs())
 	offset := 2
@@ -1099,7 +1099,7 @@ func parseChainedSequenceContextFormat3(b fontBinSegm, sub LookupSubtable) (Look
 	return sub, nil
 }
 
-func parseContextClassDef(b fontBinSegm, at int) (ClassDefinitions, error) {
+func parseContextClassDef(b binarySegm, at int) (ClassDefinitions, error) {
 	link, err := parseLink16(b, at, b, "ClassDef")
 	if err != nil {
 		return ClassDefinitions{}, err
@@ -1111,7 +1111,7 @@ func parseContextClassDef(b fontBinSegm, at int) (ClassDefinitions, error) {
 	return cdef, nil
 }
 
-func parseChainedSeqContextCoverages(b fontBinSegm, at int, err error) ([]Coverage, error) {
+func parseChainedSeqContextCoverages(b binarySegm, at int, err error) ([]Coverage, error) {
 	if err != nil {
 		return []Coverage{}, err
 	}
@@ -1137,7 +1137,7 @@ func parseChainedSeqContextCoverages(b fontBinSegm, at int, err error) ([]Covera
 // uint16   seqLookupCount                Number of SequenceLookupRecords
 // uint16   inputSequence[glyphCount-1]   Sequence of classes to be matched to the input glyph sequence, beginning with the second glyph position
 // SequenceLookupRecord seqLookupRecords[seqLookupCount]   Array of SequenceLookupRecords
-func (lksub LookupSubtable) SequenceRule(b fontBinSegm) sequenceRule {
+func (lksub LookupSubtable) SequenceRule(b binarySegm) sequenceRule {
 	seqrule := sequenceRule{}
 	seqrule.glyphCount = b.U16(0)
 	seqrule.inputSequence = array{

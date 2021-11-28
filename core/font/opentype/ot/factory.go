@@ -22,6 +22,14 @@ type Navigator interface {
 	Error() error  // previous error in call chain, if any
 }
 
+// NavList represents a sequence of—possibly unequal sized—items, addressable by
+// position.
+type NavList interface {
+	Len() int            // number of items in the list
+	Get(int) NavLocation // bytes of entry #n
+	All() []NavLocation  // all entries as (possibly variable sized) byte segments
+}
+
 // NavMap wraps OpenType structures which are map-like. Lookup is always done on
 // 32-bit values, even if the map's keys are 16-bit (will be shortened to low
 // bytes in such cases).
@@ -36,7 +44,24 @@ type NavMap interface {
 	AsTagRecordMap() TagRecordMap
 }
 
-func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
+// A TagRecordMap is a dict-type (map) to receive a data record (returned as a link)
+// from a given tag. This kind of map is used within OpenType fonts in several
+// instances, e.g.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/base#basescriptlist-table
+//
+// For some record maps the (tag) keys are not unique (e.g., the feature-list table),
+// so in this case the first matching entry will be returned.
+type TagRecordMap interface {
+	Name() string           // OpenType specification name of this map
+	LookupTag(Tag) NavLink  // returns the link associated with a given tag
+	Tags() []Tag            // returns all the tags which the map uses as keys
+	Count() int             // number of entries in the map
+	Get(int) (Tag, NavLink) // get entry at position n
+}
+
+// NavigatorFactory creates a Navigator for a given OpenType object `obj` at location
+// `log`.
+func NavigatorFactory(obj string, loc NavLocation, base NavLocation) Navigator {
 	tracer().Debugf("navigator factory for %s", obj)
 	switch obj {
 	case "Script":
@@ -85,7 +110,7 @@ func navFactory(obj string, loc NavLocation, base fontBinSegm) Navigator {
 	if fields, ok := tableFields[obj]; ok {
 		tracer().Debugf("object %s has fields %v", obj, fields)
 		size := int(fields[0]) // total byte size of fields
-		f := otFields{pattern: fields[1:], b: base[:size]}
+		f := otFields{pattern: fields[1:], b: base.Bytes()[:size]}
 		return list{navName: navName{name: obj}, f: f}
 	}
 	tracer().Debugf("no navigator found -> null navigator")
@@ -100,15 +125,6 @@ var tableFields = map[string][]uint8{
 	"bhea": {54, 2, 2, 4, 4, 4, 2, 2, 8, 8, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 	"OS/2": {53, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10, 4, 1, 2, 2, 2},
 }
-
-// var tableArrays = map[string]struct{
-
-// }
-// 	"tables": {
-// 		"OS/2": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10, 4, 1, 2, 2, 2]
-// 	}
-// }
-// `
 
 type navBase struct {
 	err error
@@ -206,7 +222,7 @@ func (l list) List() NavList {
 
 type otFields struct {
 	pattern []uint8
-	b       fontBinSegm
+	b       binarySegm
 }
 
 func (f otFields) Len() int {
@@ -215,7 +231,7 @@ func (f otFields) Len() int {
 
 func (f otFields) Get(i int) NavLocation {
 	if i < 0 || i >= len(f.pattern) {
-		return fontBinSegm{}
+		return binarySegm{}
 	}
 	offset := 0
 	for j, p := range f.pattern {
@@ -227,7 +243,7 @@ func (f otFields) Get(i int) NavLocation {
 	if r, err := f.b.view(offset, int(f.pattern[i])); err == nil {
 		return r
 	}
-	return fontBinSegm{}
+	return binarySegm{}
 }
 
 func (f otFields) All() []NavLocation {
@@ -237,7 +253,7 @@ func (f otFields) All() []NavLocation {
 		if x, err := f.b.view(offset, int(p)); err == nil {
 			r = append(r, x)
 		} else {
-			return []NavLocation{fontBinSegm{}}
+			return []NavLocation{binarySegm{}}
 		}
 	}
 	return r
