@@ -216,6 +216,10 @@ type list struct {
 	f otFields
 }
 
+func (l list) IsVoid() bool {
+	return false
+}
+
 func (l list) List() NavList {
 	return l.f
 }
