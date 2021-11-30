@@ -251,7 +251,7 @@ func (f otFields) Get(i int) NavLocation {
 }
 
 func (f otFields) All() []NavLocation {
-	r := make([]NavLocation, len(f.pattern))
+	r := make([]NavLocation, 0, len(f.pattern))
 	offset := 0
 	for _, p := range f.pattern {
 		if x, err := f.b.view(offset, int(p)); err == nil {

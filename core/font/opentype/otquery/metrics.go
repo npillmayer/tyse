@@ -45,6 +45,19 @@ func GlyphIndex(otf *ot.Font, codepoint rune) ot.GlyphIndex {
 	}
 }
 
+// CodePointForGlyph returns the code-point for a given glyph index.
+// This is an inefficient operation: All code-points contained in the font
+// are checked sequentially if they produce th given glyph.
+func CodePointForGlyph(otf *ot.Font, gid ot.GlyphIndex) rune {
+	if gid == 0 {
+		return 0
+	} else if c := otf.Table(ot.T("cmap")); c == nil {
+		return 0
+	} else {
+		return c.Self().AsCMap().GlyphIndexMap.ReverseLookup(gid)
+	}
+}
+
 // FontMetrics retrieves selected metrics of a font.
 func FontMetrics(otf *ot.Font) (opentype.FontMetricsInfo, error) {
 	metrics := opentype.FontMetricsInfo{}

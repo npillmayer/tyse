@@ -116,7 +116,8 @@ func makeGlyphIndex(b binarySegm, which encodingRecord) (CMapGlyphIndex, error) 
 // CMapGlyphIndex represents a CMap table index to receive a glyph index from
 // a code-point.
 type CMapGlyphIndex interface {
-	Lookup(rune) GlyphIndex
+	Lookup(rune) GlyphIndex        // central activiy of CMap
+	ReverseLookup(GlyphIndex) rune // this is non-standard, but helps with tests
 }
 
 // Format 4: Segment mapping to delta values
@@ -155,7 +156,7 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 		} else if entry.end < c {
 			i = h + 1
 		} else if entry.offset == 0 {
-			tracer().Debugf("direct access of glyph ID as delta = %d", c+entry.delta)
+			//tracer().Debugf("direct access of glyph ID as delta = %d", c+entry.delta)
 			return GlyphIndex(c + entry.delta)
 		} else {
 			// The spec describes the calculation the find the link into the glyph ID array
@@ -207,6 +208,28 @@ func (f4 format4GlyphIndex) Lookup(r rune) GlyphIndex {
 		}
 	}
 	return GlyphIndex(0)
+}
+
+// ReverseLookup retrieves a code-point for a given glyph. The Cmap tables do not
+// support this operation, thus this operation is inefficient.
+// However, for testing and debugging purposes it is often useful.
+func (f4 format4GlyphIndex) ReverseLookup(gid GlyphIndex) rune {
+	if gid == 0 {
+		return 0
+	}
+	//tracer().Debugf("CMap format 4 has %d entries", len(f4.entries))
+	for _, entry := range f4.entries {
+		if entry.end < entry.start || entry.start == 0xffff {
+			break
+		}
+		//tracer().Debugf("CMap format 4 entry: %d … %d", entry.start, entry.end)
+		for c := entry.start; c <= entry.end; c++ {
+			if f4.Lookup(rune(c)) == gid {
+				return rune(c)
+			}
+		}
+	}
+	return 0
 }
 
 // The format's data is divided into three parts, which must occur in the following order:
@@ -283,6 +306,24 @@ func (f12 format12GlyphIndex) Lookup(r rune) GlyphIndex {
 			i = h + 1
 		} else {
 			return GlyphIndex(c - entry.start + entry.delta)
+		}
+	}
+	return 0
+}
+
+// ReverseLookup retrieves a code-point for a given glyph. The Cmap tables do not
+// support this operation, thus this operation is inefficient.
+// However, for testing and debugging purposes it is often useful.
+func (f12 format12GlyphIndex) ReverseLookup(gid GlyphIndex) rune {
+	if gid == 0 {
+		return 0
+	}
+	cid := uint32(gid)
+	for _, entry := range f12.entries {
+		for c := entry.start; c <= entry.end; c++ {
+			if c-entry.start+entry.delta == cid {
+				return rune(c)
+			}
 		}
 	}
 	return 0
