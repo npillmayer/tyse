@@ -63,9 +63,8 @@ func TestBox1(t *testing.T) {
 
 /*
 func TestBreakParagraph(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	root := buildDOM(kafkaHTML, t)
 	p := findPara(root, t)
@@ -90,9 +89,8 @@ func TestBreakParagraph(t *testing.T) {
 
 /*
 func TestInlineBoxes(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	root := buildDOM(kafkaHTML, t)
 	p := findPara(root, t)

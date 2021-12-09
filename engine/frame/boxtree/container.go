@@ -304,11 +304,11 @@ func (pbox *PrincipalBox) AppendChild(child *PrincipalBox) {
 
 func (pbox *PrincipalBox) PresetContained() bool {
 	if pbox.Context() == nil {
-		T().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(pbox))
+		tracer().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(pbox))
 		return false
 	}
 	children := pbox.TreeNode().Children(true)
-	T().Debugf("[%v] pre-sets %d sub container(s)", pbox.domNode.NodeName(), len(children))
+	tracer().Debugf("[%v] pre-sets %d sub container(s)", pbox.domNode.NodeName(), len(children))
 	hasAdded := false
 	for _, ch := range children {
 		switch b := ch.Payload.(type) {
@@ -323,7 +323,7 @@ func (pbox *PrincipalBox) PresetContained() bool {
 				option.Some:            true,
 			})
 			if err != nil {
-				T().Errorf("preset children container: %v", err)
+				tracer().Errorf("preset children container: %v", err)
 				return false
 			}
 			if doAdd.(bool) {
@@ -334,7 +334,7 @@ func (pbox *PrincipalBox) PresetContained() bool {
 		case *TextBox:
 			pbox.Context().AddContained(b)
 		case AnonymousBox:
-			T().Errorf("unexpected anonymous box child")
+			tracer().Errorf("unexpected anonymous box child")
 		}
 	}
 	return hasAdded
@@ -436,11 +436,11 @@ func NewAnonymousBox(mode css.DisplayMode) *AnonymousBox {
 
 func (anon *AnonymousBox) PresetContained() bool {
 	if anon.Context() == nil {
-		T().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(anon))
+		tracer().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(anon))
 		return false
 	}
 	children := anon.TreeNode().Children(true)
-	T().Debugf("[anon] pre-sets %d sub container(s)", len(children))
+	tracer().Debugf("[anon] pre-sets %d sub container(s)", len(children))
 	hasAdded := false
 	for _, ch := range children {
 		switch b := ch.Payload.(type) {
@@ -455,7 +455,7 @@ func (anon *AnonymousBox) PresetContained() bool {
 				option.Some:            true,
 			})
 			if err != nil {
-				T().Errorf("preset children container: %v", err)
+				tracer().Errorf("preset children container: %v", err)
 				return false
 			}
 			if doAdd.(bool) {
@@ -466,7 +466,7 @@ func (anon *AnonymousBox) PresetContained() bool {
 		case *TextBox:
 			anon.Context().AddContained(b)
 		case AnonymousBox:
-			T().Errorf("unexpected anonymous box child")
+			tracer().Errorf("unexpected anonymous box child")
 		}
 	}
 	return hasAdded

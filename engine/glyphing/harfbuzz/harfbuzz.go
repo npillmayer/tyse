@@ -105,17 +105,25 @@ func FeatureRange4HB(frng glyphing.FeatureRange) hb.Feature {
 // Clients may provide `buf` to avoid allocating memory by Shape. Shape will wrap it
 // into the GlyphSequence returned.
 //
+var globalFontForTest *hb.Font
+
 func Shape(text io.RuneReader, buf []glyphing.ShapedGlyph, context [][]rune, params glyphing.Params) (glyphing.GlyphSequence, error) {
 	if text == nil || params.Font == nil {
 		return glyphing.GlyphSequence{}, nil
 	}
 	// Prepare font
-	f := bytes.NewReader(params.Font.ScalableFontParent().Binary)
-	hb_face, err := hbtt.Parse(f, true)
-	if err != nil {
-		return glyphing.GlyphSequence{}, err
+	var hb_font *hb.Font
+	if globalFontForTest == nil {
+		f := bytes.NewReader(params.Font.ScalableFontParent().Binary)
+		hb_face, err := hbtt.Parse(f, true)
+		if err != nil {
+			return glyphing.GlyphSequence{}, err
+		}
+		hb_font = hb.NewFont(hb_face)
+		globalFontForTest = hb_font
+	} else {
+		hb_font = globalFontForTest
 	}
-	hb_font := hb.NewFont(hb_face)
 	hb_font.Ptem = params.Font.PtSize()
 	// Prepare shaping parameters
 	var hb_seqProps hb.SegmentProperties
@@ -129,7 +137,7 @@ func Shape(text io.RuneReader, buf []glyphing.ShapedGlyph, context [][]rune, par
 	hb_buf.Props = hb_seqProps
 	bytesBuf, offset, length := bufferText(text, context)
 	runes := bytes.Runes(bytesBuf.Bytes())
-	tracer().Debugf("going to HarfBuzz-shape %v", runes)
+	//tracer().Debugf("going to HarfBuzz-shape %v", runes)
 	hb_buf.AddRunes(runes, offset, length)
 	hb_buf.Shape(hb_font, features)
 	// Prepare shaped output

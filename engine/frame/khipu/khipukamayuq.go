@@ -1,38 +1,13 @@
 package khipu
 
 /*
-BSD License
+License
 
-Copyright (c) 2017–20, Norbert Pillmayer
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-All rights reserved.
+Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of the software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
@@ -54,6 +29,7 @@ import (
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax14"
 	"github.com/npillmayer/uax/uax29"
+	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -96,7 +72,7 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper glyphing.Sh
 	//paraLen := para.Raw().Len()
 	env.pipeline = PrepareTypesettingPipeline(text, env.pipeline)
 	var result *Khipu = NewKhipu()
-	T().Debugf("------------ start of para -----------")
+	tracer().Debugf("------------ start of para -----------")
 	//T().Debugf("para text = '%s'", para.Raw().String())
 	para.EachStyleRun(func(content string, sty styled.Style, pos, length uint64) error {
 		item := styledItem{
@@ -106,7 +82,7 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper glyphing.Sh
 			to:     startpos + pos + length,
 			styles: sty,
 		}
-		T().Debugf("--- encoding run '%s'", content)
+		tracer().Debugf("--- encoding run '%s'", content)
 		k, err := encodeRun(text, item, env)
 		if err != nil {
 			return err
@@ -114,21 +90,21 @@ func EncodeParagraph(para *styled.Paragraph, startpos uint64, shaper glyphing.Sh
 		result = result.AppendKhipu(k)
 		return nil
 	})
-	T().Debugf("------------- end of para ------------")
+	tracer().Debugf("------------- end of para ------------")
 	return result, nil
 }
 
 func encodeRun(text io.Reader, item styledItem, env typEnv) (k *Khipu, err error) {
 	k = NewKhipu()                   // will be return value
-	stopper := int64(item.to)        // we won't read beyond end of item run
+	stopper := item.to               // we won't read beyond end of item run
 	if uint64(stopper) >= item.end { // except when at end of paragraph
-		stopper = math.MaxInt64 // set stopper to unreachable value
+		stopper = math.MaxInt // set stopper to unreachable value
 	}
 	seg := env.pipeline.segmenter
-	for seg.BoundedNext(stopper) {
+	for seg.BoundedNext(int(stopper)) {
 		segment := seg.Text()
 		p := penlty(seg.Penalties())
-		T().Debugf("next segment = '%s'\twith penalties %d|%d", segment, p.p1, p.p2)
+		tracer().Debugf("next segment = '%s'\twith penalties %d|%d", segment, p.p1, p.p2)
 		item.from = item.to
 		item.to += uint64(len(segment))
 		kfrag, err := encodeSegment(segment, p, item, env)
@@ -140,7 +116,7 @@ func encodeRun(text io.Reader, item styledItem, env typEnv) (k *Khipu, err error
 		}
 		k = k.AppendKhipu(kfrag)
 	}
-	T().Debugf("------------- end of run -------------")
+	tracer().Debugf("------------- end of run -------------")
 	return k, err
 }
 
@@ -168,7 +144,7 @@ func encodeSegment(segm string, p penalties, item styledItem, env typEnv) (*Khip
 	// b := NewTextBox(seg.Text(), textpos)
 	// pen := Penalty(dimen.Infty)
 	// khipu.AppendKnot(b).AppendKnot(pen)
-	T().Debugf("no line wrap possible, encode unbreakable text")
+	tracer().Debugf("no line wrap possible, encode unbreakable text")
 	b := encodeText(segm, item, env)
 	b.AppendKnot(Penalty(dimen.Infinity))
 	return b, nil
@@ -177,7 +153,7 @@ func encodeSegment(segm string, p penalties, item styledItem, env typEnv) (*Khip
 func encodeSpace(fragm string, p penalties, styles styled.Style,
 	regs *params.TypesettingRegisters) *Khipu {
 	//
-	T().Debugf("khipukamayuq: encode space with penalites %v", p)
+	tracer().Debugf("khipukamayuq: encode space with penalites %v", p)
 	k := NewKhipu()
 	g := spaceglue(regs)
 	k.AppendKnot(g).AppendKnot(Penalty(p.p2))
@@ -197,7 +173,7 @@ func encodeSpace(fragm string, p penalties, styles styled.Style,
 //
 // The final task will be to re-structure and split this up into co-routines and have
 // a monoid on text to produce the khipu. This is limited by at least two constraints:
-// First, some UAX segmentations require a O(N) scan of code-points (I did not event start to
+// First, some UAX segmentations require a O(N) scan of code-points (I did not even start to
 // reason about parallelizing the Bidi algorithm, but I'm afraid it will be a nightmare).
 // Second, shaping requires front-to-end traversal of code-points as well, and for some
 // languages may not even be chunked at whitespace (although some systems make this
@@ -212,15 +188,15 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 	// 1. break fragment into words by UAX#29
 	env.pipeline.words.Init(strings.NewReader(fragm))
 	pos := item.from
-	T().Debugf("################### start word breaker on '%s'", fragm)
+	tracer().Debugf("################### start word breaker on '%s'", fragm)
 	for env.pipeline.words.Next() {
 		word := env.pipeline.words.Text()
-		T().Debugf("      word = '%s'", word)
+		tracer().Debugf("      word = '%s'", word)
 		if len(word) == 0 { // should never happen, but be careful not to panic
 			continue
 		}
 		end := pos + uint64(len(word))
-		T().Debugf("encode text: word = '%s'", word)
+		tracer().Debugf("encode text: word = '%s'", word)
 		bidiDir := env.levels.DirectionAt(pos)
 		bidiEnd := env.levels.DirectionAt(end - 1)
 		if bidiDir != bidiEnd {
@@ -229,22 +205,30 @@ func encodeText(fragm string, item styledItem, env typEnv) *Khipu {
 			// or: have an API for this in bidi.ResolvedLevels
 		}
 		// 2. configure shaper
-		env.shaper.SetDirection(directionForText(item.styles, bidiDir, env.regs))
-		env.shaper.SetScript(scriptForText(item.styles, env.regs))
-		env.shaper.SetLanguage(env.regs.S(params.P_LANGUAGE))
+		styleset := item.styles.(frame.StyleSet)
+		shapingParams := glyphing.Params{
+			Font:      styleset.Font(),
+			Script:    scriptForText(item.styles, env.regs),
+			Direction: directionForText(item.styles, bidiDir, env.regs),
+			Language:  matchLang(item.styles, env.regs.S(params.P_LANGUAGE)),
+		}
+		// env.shaper.SetDirection(directionForText(item.styles, bidiDir, env.regs))
+		// env.shaper.SetScript(scriptForText(item.styles, env.regs))
+		// env.shaper.SetLanguage(env.regs.S(params.P_LANGUAGE))
+		//
 		// 3. do NOT hyphenate => leave this to line breaker
 		// 4. attach glyph sequences to text boxes
 		box := NewTextBox(word, pos)
 		//
-		styleset := item.styles.(frame.StyleSet)
-		box.glyphs = env.shaper.Shape(word, styleset.Font())
+		wordrd := strings.NewReader(word)
+		box.glyphs, _ = env.shaper.Shape(wordrd, nil, nil, shapingParams)
 		//
 		// 5. measure text of glyph sequence
-		box.Width, box.Height, box.Depth = box.glyphs.BBox()
+		box.Width, box.Height, box.Depth = box.glyphs.BoundingBox()
 		pos = end
 		wordsKhipu.AppendKnot(box)
 	}
-	T().Debugf("###############################################")
+	tracer().Debugf("###############################################")
 	return wordsKhipu
 }
 
@@ -257,16 +241,28 @@ func directionForText(styles styled.Style, dir bidi.Direction,
 	case bidi.RightToLeft:
 		return glyphing.RightToLeft
 	}
-	T().Infof("khipukamayuq: vertical text directions not yet implemented")
+	tracer().Infof("khipukamayuq: vertical text directions not yet implemented")
 	return glyphing.LeftToRight
 }
 
-func scriptForText(styles styled.Style, regs *params.TypesettingRegisters) glyphing.ScriptID {
+func scriptForText(styles styled.Style, regs *params.TypesettingRegisters) language.Script {
 	scr := regs.S(params.P_SCRIPT)
 	if scr == "" {
-		return glyphing.Latin
+		return language.MustParseScript("Latn")
 	}
-	return glyphing.ScriptByName(scr)
+	if script, err := language.ParseScript(scr); err == nil {
+		return script
+	}
+	return language.MustParseScript("Latn")
+}
+
+func matchLang(styles styled.Style, l string) language.Tag {
+	// TODO use langauage Matcher derived for styles
+	// matcher := language.NewMatcher([]language.Tag{
+	// 	language.English, language.Dutch, language.German,
+	// })
+	// tag, _ := language.MatchStrings(matcher, l)
+	return language.English
 }
 
 // KnotEncode transforms an input text into a khipu.
@@ -283,14 +279,14 @@ func KnotEncode(text io.Reader, startpos uint64, pipeline *TypesettingPipeline,
 	for seg.Next() {
 		fragment := seg.Text()
 		p := penlty(seg.Penalties())
-		T().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
+		tracer().Debugf("next segment = '%s'\twith penalties %d|%d", fragment, p.p1, p.p2)
 		k := createPartialKhipuFromSegment(seg, textpos, pipeline, regs)
 		if regs.N(params.P_MINHYPHENLENGTH) < dimen.Infinity {
 			HyphenateTextBoxes(k, pipeline, regs)
 		}
 		khipu.AppendKhipu(k)
 	}
-	T().Infof("resulting khipu = %s", khipu)
+	tracer().Infof("resulting khipu = %s", khipu)
 	return khipu
 }
 
@@ -307,7 +303,7 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 	//
 	khipu := NewKhipu()
 	p := penlty(seg.Penalties())
-	T().Errorf("CREATE PARITAL KHIPU, PENALTIES=%d|%d", p.p1, p.p2)
+	tracer().Errorf("CREATE PARITAL KHIPU, PENALTIES=%d|%d", p.p1, p.p2)
 	if p.canWrapLine() { // broken by primary breaker
 		// fragment is terminated by possible line wrap opportunity
 		if p.breaksAtSpace() { // broken by secondary breaker, too
@@ -327,13 +323,13 @@ func createPartialKhipuFromSegment(seg *segment.Segmenter, textpos uint64, pipel
 	} else { // segment is broken by secondary breaker
 		// fragment is start or end of a span of whitespace
 		if isspace(seg.Text()) {
-			T().Errorf("BROKEN BY SECONDARY BREAKER: WHITESPACE")
+			tracer().Errorf("BROKEN BY SECONDARY BREAKER: WHITESPACE")
 			// close a span of whitespace
 			g := spaceglue(regs)
 			pen := Penalty(p.p2)
 			khipu.AppendKnot(g).AppendKnot(pen)
 		} else {
-			T().Errorf("BROKEN BY SECONDARY BREAKER: TEXT_BOX")
+			tracer().Errorf("BROKEN BY SECONDARY BREAKER: TEXT_BOX")
 			// close a text box which is not a possible line wrap position
 			b := NewTextBox(seg.Text(), textpos)
 			pen := Penalty(dimen.Infinity)
@@ -361,14 +357,14 @@ func HyphenateTextBoxes(khipu *Khipu, pipeline *TypesettingPipeline,
 			k = append(k, iterator.Knot())
 			continue
 		}
-		T().Debugf("knot = %v | %v", iterator.Knot(), iterator.Knot())
+		tracer().Debugf("knot = %v | %v", iterator.Knot(), iterator.Knot())
 		textbox := iterator.AsTextBox()
 		textpos := textbox.Position
 		text := textbox.text
 		pipeline.words.Init(strings.NewReader(text))
 		for pipeline.words.Next() {
 			word := pipeline.words.Text()
-			T().Debugf("   word = '%s'", word)
+			tracer().Debugf("   word = '%s'", word)
 			var syllables []string
 			isHyphenated := false
 			if len(word) >= regs.N(params.P_MINHYPHENLENGTH) {
@@ -428,12 +424,12 @@ func HyphenateWord(word string, regs *params.TypesettingRegisters) ([]string, bo
 	if dict == nil {
 		panic("TODO not yet implemented: find dictionnary for language")
 	}
-	T().Debugf("   will try to hyphenate word")
+	tracer().Debugf("   will try to hyphenate word")
 	splitWord := dict.Hyphenate(word)
 	if len(splitWord) > 1 {
 		ok = true
 	}
-	T().Debugf("   %v", splitWord)
+	tracer().Debugf("   %v", splitWord)
 	return splitWord, ok
 }
 

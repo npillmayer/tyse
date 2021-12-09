@@ -74,3 +74,7 @@ type GlyphSequence struct {
 	Glyphs  []ShapedGlyph // resulting sequence of glyphs
 	W, H, D dimen.DU      // width, height, depth of bounding box
 }
+
+func (seq GlyphSequence) BoundingBox() (w dimen.DU, h dimen.DU, d dimen.DU) {
+	return seq.W, seq.H, seq.D
+}

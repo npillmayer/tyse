@@ -134,23 +134,23 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]frame.Container, error) 
 	//parshape := OutlineParshape(pbox, leftAlign, rightAlign)
 	parshape := OutlineParshape(box, nil, nil)
 	if parshape == nil {
-		T().Errorf("could not create a parshape for principal box")
+		tracer().Errorf("could not create a parshape for principal box")
 	}
 	cursor := linebreak.NewFixedWidthCursor(khipu.NewCursor(para.Khipu), 10*dimen.BP, 0)
 	breakpoints, err := firstfit.BreakParagraph(cursor, parshape, nil)
 	if err != nil {
 		return nil, err
 	}
-	T().Debugf("text broken up with %d breaks: %v", len(breakpoints), breakpoints)
+	tracer().Debugf("text broken up with %d breaks: %v", len(breakpoints), breakpoints)
 	//
 	// TODO
 	// assemble the broken line segments into anonymous line boxes
-	T().Debugf("     |---------+---------+---------+---------+---------50--------|")
+	tracer().Debugf("     |---------+---------+---------+---------+---------50--------|")
 	j := int64(0)
 	var lines []frame.Container
 	for i := 1; i < len(breakpoints); i++ {
 		pos := breakpoints[i].Position()
-		T().Debugf("%3d: %s", i, para.Khipu.Text(j, pos))
+		tracer().Debugf("%3d: %s", i, para.Khipu.Text(j, pos))
 		l := pos - j
 		indent := dimen.DU(0) // TODO derive from parshape
 		linebox := NewLineBox(para.Khipu, breakpoints[i].Position(), l, indent)
@@ -166,7 +166,7 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]frame.Container, error) 
 func TextOfParagraph(c frame.Container) (*Paragraph, []frame.Container, error) {
 	paraText, blocks, err := paragraphTextFromBox(c)
 	if err != nil {
-		T().Errorf(err.Error())
+		tracer().Errorf(err.Error())
 		return nil, []frame.Container{}, err
 	}
 	paraText.Regs = parameters.NewTypesettingRegisters()
@@ -174,7 +174,7 @@ func TextOfParagraph(c frame.Container) (*Paragraph, []frame.Container, error) {
 	paraText.Khipu, err = khipu.EncodeParagraph(paraText.Paragraph, 0,
 		monospace.Shaper(11*dimen.PT, nil), nil, paraText.Regs)
 	if err != nil || paraText.Khipu == nil {
-		T().Errorf("lines: khipu resulting from paragraph is nil")
+		tracer().Errorf("lines: khipu resulting from paragraph is nil")
 		return nil, []frame.Container{}, err
 	}
 	return paraText, blocks, err
@@ -185,14 +185,14 @@ func XFindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
 	//
 	paraText, blocks, err := paragraphTextFromBox(pbox)
 	if err != nil {
-		T().Errorf(err.Error())
+		tracer().Errorf(err.Error())
 		return []frame.Container{}, rootctx, err
 	}
 	regs := parameters.NewTypesettingRegisters()
 	regs = adaptTypesettingRegisters(regs, pbox)
 	k, err := khipu.EncodeParagraph(paraText.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	if err != nil || k == nil {
-		T().Errorf("lines: khipu resulting from paragraph is nil")
+		tracer().Errorf("lines: khipu resulting from paragraph is nil")
 		return []frame.Container{}, rootctx, err
 	}
 	pbox.para = paraText
@@ -254,7 +254,7 @@ func collectFloatBoxes(pbox *boxtree.PrincipalBox) ([]*frame.Box, []*frame.Box) 
 }
 
 func Layout(c frame.Container) {
-	T().Debugf("Layout of sub-block")
+	tracer().Debugf("Layout of sub-block")
 	if c.DisplayMode().Inner().Contains(css.InlineMode) {
 		// call layout paragraph
 	} else {

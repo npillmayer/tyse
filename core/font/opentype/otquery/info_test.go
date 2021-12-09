@@ -51,6 +51,31 @@ func TestLayoutInfo(t *testing.T) {
 	}
 }
 
+func TestReverseLookup(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
+	defer teardown()
+	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelError)
+	//
+	otf := loadCalibri(t)
+	r := CodePointForGlyph(otf, 4)
+	if r != 'A' {
+		t.Errorf("expected code-point to be %#U, is %d", 'A', r)
+	}
+}
+
+func TestGlyphClasses(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
+	defer teardown()
+	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelError)
+	//
+	otf := loadCalibri(t)
+	clz := GlyphClasses(otf, 4) // 4 = 'A'
+	if clz.Class != 1 {
+		t.Logf("clz = %#v", clz)
+		t.Errorf("expected class of 'A' to be 1, is %d", clz.Class)
+	}
+}
+
 // ----------------------------------------------------------------------
 
 func loadCalibri(t *testing.T) *ot.Font {

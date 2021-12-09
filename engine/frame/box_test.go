@@ -3,16 +3,14 @@ package frame
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBoxNullbox(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
 	//
 	box := InitEmptyBox(&Box{})
@@ -25,7 +23,7 @@ func TestBoxNullbox(t *testing.T) {
 }
 
 func TestFixContent1(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
 	//
 	box := InitEmptyBox(&Box{})
@@ -39,7 +37,7 @@ func TestFixContent1(t *testing.T) {
 }
 
 func TestFixContent2(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
 	//
 	box := &Box{}
@@ -54,7 +52,7 @@ func TestFixContent2(t *testing.T) {
 }
 
 func TestFixContentBorderBoxSizing(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
 	//
 	box := &Box{BorderBoxSizing: true}
@@ -73,9 +71,8 @@ func TestFixContentBorderBoxSizing(t *testing.T) {
 }
 
 func TestFixBorderBoxWidth(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	box := InitEmptyBox(&Box{})
 	box.Padding[Left] = css.DimenOption("10%")
@@ -87,9 +84,8 @@ func TestFixBorderBoxWidth(t *testing.T) {
 }
 
 func TestFixBorderBoxBorderBoxSizing(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	box := InitEmptyBox(&Box{BorderBoxSizing: true})
 	box.Padding[Left] = css.DimenOption("10%")
@@ -101,9 +97,8 @@ func TestFixBorderBoxBorderBoxSizing(t *testing.T) {
 }
 
 func TestSetWidth(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	box := InitEmptyBox(&Box{})
 	assert.True(t, box.W.Equals(css.Auto))
@@ -119,9 +114,8 @@ func TestSetWidth(t *testing.T) {
 }
 
 func TestMargins(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	box := InitEmptyBox(&Box{})
 	box.Padding[Left] = css.SomeDimen(10 * dimen.PT)
@@ -141,9 +135,8 @@ func TestMargins(t *testing.T) {
 }
 
 func TestConstraints1(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	box := InitEmptyBox(&Box{})
 	box.Padding[Left] = css.SomeDimen(10 * dimen.PT)
@@ -161,9 +154,8 @@ func TestConstraints1(t *testing.T) {
 }
 
 func TestConstraints2(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	box := InitEmptyBox(&Box{})
 	box.Padding[Left] = css.SomeDimen(10 * dimen.PT)

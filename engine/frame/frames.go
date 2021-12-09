@@ -74,7 +74,7 @@ func DisplayModeForDOMNode(domnode *dom.W3CNode) css.DisplayMode {
 	//outerMode, innerMode, err = ParseDisplay(display.String())
 	mode, err := css.ParseDisplay(display.String())
 	if err != nil {
-		T().Errorf("unrecognized display property: %s", display)
+		tracer().Errorf("unrecognized display property: %s", display)
 		mode = css.BlockMode
 	}
 	//T().Infof("display modes = %s", mode)

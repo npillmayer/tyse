@@ -209,11 +209,12 @@ github.com/npillmayer/nestext v0.1.3/go.mod h1:h2lrijH8jpicr25dFY+oAJLyzlya6jhnu
 github.com/npillmayer/schuko v0.0.0-20201204201146-2476b260d9a6/go.mod h1:ZBwSZ3NU/4nLac7UPWGLw+W1fzAUj0iRViGjoS9j+Q0=
 github.com/npillmayer/schuko v0.0.0-20201204202054-953994f422ef/go.mod h1:ZBwSZ3NU/4nLac7UPWGLw+W1fzAUj0iRViGjoS9j+Q0=
 github.com/npillmayer/schuko v0.1.0/go.mod h1:ZBwSZ3NU/4nLac7UPWGLw+W1fzAUj0iRViGjoS9j+Q0=
-github.com/npillmayer/schuko v0.2.0-alpha.2 h1:NFF/9KYNE1nTP0V5Sez8C1XSRqONNpIdgFajLQLNPbI=
-github.com/npillmayer/schuko v0.2.0-alpha.2/go.mod h1:fmY+GquSPYHz66HRFIfNO8LvDw9eHeoqjeFBw6moyH0=
+github.com/npillmayer/schuko v0.2.0-alpha.3/go.mod h1:fmY+GquSPYHz66HRFIfNO8LvDw9eHeoqjeFBw6moyH0=
+github.com/npillmayer/schuko v0.2.0-alpha.3.0.20211209143531-2d524c4964ff h1:x4BosHIgMxCqej/AA74FT9jHhX4dvfzfVZ0TfOq+Ifs=
+github.com/npillmayer/schuko v0.2.0-alpha.3.0.20211209143531-2d524c4964ff/go.mod h1:fmY+GquSPYHz66HRFIfNO8LvDw9eHeoqjeFBw6moyH0=
 github.com/npillmayer/uax v0.0.0-20210211112302-29b15ddc8d46/go.mod h1:GYOpOKvY0QEqgDJIWVd9Gs654j/JKz69LAZXJHGODNM=
-github.com/npillmayer/uax v0.1.0 h1:SBwUhVrVuT6jx5mnYJqGOJTEsXXYdtWAdKYcMTfZdyI=
-github.com/npillmayer/uax v0.1.0/go.mod h1:YrWx4v9pP+PNDML38Z3EgiuYoUjnc4xpPtw/r5mpDWA=
+github.com/npillmayer/uax v0.2.1-0.20211209145128-97711de03a50 h1:NyZKTJ2EMnvIxhxs3yOCCE5a2oNeWyJf53oJHjCdmWA=
+github.com/npillmayer/uax v0.2.1-0.20211209145128-97711de03a50/go.mod h1:fbPQknCU/rsScwIkFJFkPSIvnN0MbNMK4avBLx6ItvU=
 github.com/nxadm/tail v1.4.4 h1:DQuhQpB1tVlglWS2hLQ5OV6B5r8aGxSrPc5Qo6uTN78=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQA=

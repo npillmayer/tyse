@@ -10,12 +10,12 @@ import (
 
 func OutlineParshape(box *frame.Box, leftAlign, rightAlign []*frame.Box) linebreak.ParShape {
 	if box == nil || !box.HasFixedBorderBoxWidth(false) {
-		T().Errorf("outline parshape cannot be calculated for unfixed box")
+		tracer().Errorf("outline parshape cannot be calculated for unfixed box")
 		panic("TODO")
 	}
-	T().Infof("parshape: bounding box = %v", box.Rect)
+	tracer().Infof("parshape: bounding box = %v", box.Rect)
 	polygon := paragraphPolygon(box, leftAlign, rightAlign)
-	T().Debugf("polygon = %v", polygon)
+	tracer().Debugf("polygon = %v", polygon)
 	if polygon == nil {
 		return nil
 	}
@@ -79,18 +79,18 @@ func paragraphPolygon(pbox *frame.Box, leftAlign, rightAlign []*frame.Box) *isoP
 		b := box2box(ch)
 		rightaligned = insertBox(rightaligned, b)
 	}
-	T().Debugf("leftaligned = %v", leftaligned)
-	T().Debugf("rightaligned = %v", rightaligned)
+	tracer().Debugf("leftaligned = %v", leftaligned)
+	tracer().Debugf("rightaligned = %v", rightaligned)
 	// now child boxes are ordered by X and grouped by alignment
 	for _, b := range leftaligned {
 		parPolygon = parPolygon.Subtract(b)
-		T().Debugf("resulting polygon = %v", parPolygon)
-		T().Debugf("===================")
+		tracer().Debugf("resulting polygon = %v", parPolygon)
+		tracer().Debugf("===================")
 	}
 	for _, b := range rightaligned {
 		parPolygon = parPolygon.Subtract(b)
-		T().Debugf("resulting polygon = %v", parPolygon)
-		T().Debugf("===================")
+		tracer().Debugf("resulting polygon = %v", parPolygon)
+		tracer().Debugf("===================")
 	}
 	return parPolygon
 }
@@ -190,19 +190,19 @@ func intersection(box1, box2 isoBox) isoBox {
 //
 func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 	stk := make([]isoBox, 0, len(iso.stack)+1)
-	T().Debugf("stack has length %d", len(iso.stack))
+	tracer().Debugf("stack has length %d", len(iso.stack))
 	for i, b := range iso.stack {
 		if !intersect(b, box) {
 			stk = append(stk, b)
-			T().Debugf("box %v does not intersect stack box #%d = %v", box, i, b)
-			T().Debugf("-X-----------------")
+			tracer().Debugf("box %v does not intersect stack box #%d = %v", box, i, b)
+			tracer().Debugf("-X-----------------")
 			continue
 		}
-		T().Debugf("box %v intersects with stack box #%d = %v", box, i, b)
+		tracer().Debugf("box %v intersects with stack box #%d = %v", box, i, b)
 		x := intersection(b, box)
 		if x.TopL.X == b.TopL.X {
 			if x.TopL.Y == b.TopL.Y {
-				T().Debugf("(1)")
+				tracer().Debugf("(1)")
 				top := isoBox{
 					TopL: dimen.Point{X: x.BotR.X, Y: b.TopL.Y},
 					BotR: dimen.Point{X: b.BotR.X, Y: x.BotR.Y},
@@ -216,7 +216,7 @@ func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 					stk = append(stk, bot)
 				}
 			} else if x.BotR.Y == b.BotR.Y {
-				T().Debugf("(2)")
+				tracer().Debugf("(2)")
 				top := isoBox{
 					TopL: dimen.Point{X: b.TopL.X, Y: b.TopL.Y},
 					BotR: dimen.Point{X: b.BotR.X, Y: x.TopL.Y},
@@ -228,7 +228,7 @@ func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 				stk = append(stk, top)
 				stk = append(stk, bot)
 			} else {
-				T().Debugf("(3)")
+				tracer().Debugf("(3)")
 				// make 3 slices out of 1 box
 				top := isoBox{
 					TopL: dimen.Point{X: b.TopL.X, Y: b.TopL.Y},
@@ -247,7 +247,7 @@ func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 				stk = append(stk, bot)
 			}
 		} else if x.BotR.X == b.BotR.X {
-			T().Debugf("(4)")
+			tracer().Debugf("(4)")
 			if x.TopL.Y == b.TopL.Y {
 				top := isoBox{
 					TopL: dimen.Point{X: b.TopL.X, Y: b.TopL.Y},
@@ -262,7 +262,7 @@ func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 					stk = append(stk, bot)
 				}
 			} else if x.BotR.Y == b.BotR.Y {
-				T().Debugf("(5)")
+				tracer().Debugf("(5)")
 				top := isoBox{
 					TopL: dimen.Point{X: b.TopL.X, Y: b.TopL.Y},
 					BotR: dimen.Point{X: b.BotR.X, Y: x.TopL.Y},
@@ -274,7 +274,7 @@ func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 				stk = append(stk, top)
 				stk = append(stk, bot)
 			} else {
-				T().Debugf("(6)")
+				tracer().Debugf("(6)")
 				// make 3 slices out of 1 box
 				top := isoBox{
 					TopL: dimen.Point{X: b.TopL.X, Y: b.TopL.Y},
@@ -295,7 +295,7 @@ func (iso *isoPolygon) Subtract(box isoBox) *isoPolygon {
 		} else {
 			panic(fmt.Sprintf("cannot cut a hole, x = %v", x))
 		}
-		T().Debugf("-------------------")
+		tracer().Debugf("-------------------")
 	}
 	return &isoPolygon{stack: stk}
 }

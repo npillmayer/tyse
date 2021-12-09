@@ -13,8 +13,8 @@ require (
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/npillmayer/arithm v0.1.0
 	github.com/npillmayer/cords v0.1.0
-	github.com/npillmayer/schuko v0.2.0-alpha.2
-	github.com/npillmayer/uax v0.1.0
+	github.com/npillmayer/schuko v0.2.0-alpha.3.0.20211209143531-2d524c4964ff
+	github.com/npillmayer/uax v0.2.1-0.20211209145128-97711de03a50
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/image v0.0.0-20210504121937-7319ad40d33e
 	golang.org/x/net v0.0.0-20210510120150-4163338589ed

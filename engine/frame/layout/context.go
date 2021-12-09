@@ -61,7 +61,7 @@ func (ctx *BlockContext) AddContained(c frame.Container) {
 		c.TreeNode().Isolate()
 		anon.AddChild(c.TreeNode())
 		ctx.AddChild(anon.TreeNode())
-		T().Debugf("block context added [%v] wrapped in anon box", c.DOMNode().NodeName())
+		tracer().Debugf("block context added [%v] wrapped in anon box", c.DOMNode().NodeName())
 		return
 	}
 	// if c.DOMNode().ComputedStyles().GetPropertyValue("float") != style.NullStyle {
@@ -78,14 +78,14 @@ func (ctx *BlockContext) AddContained(c frame.Container) {
 	if ctx.C.TreeNode().IndexOfChild(c.TreeNode()) >= 0 {
 		panic("container is child container; cannot have 2 parents")
 	}
-	T().Debugf("block context added [%v]", c.DOMNode().NodeName())
+	tracer().Debugf("block context added [%v]", c.DOMNode().NodeName())
 	ctx.AddChild(c.TreeNode())
 }
 
 func (ctx *BlockContext) Layout(flowRoot *frame.FlowRoot) error {
 	H := dimen.Zero
 	for _, c := range ctx.Contained() {
-		T().Debugf("[%s] positions box [%s]", boxtree.ContainerName(ctx.Container()),
+		tracer().Debugf("[%s] positions box [%s]", boxtree.ContainerName(ctx.Container()),
 			boxtree.ContainerName(c))
 		c.CSSBox().TopL.Y = H
 		if !c.CSSBox().H.IsAbsolute() {
@@ -155,7 +155,7 @@ func (ctx *InlineContext) Type() frame.FormattingContextType {
 func (ctx *InlineContext) AddContained(c frame.Container) {
 	if c.DisplayMode().Outer() == css.BlockMode {
 		ctx.AddChild(c.TreeNode())
-		T().Debugf("inline context added block [%v]", c.DOMNode().NodeName())
+		tracer().Debugf("inline context added block [%v]", c.DOMNode().NodeName())
 		return
 	} else if c.DisplayMode().Outer() != css.InlineMode {
 		anon := boxtree.NewAnonymousBox(css.InlineMode | css.InnerInlineMode)
@@ -163,15 +163,15 @@ func (ctx *InlineContext) AddContained(c frame.Container) {
 		c.TreeNode().Isolate()
 		anon.AddChild(c.TreeNode())
 		ctx.AddChild(anon.TreeNode())
-		T().Debugf("inline context added [%v] wrapped in anon box", c.DOMNode().NodeName())
+		tracer().Debugf("inline context added [%v] wrapped in anon box", c.DOMNode().NodeName())
 		return
 	}
 	c.TreeNode().Isolate()
 	if ctx.C.TreeNode().IndexOfChild(c.TreeNode()) >= 0 {
 		panic("container is child container; cannot have 2 parents")
 	}
-	T().Debugf("inline context added [%v]", c.DOMNode().NodeName())
-	T().Debugf("text = '%s'", c.DOMNode().HTMLNode().Data)
+	tracer().Debugf("inline context added [%v]", c.DOMNode().NodeName())
+	tracer().Debugf("text = '%s'", c.DOMNode().HTMLNode().Data)
 	ctx.AddChild(c.TreeNode())
 }
 
@@ -213,14 +213,14 @@ func (ctx *InlineContext) Layout(flowRoot *frame.FlowRoot) error {
 	if err != nil {
 		return err
 	} else if len(blocks) > 0 {
-		T().Debugf("layout of inline container: %d enclosed blocks", len(blocks))
+		tracer().Debugf("layout of inline container: %d enclosed blocks", len(blocks))
 	}
 	box := ctx.Container().CSSBox()
 	lines, err := inline.BreakParagraph(para, box)
 	if err != nil {
 		return err
 	}
-	T().Debugf("paragraph broken into %d lines", len(lines))
+	tracer().Debugf("paragraph broken into %d lines", len(lines))
 	if len(lines) > 0 {
 		last := lines[len(lines)-1]
 		ctx.Container().CSSBox().H = css.SomeDimen(last.CSSBox().TopL.Y + last.CSSBox().H.Unwrap())
@@ -308,28 +308,28 @@ func NewContextFor(c frame.Container) frame.Context {
 	inner := c.DisplayMode().Inner()
 	isroot := needsRootContext(c)
 	if inner.Contains(css.InnerInlineMode) {
-		T().Debugf("providing inline context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
+		tracer().Debugf("providing inline context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
 		return NewInlineContext(c, isroot)
 	}
 	if inner.Contains(css.InnerBlockMode) {
 		if c.TreeNode().ChildCount() > 0 {
-			T().Debugf("context: checking %d children", c.TreeNode().ChildCount())
+			tracer().Debugf("context: checking %d children", c.TreeNode().ChildCount())
 			// If a block level container contains only inline level children,
 			// its formatting context switches to inline
 			modes := css.InlineMode
 			children := c.TreeNode().Children(true)
-			T().Debugf("context: children = %+v", children)
+			tracer().Debugf("context: children = %+v", children)
 			for _, ch := range children {
 				if childContainer, ok := ch.Payload.(frame.Container); ok {
 					modes &= childContainer.DisplayMode().Outer()
 				}
 			}
 			if modes.Contains(css.InlineMode) {
-				T().Debugf("providing inline context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
+				tracer().Debugf("providing inline context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
 				return NewInlineContext(c, isroot)
 			}
 		}
-		T().Debugf("providing block context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
+		tracer().Debugf("providing block context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
 		return NewBlockContext(c, isroot)
 	}
 	return nil

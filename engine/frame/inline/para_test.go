@@ -10,9 +10,7 @@ import (
 	"testing"
 
 	"github.com/npillmayer/cords"
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
 	"github.com/npillmayer/tyse/engine/frame"
@@ -33,10 +31,8 @@ var testhtml = `
 `
 
 func TestParaCreate(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	domroot := buildTestDOM(testhtml, t)
 	boxes, err := boxtree.BuildBoxTree(domroot)

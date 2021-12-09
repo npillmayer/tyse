@@ -1,38 +1,13 @@
 package frame
 
 /*
-BSD License
+License
 
-Copyright (c) 2017–2021, Norbert Pillmayer
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-All rights reserved.
+Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
@@ -259,16 +234,16 @@ func (box *Box) FixBorderBoxWidth(w dimen.DU) {
 		box.W = css.SomeDimen(w)
 		_, ok := fixPaddingAndBorderWidthFromBorderBoxWidth(box, w)
 		if !ok {
-			T().Errorf("cannot fix padding and border")
+			tracer().Errorf("cannot fix padding and border")
 		}
 		return
 	}
 	//contentW := box.fixPaddingAndBorderWidthFromBorderBox(w)
-	T().Debugf("w = %v", w)
+	tracer().Debugf("w = %v", w)
 	contentW, ok := fixPaddingAndBorderWidthFromBorderBoxWidth(box, w)
-	T().Debugf("contentW = %v", contentW)
+	tracer().Debugf("contentW = %v", contentW)
 	if !ok || contentW.IsNone() {
-		T().Errorf("cannot fix padding and border")
+		tracer().Errorf("cannot fix padding and border")
 		return
 	}
 	// decW := innerDecorationWidth(box)
@@ -472,7 +447,7 @@ func setWFromEnclosing(box *Box, enclw dimen.DU) {
 	box.W = css.SomeDimen(box.W.Unwrap() * enclw)
 }
 func fixPaddingAndBorderWidthFromBorderBoxWidth(box *Box, w dimen.DU) (css.DimenT, bool) {
-	T().Debugf("fix padding from bbox")
+	tracer().Debugf("fix padding from bbox")
 	var hundredPcntW int64
 	var W css.DimenT
 	if !box.BorderBoxSizing {
@@ -494,7 +469,7 @@ func fixPaddingAndBorderWidthFromBorderBoxWidth(box *Box, w dimen.DU) (css.Dimen
 			}
 		}
 		hundredPcntW = int64(total) * 100 / pcnt
-		T().Debugf("100%% = %v", hundredPcntW)
+		tracer().Debugf("100%% = %v", hundredPcntW)
 		W = css.SomeDimen(dimen.DU(hundredPcntW))
 	} else {
 		hundredPcntW = int64(w)
@@ -621,7 +596,7 @@ var ErrUnderspecified error = errors.New("box width dimensions are underspecifie
 // dimension.
 //
 func FixDimensionsFromEnclosingWidth(box *Box, enclosingWidth dimen.DU) (bool, error) {
-	T().Debugf("fix contraint dimensions, enclosing = %v", enclosingWidth)
+	tracer().Debugf("fix contraint dimensions, enclosing = %v", enclosingWidth)
 	fixIllegalDimensionSpecifications(box)
 	box.FixPercentages(enclosingWidth)
 	if err := checkForUnresolvedDependentDimensions(box); err != nil {
@@ -643,7 +618,7 @@ func FixDimensionsFromEnclosingWidth(box *Box, enclosingWidth dimen.DU) (bool, e
 		return false, ErrUnderspecified
 	}
 	box.W = w
-	T().Debugf("dimensions calculated from enclosing width: %s", box.DebugString())
+	tracer().Debugf("dimensions calculated from enclosing width: %s", box.DebugString())
 	// if !box.Padding[dir].IsAbsolute() || !box.BorderWidth[dir].IsAbsolute() ||
 	// 	!box.BorderWidth[dir].IsAbsolute() {
 	// 	fixed = false
@@ -658,7 +633,7 @@ func asCalcFn(f interface{}) calcFn {
 }
 
 func takeWidth(box *Box, enclosing dimen.DU) (css.DimenT, error) {
-	T().Debugf("calculating width: simply take is as is = %v", box.W)
+	tracer().Debugf("calculating width: simply take is as is = %v", box.W)
 	fixed := distributeHorizontalMarginSpace(box, enclosing)
 	if !fixed {
 		return box.W, ErrUnderspecified
@@ -689,7 +664,7 @@ func calcWidthAsRest(box *Box, enclosing dimen.DU) (css.DimenT, error) {
 	}
 	box.Margins[Right] = css.SomeDimen(right)
 	width := enclosing - left - right
-	T().Debugf("w = %v", width)
+	tracer().Debugf("w = %v", width)
 	if !box.BorderBoxSizing {
 		var d css.DimenT
 		if d = innerDecorationWidth(box); d.IsNone() {
@@ -698,7 +673,7 @@ func calcWidthAsRest(box *Box, enclosing dimen.DU) (css.DimenT, error) {
 		width -= d.Unwrap()
 	}
 	r := css.SomeDimen(width)
-	T().Debugf("calculate width as rest to w = %v", r)
+	tracer().Debugf("calculate width as rest to w = %v", r)
 	return r, nil
 	//return css.SomeDimen(width), nil
 }
@@ -719,7 +694,7 @@ func distributeHorizontalMarginSpace(box *Box, enclosing dimen.DU) bool {
 		})),
 	})
 	if err != nil {
-		T().Errorf("distribute h-margins: %s", err.Error())
+		tracer().Errorf("distribute h-margins: %s", err.Error())
 		return false
 	}
 	r := remaining - l.(dimen.DU)

@@ -25,7 +25,7 @@ func BuildBoxTree(domRoot *dom.W3CNode) (frame.Container, error) {
 		return nil, ErrDOMRootIsNull
 	}
 	domWalker := domRoot.Walk()
-	T().Debugf("Creating box tree")
+	tracer().Debugf("Creating box tree")
 	dom2box := newAssoc()
 	createBoxForEach := prepareBoxCreator(dom2box)
 	future := domWalker.TopDown(createBoxForEach).Promise() // start asynchronous traversal
@@ -33,19 +33,19 @@ func BuildBoxTree(domRoot *dom.W3CNode) (frame.Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	T().Infof("Walker returned %d render nodes", len(renderNodes))
+	tracer().Infof("Walker returned %d render nodes", len(renderNodes))
 	/*
 		for _, rnode := range renderNodes {
 			n := TreeNodeAsPrincipalBox(rnode)
 			T().Infof("  node for %s", n.domNode.NodeName())
 		}
 	*/
-	T().Infof("dom2box dict contains %d entries", dom2box.Length())
+	tracer().Infof("dom2box dict contains %d entries", dom2box.Length())
 	//T().Errorf("domRoot/2 = %s", dbgNodeString(domRoot))
 	boxRoot, ok := dom2box.Get(domRoot)
 	//T().Errorf("box for domRoot = %v", boxRoot)
 	if !ok || boxRoot.Type() != TypePrincipal {
-		T().Errorf("No box created for root style node")
+		tracer().Errorf("No box created for root style node")
 		err = ErrNoBoxTreeCreated
 	} else {
 		err = attributeBoxes(boxRoot.(*PrincipalBox))
@@ -59,18 +59,18 @@ func BuildBoxTree(domRoot *dom.W3CNode) (frame.Container, error) {
 // prepareBocCreator is an action function for concurrent tree-traversal.
 func prepareBoxCreator(dict *domToBoxAssoc) tree.Action {
 	dom2box := dict
-	T().Infof("generate ACTION box creator ========================================")
+	tracer().Infof("generate ACTION box creator ========================================")
 	action := func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
 		domnode, err := dom.NodeFromTreeNode(node)
 		if err != nil {
-			T().Errorf("action 1: %s", err.Error())
+			tracer().Errorf("action 1: %s", err.Error())
 			return nil, err
 		}
 		var parent *dom.W3CNode
 		if parentNode != nil {
 			parent, err = dom.NodeFromTreeNode(parentNode)
 			if err != nil {
-				T().Errorf("action 2: %s", err.Error())
+				tracer().Errorf("action 2: %s", err.Error())
 				return nil, err
 			}
 		}
@@ -82,13 +82,13 @@ func prepareBoxCreator(dict *domToBoxAssoc) tree.Action {
 func createAndAttachBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int, dom2box *domToBoxAssoc) (
 	*tree.Node, error) {
 	//
-	T().Infof("making box for %s", domnode.NodeName())
+	tracer().Infof("making box for %s", domnode.NodeName())
 	box := NewBoxForDOMNode(domnode)
 	if box == nil { // legit, e.g. for "display:none"
-		T().Debugf("box is nil")
+		tracer().Debugf("box is nil")
 		return nil, nil // will not descend to children of domnode
 	}
-	T().Infof("remembering %d/%s", domnode.NodeType(), domnode.NodeName())
+	tracer().Infof("remembering %d/%s", domnode.NodeType(), domnode.NodeName())
 	dom2box.Put(domnode, box) // associate the styled tree node to this box
 	if domnode.IsDocument() { // document root cannot be attached to anything
 		return box.TreeNode(), nil
@@ -97,7 +97,7 @@ func createAndAttachBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int
 		parent := parentNode.(*dom.W3CNode)
 		parentbox, found := dom2box.Get(parent)
 		if found {
-			T().Debugf("adding new box [%s] to parent [%s]\n", boxname(box), boxname(parentbox))
+			tracer().Debugf("adding new box [%s] to parent [%s]\n", boxname(box), boxname(parentbox))
 			p := parentbox.(*PrincipalBox)
 			var err error
 			switch b := box.(type) {
@@ -106,11 +106,11 @@ func createAndAttachBoxNode(domnode *dom.W3CNode, parent *dom.W3CNode, chpos int
 			case *TextBox:
 				err = p.AddTextChild(b, chpos)
 			default:
-				T().Errorf("Unknown box type for %v", box)
+				tracer().Errorf("Unknown box type for %v", box)
 				err = errDOMNodeNotSuitable
 			}
 			if err != nil {
-				T().Errorf(err.Error())
+				tracer().Errorf(err.Error())
 			}
 		}
 	}
@@ -131,7 +131,7 @@ func NewBoxForDOMNode(domnode *dom.W3CNode) frame.Container {
 	// document or element node
 	mode := frame.DisplayModeForDOMNode(domnode)
 	if mode == css.NoMode || mode == css.DisplayNone {
-		T().Debugf("removing node for %v with display=none", domnode.NodeName())
+		tracer().Debugf("removing node for %v with display=none", domnode.NodeName())
 		//panic(fmt.Sprintf("NO MODE for %v", domnode.NodeName()))
 		return nil // do not produce box for illegal mode or for display = "none"
 	}
@@ -156,7 +156,7 @@ func possiblyCreateMiniHierarchy(c frame.Container) {
 			//markerbox := newContainer(BlockMode, FlowMode)
 			// TODO: fill box with correct marker symbol
 			//pbox.Add(markerbox)
-			T().Debugf("need marker for principal box")
+			tracer().Debugf("need marker for principal box")
 		}
 	}
 }
@@ -177,7 +177,7 @@ func attributeBoxes(boxRoot *PrincipalBox) error {
 
 // Tree action: attribute each box from CSS styles.
 func makeAttributesAction(root frame.Container) tree.Action {
-	T().Infof("generate ACTION attributer ==============================================")
+	tracer().Infof("generate ACTION attributer ==============================================")
 	view := viewFromBoxRoot(root)
 	//return func attributeFromCSS(node *tree.Node, unused *tree.Node, chpos int) (match *tree.Node, err error) {
 	return func(node *tree.Node, parentNode *tree.Node, chpos int) (*tree.Node, error) {
@@ -187,7 +187,7 @@ func makeAttributesAction(root frame.Container) tree.Action {
 		}
 		style := c.DOMNode().ComputedStyles().GetPropertyValue // function shortcut
 		if c.Type() == TypePrincipal {
-			T().Debugf("attributing container %+v", c.DOMNode().NodeName())
+			tracer().Debugf("attributing container %+v", c.DOMNode().NodeName())
 			//
 			// TODO font handling
 			// https://developer.mozilla.org/en-US/docs/Web/CSS/font

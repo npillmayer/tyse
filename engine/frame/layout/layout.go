@@ -60,7 +60,7 @@ type View struct {
 }
 
 func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthesizedParams) {
-	T().Debugf("============ Layout ===========================")
+	tracer().Debugf("============ Layout ===========================")
 	if view == nil {
 		if boxRoot != nil {
 			syn.lastErr = errors.New("illegal arguments")
@@ -85,7 +85,7 @@ func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthes
 		syn = CalcBlockWidths(boxRoot, params)
 	}
 	if syn.lastErr != nil {
-		T().Errorf("layout tree: %v", syn.lastErr)
+		tracer().Errorf("layout tree: %v", syn.lastErr)
 	}
 	// now recursivly call boxRoot.Context().Layout(params/flowRoot)
 	return syn
@@ -96,7 +96,7 @@ func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesi
 	if c.Context() == nil {
 		c.SetContext(NewContextFor(c))
 	}
-	T().Debugf("calculating block width of [%s]", boxtree.ContainerName(c))
+	tracer().Debugf("calculating block width of [%s]", boxtree.ContainerName(c))
 	// case c.Box.W is Font or View dependent: should have been done already => error
 	// case c.Box.W is Content dependent: call calc on nested block
 	// case c.Box.W is absolute: we're done
@@ -134,7 +134,7 @@ func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesi
 	if ok && syn.lastErr == nil {
 		// recurse down
 		if hasContained := c.PresetContained(); hasContained {
-			T().Debugf("calculating width for %d children of [%s]", len(c.Context().Contained()),
+			tracer().Debugf("calculating width for %d children of [%s]", len(c.Context().Contained()),
 				boxtree.ContainerName(c))
 			inherited.W = c.CSSBox().W
 			inherited.MaxW = c.CSSBox().W.Unwrap()
@@ -142,8 +142,8 @@ func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesi
 				if sub.Type() == boxtree.TypeText {
 					continue
 				}
-				T().Debugf("--------------------------------------------------")
-				T().Debugf("width of sub-container [%s]", boxtree.ContainerName(sub))
+				tracer().Debugf("--------------------------------------------------")
+				tracer().Debugf("width of sub-container [%s]", boxtree.ContainerName(sub))
 				s := CalcBlockWidths(sub, inherited)
 				if s.lastErr != nil {
 					syn.lastErr = s.lastErr
@@ -153,15 +153,15 @@ func CalcBlockWidths(c frame.Container, inherited inheritedParams) (syn synthesi
 		}
 		// now c should have its width determined
 		// and the non-text sub-containers of c should have their dimensions fixed
-		T().Debugf("calling [%s].Layout()", boxtree.ContainerName(c))
+		tracer().Debugf("calling [%s].Layout()", boxtree.ContainerName(c))
 		syn.lastErr = c.Context().Layout(inherited.flowRoot)
 	} else if syn.lastErr == frame.ErrContentScaling {
-		T().Debugf("[%v] width cannot be solved top-down, have to calc content-based",
+		tracer().Debugf("[%v] width cannot be solved top-down, have to calc content-based",
 			c.DOMNode().NodeName())
 		syn = solveWidthForContent(c, inherited) // this will recurse all the way down
 	}
 	if syn.lastErr != nil {
-		T().Debugf("calc block width: last error = %v", syn.lastErr)
+		tracer().Debugf("calc block width: last error = %v", syn.lastErr)
 	}
 	if size, _, _ := c.Context().Measure(); !size.H.IsNone() {
 		syn.H = size.H.Unwrap()

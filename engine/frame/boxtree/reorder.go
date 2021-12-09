@@ -17,7 +17,7 @@ import (
 // In a future version, CSS regions should be supported as well.
 //
 func reorderBoxTree(boxRoot *PrincipalBox) error {
-	T().Infof("=========== box REORDER ========================================")
+	tracer().Infof("=========== box REORDER ========================================")
 	if boxRoot == nil {
 		return nil
 	}
@@ -39,7 +39,7 @@ func reposition(node *tree.Node, unused *tree.Node) (match *tree.Node, err error
 			css.PositionFloatRight: true,
 			option.Some:            false,
 		}); nonflow.(bool) {
-			T().Debugf("box has to be re-ordered: %s (%v)", boxname(pbox), pos)
+			tracer().Debugf("box has to be re-ordered: %s (%v)", boxname(pbox), pos)
 			match = pbox.TreeNode()
 		}
 	}
@@ -56,8 +56,8 @@ func anchor(anchorCandidate *tree.Node, node *tree.Node) (match *tree.Node, err 
 	if positionedChild.Type() != TypePrincipal || possibleAnchor.Type() != TypePrincipal {
 		return
 	}
-	T().Debugf("trying to re-attach %s node", boxname(positionedChild))
-	T().Debugf("   candidate anchor is %s", boxname(possibleAnchor))
+	tracer().Debugf("trying to re-attach %s node", boxname(positionedChild))
+	tracer().Debugf("   candidate anchor is %s", boxname(possibleAnchor))
 	var anchor *PrincipalBox
 	anchorCandidateIsDocRoot := func(interface{}) (interface{}, error) {
 		return possibleAnchor.DOMNode().NodeName() == "#document", nil

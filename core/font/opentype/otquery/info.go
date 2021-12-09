@@ -86,3 +86,29 @@ func LayoutTables(otf *ot.Font) []string {
 	}
 	return lt
 }
+
+// GlyphClass collects glyph class information for a glyph index.
+type GlyphClass struct {
+	Class           int
+	MarkAttachClass int
+	MarkGlyphSet    int
+}
+
+// GlyphClasses retrieves glyph class information for a given glyph index.
+func GlyphClasses(otf *ot.Font, gid ot.GlyphIndex) GlyphClass {
+	t := otf.Table(ot.T("GDEF"))
+	if t == nil {
+		return GlyphClass{}
+	}
+	gdef := t.Self().AsGDef()
+	clz := GlyphClass{
+		Class:           gdef.GlyphClassDef.Lookup(gid),
+		MarkAttachClass: gdef.MarkAttachmentClassDef.Lookup(gid),
+	}
+	for _, set := range gdef.MarkGlyphSets {
+		if n, ok := set.Match(gid); ok {
+			clz.MarkGlyphSet = n
+		}
+	}
+	return clz
+}

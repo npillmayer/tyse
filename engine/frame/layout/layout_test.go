@@ -9,9 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
@@ -22,12 +20,8 @@ import (
 )
 
 func TestLayout(t *testing.T) {
-	// teardown := testconfig.QuickConfig(t)
-	// defer teardown()
-	gtrace.EngineTracer = gologadapter.New()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
+	defer teardown()
 	//
 	domroot := buildDOM(t, false)
 	boxes, err := boxtree.BuildBoxTree(domroot)
@@ -68,9 +62,6 @@ func buildDOM(t *testing.T, drawit bool) *dom.W3CNode {
 }
 
 func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
-	tl := gtrace.EngineTracer.GetTraceLevel()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
-	//
 	tmpfile, err := ioutil.TempFile(".", "dom.*.dot")
 	if err != nil {
 		log.Fatal(err)
@@ -87,7 +78,6 @@ func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
 		t.Fatal(err.Error())
 	}
 	fmt.Printf("done with dom.svg\n")
-	gtrace.EngineTracer.SetTraceLevel(tl)
 	return tmpfile
 }
 
@@ -106,9 +96,6 @@ func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
 }
 
 func dottyLayoutTree(root frame.Container, t *testing.T) *os.File {
-	tl := gtrace.EngineTracer.GetTraceLevel()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
-	//
 	tmpfile, err := ioutil.TempFile(".", "layouttree.*.dot")
 	if err != nil {
 		log.Fatal(err)
@@ -125,6 +112,5 @@ func dottyLayoutTree(root frame.Container, t *testing.T) *os.File {
 		t.Error(err.Error())
 	}
 	fmt.Printf("done with layouttree.svg\n")
-	gtrace.EngineTracer.SetTraceLevel(tl)
 	return tmpfile
 }

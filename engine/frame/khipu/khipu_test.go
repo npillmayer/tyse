@@ -4,34 +4,24 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/core/parameters"
 )
 
-// func init() {
-// 	gconf.Initialize(configtestadapter.New())
-// 	gtrace.CoreTracer = gotestingadapter.New()
-// 	//gtrace.CoreTracer = gologadapter.New()
-// }
-
-func config(t *testing.T) func() {
-	return testconfig.QuickConfig(t)
-}
-
 func TestDimen(t *testing.T) {
-	teardown := config(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
 	defer teardown()
+	//
 	if dimen.BP.String() != "65536sp" {
 		t.Error("a big point BP should be 65536 scaled points SP")
 	}
 }
 
 func TestKhipu(t *testing.T) {
-	teardown := config(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
 	defer teardown()
+	//
 	kh := NewKhipu()
 	kh.AppendKnot(NewKnot(KTKern)).AppendKnot(NewKnot(KTGlue))
 	kh.AppendKnot(NewTextBox("Hello", 0))
@@ -42,9 +32,9 @@ func TestKhipu(t *testing.T) {
 }
 
 func TestBreaking1(t *testing.T) {
-	teardown := config(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
 	regs := parameters.NewTypesettingRegisters()
 	regs.Push(parameters.P_MINHYPHENLENGTH, 3)
 	kh := KnotEncode(strings.NewReader("Hello World "), 0, nil, regs)
@@ -55,9 +45,9 @@ func TestBreaking1(t *testing.T) {
 }
 
 func TestBreaking2(t *testing.T) {
-	teardown := config(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
 	regs := parameters.NewTypesettingRegisters()
 	regs.Push(parameters.P_MINHYPHENLENGTH, 3)
 	kh := KnotEncode(strings.NewReader("The quick !"), 0, nil, regs)
@@ -68,9 +58,9 @@ func TestBreaking2(t *testing.T) {
 }
 
 func TestText(t *testing.T) {
-	teardown := config(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
 	text := "The quick brown fox jumps over the lazy dog!"
 	regs := parameters.NewTypesettingRegisters()
 	regs.Push(parameters.P_MINHYPHENLENGTH, 3)
@@ -83,9 +73,9 @@ func TestText(t *testing.T) {
 }
 
 func TestExHyphen(t *testing.T) {
-	teardown := config(t)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
 	text := "lime-tree"
 	regs := parameters.NewTypesettingRegisters()
 	regs.Push(parameters.P_MINHYPHENLENGTH, 3)

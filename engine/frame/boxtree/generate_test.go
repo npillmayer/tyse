@@ -9,9 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
 	"github.com/npillmayer/tyse/engine/frame"
@@ -21,15 +19,13 @@ import (
 )
 
 func TestCSSAttributing(t *testing.T) {
-	// teardown := testconfig.QuickConfig(t)
-	// defer teardown()
-	gtrace.EngineTracer = gologadapter.New()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelDebug)
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.box")
+	defer teardown()
 	//
 	domroot := buildDOM(t, false)
 	boxes, err := boxtree.BuildBoxTree(domroot)
 	checkBoxTree(boxes, err, t)
-	dottyBoxTree(boxes, t)
+	//dottyBoxTree(boxes, t)
 }
 
 // ---------------------------------------------------------------------------
@@ -61,9 +57,6 @@ func buildDOM(t *testing.T, drawit bool) *dom.W3CNode {
 }
 
 func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
-	tl := gtrace.EngineTracer.GetTraceLevel()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
-	//
 	tmpfile, err := ioutil.TempFile(".", "dom.*.dot")
 	if err != nil {
 		log.Fatal(err)
@@ -80,7 +73,6 @@ func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
 		t.Fatal(err.Error())
 	}
 	fmt.Printf("done with dom.svg\n")
-	gtrace.EngineTracer.SetTraceLevel(tl)
 	return tmpfile
 }
 
@@ -99,9 +91,6 @@ func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
 }
 
 func dottyBoxTree(root frame.Container, t *testing.T) *os.File {
-	tl := gtrace.EngineTracer.GetTraceLevel()
-	gtrace.EngineTracer.SetTraceLevel(tracing.LevelError)
-	//
 	tmpfile, err := ioutil.TempFile(".", "boxtree.*.dot")
 	if err != nil {
 		log.Fatal(err)
@@ -118,6 +107,5 @@ func dottyBoxTree(root frame.Container, t *testing.T) *os.File {
 		t.Error(err.Error())
 	}
 	fmt.Printf("done with boxtree.svg\n")
-	gtrace.EngineTracer.SetTraceLevel(tl)
 	return tmpfile
 }

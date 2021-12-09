@@ -41,15 +41,15 @@ import (
 )
 
 // ErrInvalidFilter is thrown if a pipeline filter step is defunct.
-var ErrInvalidFilter = errors.New("Filter stage is invalid")
+var ErrInvalidFilter = errors.New("filter stage is invalid")
 
 // ErrEmptyTree is thrown if a Walker is called with an empty tree. Refer to
 // the documentation of NewWalker() for details about this scenario.
-var ErrEmptyTree = errors.New("Cannot walk empty tree")
+var ErrEmptyTree = errors.New("cannot walk empty tree")
 
 // ErrNoMoreFiltersAccepted is thrown if a client already called Promise(), but tried to
 // re-use a walker with another filter.
-var ErrNoMoreFiltersAccepted = errors.New("In promise mode; will not accept new filters; use a new walker")
+var ErrNoMoreFiltersAccepted = errors.New("in promise mode; will not accept new filters; use a new walker")
 
 // Walker holds information for operating on trees: finding nodes and
 // doing work on them. Clients usually create a Walker for a (sub-)tree

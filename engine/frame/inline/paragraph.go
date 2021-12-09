@@ -25,9 +25,7 @@ type ParagraphBox struct {
 	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
 	context frame.Context    // principal boxes may establish a context
 	para    *Paragraph       // text of the paragraph
-	khipu   *khipu.Khipu     // khipu knots make from paragraph text
-	//tree.Node                     // a paragraph box is a node within the layout tree
-	//displayMode frame.DisplayMode // outer display mode
+	khipu   *khipu.Khipu     // khipu knots made from paragraph text // TOOD duplicate ?
 }
 
 var _ frame.Container = &ParagraphBox{}
@@ -120,7 +118,10 @@ func paragraphTextFromBox(c frame.Container) (*Paragraph, []frame.Container, err
 	}
 	var innerText *styled.Text // TODO set boxText()
 	innerText, blocks, err := containedText(c, &para.irs)
-	//T().Debugf("para from container: inner text = '%s'", innerText.Raw())
+	if err != nil {
+		return nil, nil, err
+	}
+	tracer().Debugf("para from container: inner text = '%s'", innerText.Raw())
 	eBidiDir, _ := findEmbeddingBidiDirection(c.DOMNode())
 	para.Paragraph, err = styled.ParagraphFromText(innerText, 0, innerText.Raw().Len(), eBidiDir,
 		para.bidiMarkup())
@@ -133,7 +134,7 @@ func containedText(c frame.Container, irs *infoIRS) (*styled.Text, []frame.Conta
 	}
 	b := styled.NewTextBuilder()
 	var blocks []frame.Container
-	T().Debugf("collecting contained text of [%s]", boxtree.ContainerName(c))
+	tracer().Debugf("collecting contained text of [%s]", boxtree.ContainerName(c))
 	collectContainedText(c, c, b, irs, blocks)
 	return b.Text(), blocks, nil
 }
@@ -156,7 +157,10 @@ func collectContainedText(root, c frame.Container, b *styled.TextBuilder, irs *i
 	} else if c != root && c.DisplayMode().Outer() == css.BlockMode {
 		b.Append(&nonReplacableElementLeaf{c.DOMNode()}, frame.StyleSet{})
 	} else {
-		//T().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())
+		tracer().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())
+		if c.Context() == nil {
+			panic("container without context")
+		}
 		children := c.Context().Contained()
 		for _, childContainer := range children {
 			collectContainedText(root, childContainer, b, irs, blocks)
