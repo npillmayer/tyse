@@ -144,6 +144,7 @@ func collectContainedText(root, c frame.Container, b *styled.TextBuilder, irs *i
 	//
 	if c.DOMNode() != nil && c.DOMNode().NodeType() == html.TextNode {
 		leaf := createLeaf(c.DOMNode())
+		tracer().Debugf("collect text node %q", leaf.String())
 		styles := leaf.element.ComputedStyles().Styles()
 		styleset := frame.StyleSet{Props: styles}
 		var isExplicitDir bool

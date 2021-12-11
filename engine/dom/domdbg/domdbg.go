@@ -1,44 +1,27 @@
 /*
 Package domdbg implements helpers to debug a DOM tree.
 
-BSD License
+______________________________________________________________________
 
-Copyright (c) 2017–20, Norbert Pillmayer
+License
 
-All rights reserved.
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
 
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
+*/
 package domdbg
 
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"os/exec"
 	"strings"
+	"testing"
 	"text/template"
 
 	"github.com/npillmayer/tyse/engine/dom"
@@ -69,12 +52,15 @@ var defaultGroups = []string{
 // the DOM, a Writer, and an optional list of style parameter groups.
 // The diagram will include all styles belonging to one of the
 // parameter groups.
+//
 // If the client does not provide a list of style groups, the following
 // default will be used:
+//
 //     - Margins
 //     - Padding
 //     - Border
 //     - Display
+//
 func ToGraphViz(doc *dom.W3CNode, w io.Writer, styleGroups []string) {
 	tmpl, err := template.New("dom").Parse(graphHeadTmpl)
 	if err != nil {
@@ -100,6 +86,35 @@ func ToGraphViz(doc *dom.W3CNode, w io.Writer, styleGroups []string) {
 	dict := make(map[*html.Node]string, 4096)
 	nodes(doc, w, dict, &gparams)
 	w.Write([]byte("}\n"))
+}
+
+// Dotty is a helper for testing. Given a DOM node and a testing.T, it will
+// create a Graphiviz image of the DOM tree under `doc` and write it to
+// a file in the current folder, choosing a unique file name.
+// The image is in SVG format.
+//
+// If an error occurs, t.Error(…) will be set, causing the test to fail.
+//
+func Dotty(doc *dom.W3CNode, t *testing.T) {
+	tmpfile, err := ioutil.TempFile(".", "dom.*.dot")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer func() {
+		tmpfile.Close()
+		os.Remove(tmpfile.Name()) // clean up
+	}()
+	t.Logf("writing DOM digraph to %s\n", tmpfile.Name())
+	ToGraphViz(doc, tmpfile, nil)
+	outOption := fmt.Sprintf("-o%s.svg", tmpfile.Name())
+	cmd := exec.Command("dot", "-Tsvg", outOption, tmpfile.Name())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	t.Log("writing DOM tree image to tree.svg\n")
+	if err := cmd.Run(); err != nil {
+		t.Error(err.Error())
+	}
 }
 
 type node struct {

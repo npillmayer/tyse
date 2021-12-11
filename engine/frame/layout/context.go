@@ -332,6 +332,7 @@ func NewContextFor(c frame.Container) frame.Context {
 		tracer().Debugf("providing block context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
 		return NewBlockContext(c, isroot)
 	}
+	tracer().Errorf("no new context for [%v]", boxtree.ContainerName(c))
 	return nil
 }
 

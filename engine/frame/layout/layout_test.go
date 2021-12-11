@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/core/dimen"
 	"github.com/npillmayer/tyse/engine/dom"
@@ -20,19 +21,24 @@ import (
 )
 
 func TestLayout(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "tyse.khipu")
+	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
+	dottyTracer := gotestingadapter.New(t)
+	dottyTracer.SetTraceLevel(tracing.LevelError)
 	//
 	domroot := buildDOM(t, false)
 	boxes, err := boxtree.BuildBoxTree(domroot)
 	checkBoxTree(boxes, err, t)
 	v := View{Width: 8 * dimen.CM}
 	r := BoxTreeToLayoutTree(boxes.(*boxtree.PrincipalBox), &v)
-	t.Logf("resulting W = %s", r.W)
 	if r.lastErr != nil {
-		t.Errorf("resulting error is: %v", r.lastErr)
+		t.Errorf("layout tree: resulting error is: %v", r.lastErr)
 	}
-	//dottyLayoutTree(boxes, t)
+	if r.W == 0 {
+		t.Logf("resulting W = %s", r.W)
+		t.Errorf("layout tree: resulting bounding box has no width")
+	}
+	dottyLayoutTree(boxes, t, dottyTracer)
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +72,7 @@ func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//defer os.Remove(tmpfile.Name()) // clean up
+	defer os.Remove(tmpfile.Name()) // clean up
 	fmt.Printf("writing DOM to %s\n", tmpfile.Name())
 	domdbg.ToGraphViz(doc, tmpfile, nil)
 	defer tmpfile.Close()
@@ -95,14 +101,14 @@ func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
 	t.Logf("root node = %+v", boxes)
 }
 
-func dottyLayoutTree(root frame.Container, t *testing.T) *os.File {
+func dottyLayoutTree(root frame.Container, t *testing.T, tracer tracing.Trace) *os.File {
 	tmpfile, err := ioutil.TempFile(".", "layouttree.*.dot")
 	if err != nil {
 		log.Fatal(err)
 	}
 	//defer os.Remove(tmpfile.Name()) // clean up
 	fmt.Printf("writing BoxTree to %s\n", tmpfile.Name())
-	framedebug.ToGraphViz(root.(*boxtree.PrincipalBox), tmpfile)
+	framedebug.ToGraphViz(root.(*boxtree.PrincipalBox), tmpfile, tracer)
 	defer tmpfile.Close()
 	cmd := exec.Command("dot", "-Tsvg", "-olayouttree.svg", tmpfile.Name())
 	cmd.Stdout = os.Stdout

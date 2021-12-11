@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
@@ -97,7 +98,7 @@ func dottyBoxTree(root frame.Container, t *testing.T) *os.File {
 	}
 	//defer os.Remove(tmpfile.Name()) // clean up
 	fmt.Printf("writing BoxTree to %s\n", tmpfile.Name())
-	framedebug.ToGraphViz(root.(*boxtree.PrincipalBox), tmpfile)
+	framedebug.ToGraphViz(root.(*boxtree.PrincipalBox), tmpfile, tracing.Select("tyse.frame.box"))
 	defer tmpfile.Close()
 	cmd := exec.Command("dot", "-Tsvg", "-oboxtree.svg", tmpfile.Name())
 	cmd.Stdout = os.Stdout

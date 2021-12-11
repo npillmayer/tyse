@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/tracing"
 
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
@@ -21,11 +21,12 @@ type graphParamsType struct {
 	BoxTmpl     *template.Template
 	PBoxTmpl    *template.Template
 	EdgeTmpl    *template.Template
+	cnt         int
 }
 
 // ToGraphViz creates a graphical representation of a render tree.
 // It produces a DOT file format suitable as input for Graphviz, given a Writer.
-func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer) {
+func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer, tracer tracing.Trace) {
 	header, err := template.New("renderTree").Parse(graphHeadTmpl)
 	if err != nil {
 		panic(err)
@@ -49,43 +50,46 @@ func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer) {
 		panic(err)
 	}
 	dict := make(map[frame.Container]string, 4096)
-	boxes(boxroot, w, dict, &gparams)
+	boxes(boxroot, w, dict, &gparams, tracer)
 	w.Write([]byte("}\n"))
 }
 
-var cnt int
-
-func boxes(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
-	cnt++
-	if cnt == 300 {
-		return
+func boxes(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType,
+	tracer tracing.Trace) {
+	//
+	gparams.cnt++
+	if gparams.cnt == 300 {
+		return // guard against errorneous cycles
 	}
 	box(c, w, dict, gparams)
-	gtrace.EngineTracer.Debugf("container = %v", c)
-	n := c.TreeNode()
-	if n.ChildCount() >= 0 {
-		//children := n.Children(true)
-		//nn := n.ChildCount()
-		//gtrace.EngineTracer.Errorf("container has %d/%d children ..............", len(children), nn)
+	tracer.Debugf("container = %v", c)
+	kids := children(c)
+	for i, child := range kids {
+		tracing.Debugf("  child[%d] = %v", i, child)
+		boxes(child, w, dict, gparams, tracer)
+		edge(c, child, w, dict, gparams)
+	}
+}
 
-		//for i, ch := range children {
-		for i := 0; i < n.ChildCount(); i++ {
-			ch, ok := n.Child(i)
-			if !ok {
-				gtrace.EngineTracer.Debugf("Child at #%d could not be retrieved", i)
-			} else {
-				if ch == nil {
-					gtrace.EngineTracer.Debugf("Child at #%d is nil", i)
-				} else {
-					//gtrace.EngineTracer.Errorf("Child is %v", ch)
-					child := ch.Payload.(frame.Container)
-					gtrace.EngineTracer.Debugf("  child[%d] = %v", i, child)
-					boxes(child, w, dict, gparams)
-					edge(c, child, w, dict, gparams)
-				}
-			}
+func children(c frame.Container) []frame.Container {
+	if c.Context() != nil {
+		// This is for the layout tree instead of the box tree:
+		// instead of iterating over tree children, iterate over context children
+		return c.Context().Contained()
+	}
+	kids := make([]frame.Container, 0, 16)
+	n := c.TreeNode()
+	for i := 0; i < n.ChildCount(); i++ {
+		ch, ok := n.Child(i)
+		if !ok {
+			tracing.Debugf("Child at #%d could not be retrieved", i)
+		} else if ch == nil {
+			tracing.Debugf("Child at #%d is nil", i)
+		} else {
+			kids = append(kids, ch.Payload.(frame.Container))
 		}
 	}
+	return kids
 }
 
 func box(c frame.Container, w io.Writer, dict map[frame.Container]string, gparams *graphParamsType) {
@@ -128,9 +132,6 @@ type pbox struct {
 
 func shortText(box *cbox) string {
 	txt := box.N.NodeValue()
-	//disp := box.C.DisplayMode()
-	//sym := disp.Symbol()
-	//s := fmt.Sprintf("\"%s\u2000\\\"", sym)
 	s := fmt.Sprintf("\"%s\u2000\\\"", "T")
 	if len(txt) > 10 {
 		s += txt[:10] + "…\\\"\""
@@ -150,7 +151,6 @@ type cedge struct {
 func edge(c1 frame.Container, c2 frame.Container, w io.Writer, dict map[frame.Container]string,
 	gparams *graphParamsType) {
 	//
-	//fmt.Printf("dict has %d entries\n", len(dict))
 	name1 := dict[c1]
 	name2 := dict[c2]
 	e := cedge{cbox{c1, c1.DOMNode(), name1}, cbox{c2, c2.DOMNode(), name2}}
@@ -176,16 +176,11 @@ func PrincipalLabel(pbox *boxtree.PrincipalBox) string {
 		return "<empty box>"
 	}
 	name := pbox.DOMNode().NodeName()
-	//fmt.Printf("LABEL for PBOX %v\n", name)
 	innerSym := pbox.DisplayMode().Inner().Symbol()
-	//fmt.Printf("inner display mode = %+v\n", pbox.DisplayMode().Inner())
-	//outerSym := pbox.outerMode.Symbol()
 	outerSym := pbox.DisplayMode().Outer().Symbol()
-	//fmt.Println("display modes OK")
 	return fmt.Sprintf("%s %s %s", outerSym, innerSym, name)
 }
 
-//func String(anon *boxtree.AnonymousBox) string {
 func AnonLabel(c frame.Container) string {
 	if c == nil {
 		return "<empty anon box>"
@@ -242,7 +237,6 @@ func styledBoxParams(p *boxtree.PrincipalBox, name string) (b *pbox) {
 	if p.Box.Styles == nil && isFixed {
 		return nil // we'll create a standard box
 	}
-	//fmt.Printf("principal box for %v does have styles\n", p.DOMNode().NodeName())
 	if p.Box.Styles == nil {
 		b = &pbox{
 			C:     p,

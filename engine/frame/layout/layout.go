@@ -18,7 +18,7 @@ import (
 /*
   It would be natural to make the layout functions members of type Context.
   However, I prefer setting up a driver pattern to be able to experiment with
-  different approaches to layout. I's easier to reason about layout in a recursive
+  different approaches to layout. It's easier to reason about layout in a recursive
   top-down manner (as does Mozilla), but I intend to move to a more concurrent
   approach step-by-step.
 */
@@ -60,10 +60,10 @@ type View struct {
 }
 
 func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthesizedParams) {
-	tracer().Debugf("============ Layout ===========================")
+	tracer().Debugf("================= ###### Layout ###### =====================")
 	if view == nil {
 		if boxRoot != nil {
-			syn.lastErr = errors.New("illegal arguments")
+			syn.lastErr = errors.New("illegal arguments: view is void")
 		}
 		return
 	}
@@ -85,8 +85,10 @@ func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthes
 		syn = CalcBlockWidths(boxRoot, params)
 	}
 	if syn.lastErr != nil {
-		tracer().Errorf("layout tree: %v", syn.lastErr)
+		tracer().Errorf("layout tree error: %v", syn.lastErr)
 	}
+	tracer().Debugf("=================== ############### ======================")
+	// TODO
 	// now recursivly call boxRoot.Context().Layout(params/flowRoot)
 	return syn
 }

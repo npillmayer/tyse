@@ -34,10 +34,16 @@ type FlowRoot struct {
 }
 
 type ContextBase struct {
-	tree.Node
+	*tree.Node
 	C         Container
 	IsRootCtx bool
 	flowRoot  *FlowRoot
+}
+
+func MakeContextBase() ContextBase {
+	ctx := ContextBase{}
+	ctx.Node = tree.NewNode(nil)
+	return ctx
 }
 
 func (ctx ContextBase) Container() Container {
@@ -52,7 +58,7 @@ func (ctx ContextBase) Container() Container {
 // }
 
 func (ctx ContextBase) TreeNode() *tree.Node {
-	return &ctx.Node
+	return ctx.Node
 }
 
 func (ctx ContextBase) IsFlowRoot() bool {

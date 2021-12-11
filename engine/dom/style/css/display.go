@@ -40,10 +40,25 @@ func (disp DisplayMode) Inner() DisplayMode {
 	return disp & 0xfff0
 }
 
-// IsBlock return true if it has outer mode of BlockMode.
-func (disp DisplayMode) IsBlock() bool {
-	return disp&0x0001 == BlockMode
+// IsBlockLevel return true if it has outer display level of BlockMode.
+//
+// A block-level element is defined as (from the spec):
+// Block-level elements are those elements of the source document that are formatted visually
+// as blocks (e.g., paragraphs). The following values of the 'display' property make an element
+// block-level: 'block', 'list-item', and 'table'.
+//
+func (disp DisplayMode) IsBlockLevel() bool {
+	return disp&0x000f == BlockMode
 }
+
+/*
+func (disp DisplayMode) BlockOrInline() DisplayMode {
+	if disp.Overlaps(InlineMode) {
+		return InlineMode
+	}
+	return BlockMode
+}
+*/
 
 // Set sets a given atomic mode within this display mode.
 func (disp *DisplayMode) Set(d DisplayMode) {
@@ -65,13 +80,6 @@ func (disp DisplayMode) Overlaps(d DisplayMode) bool {
 		}
 	}
 	return false
-}
-
-func (disp DisplayMode) BlockOrInline() DisplayMode {
-	if disp.Overlaps(InlineMode) {
-		return InlineMode
-	}
-	return BlockMode
 }
 
 // FullString returns all atomic modes set in a display mode.
