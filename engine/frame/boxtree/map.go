@@ -10,22 +10,22 @@ import (
 
 type domToBoxAssoc struct {
 	sync.RWMutex
-	m map[*html.Node]frame.Container
+	m map[*html.Node]*frame.ContainerBase
 }
 
 func newAssoc() *domToBoxAssoc {
 	return &domToBoxAssoc{
-		m: make(map[*html.Node]frame.Container),
+		m: make(map[*html.Node]*frame.ContainerBase),
 	}
 }
 
-func (d2c *domToBoxAssoc) Put(domnode *dom.W3CNode, c frame.Container) {
+func (d2c *domToBoxAssoc) Put(domnode *dom.W3CNode, c *frame.ContainerBase) {
 	d2c.Lock()
 	defer d2c.Unlock()
 	d2c.m[domnode.HTMLNode()] = c
 }
 
-func (d2c *domToBoxAssoc) Get(domnode *dom.W3CNode) (frame.Container, bool) {
+func (d2c *domToBoxAssoc) Get(domnode *dom.W3CNode) (*frame.ContainerBase, bool) {
 	d2c.RLock()
 	defer d2c.RUnlock()
 	c, ok := d2c.m[domnode.HTMLNode()]

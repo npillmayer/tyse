@@ -11,15 +11,41 @@ import (
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
-var _ frame.Container = &PrincipalBox{}
-var _ frame.Container = &AnonymousBox{}
-var _ frame.Container = &TextBox{}
+var _ frame.RenderTreeNode = &PrincipalBox{}
+var _ frame.RenderTreeNode = &AnonymousBox{}
+var _ frame.RenderTreeNode = &TextBox{}
 
-const (
-	TypePrincipal frame.ContainerType = 100
-	TypeAnonymous frame.ContainerType = 101
-	TypeText      frame.ContainerType = 102
-)
+// const (
+// 	TypePrincipal frame.ContainerType = 100
+// 	TypeAnonymous frame.ContainerType = 101
+// 	TypeText      frame.ContainerType = 102
+// )
+
+// IsPrincipal returns true if this is a principal box.
+//
+// Some HTML elements create a mini-hierachy of boxes for rendering. The outermost box
+// is called the principal box. It will always refer to the styled node.
+// An example would be a `<li>`-element: it will create two sub-boxes, one for the
+// list item marker and one for the item's text/content. Another example are anonymous
+// boxes, which will be generated for reconciling context/level-discrepancies.
+//
+func IsPrincipal(c frame.RenderTreeNode) bool {
+	_, ok := c.(*PrincipalBox)
+	return ok
+}
+
+// IsAnonymous returns true if this box is an anonymous box created by the layout algorithm.
+func IsAnonymous(c frame.RenderTreeNode) bool {
+	_, ok := c.(*AnonymousBox)
+	return ok
+}
+
+// IsText returns true if the underlying box is a text box.
+// Text boxes reference text nodes in the DOM.
+func IsText(c frame.RenderTreeNode) bool {
+	_, ok := c.(*TextBox)
+	return ok
+}
 
 // --- PrincipalBox --------------------------------------------------------------------
 
@@ -29,7 +55,6 @@ type PrincipalBox struct {
 	frame.ContainerBase
 	Box     *frame.StyledBox // styled box for a DOM node
 	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
-	context frame.Context    // principal boxes may establish a context
 }
 
 // NewPrincipalBox creates either a block-level container or an inline-level container
@@ -74,21 +99,10 @@ func (pbox *PrincipalBox) CSSBox() *frame.Box {
 	return &pbox.Box.Box
 }
 
-// IsPrincipal returns true if this is a principal box.
-//
-// Some HTML elements create a mini-hierachy of boxes for rendering. The outermost box
-// is called the principal box. It will always refer to the styled node.
-// An example would be a `<li>`-element: it will create two sub-boxes, one for the
-// list item marker and one for the item's text/content. Another example are anonymous
-// boxes, which will be generated for reconciling context/level-discrepancies.
-// func (pbox *PrincipalBox) IsPrincipal() bool {
-// 	return (pbox.domNode != nil)
-// }
-
 // Type returns TypePrincipal
-func (pbox *PrincipalBox) Type() frame.ContainerType {
-	return TypePrincipal
-}
+// func (pbox *PrincipalBox) Type() frame.ContainerType {
+// 	return TypePrincipal
+// }
 
 // IsAnonymous will always return false for a container.
 // func (pbox *PrincipalBox) IsAnonymous() bool {
@@ -106,31 +120,32 @@ func (pbox *PrincipalBox) Type() frame.ContainerType {
 // 	return pbox.displayMode
 // }
 
-func (pbox *PrincipalBox) Context() frame.Context {
-	// if pbox.context == nil {
-	// panic("principal box does not yet have a valid context")
-	//pbox.context = layout.CreateContextForContainer(pbox, false)
-	//
-	// if pbox.context == nil {
-	// 	parent := pbox.Node.Parent()
-	// 	for parent != nil {
-	// 		c, ok := parent.Payload.(Container)
-	// 		if !ok {
-	// 			break
-	// 		}
-	// 		ctx := c.Context()
-	// 		if ctx != nil {
-	// 			pbox.context = ctx
-	// 		}
-	// 		parent = parent.Parent()
-	// 	}
-	// }
-	// }
-	return pbox.context
-}
+// func (pbox *PrincipalBox) Context() frame.Context {
+// if pbox.context == nil {
+// panic("principal box does not yet have a valid context")
+//pbox.context = layout.CreateContextForContainer(pbox, false)
+//
+// if pbox.context == nil {
+// 	parent := pbox.Node.Parent()
+// 	for parent != nil {
+// 		c, ok := parent.Payload.(Container)
+// 		if !ok {
+// 			break
+// 		}
+// 		ctx := c.Context()
+// 		if ctx != nil {
+// 			pbox.context = ctx
+// 		}
+// 		parent = parent.Parent()
+// 	}
+// }
+// }
+//
+// return pbox.context
+// }
 
 func (pbox *PrincipalBox) SetContext(ctx frame.Context) {
-	pbox.context = ctx
+	pbox.Context = ctx
 }
 
 // func (pbox *PrincipalBox) String() string {
@@ -229,17 +244,17 @@ func (pbox *PrincipalBox) SetContext(ctx frame.Context) {
 // }
 
 // ErrNullChild flags an error condition when a non-nil child has been expected.
-var ErrNullChild = fmt.Errorf("Child box max not be null")
+var ErrNullChild = fmt.Errorf("child box max not be null")
 
 // ErrAnonBoxNotFound flags an error condition where an anonymous box should be
 // present but could not be found.
-var ErrAnonBoxNotFound = fmt.Errorf("No anonymous box found for index")
+var ErrAnonBoxNotFound = fmt.Errorf("no anonymous box found for index")
 
 // AddChild appends a child box to its parent principal box.
 // The child is a principal box itself, i.e. references a styleable DOM node.
 // The child must have its child index set.
 func (pbox *PrincipalBox) AddChild(child *PrincipalBox, at int) error {
-	return pbox.addChildContainer(child, at)
+	return pbox.addChildContainer(&child.ContainerBase, at)
 }
 
 // AddTextChild appends a child box to its parent principal box.
@@ -249,7 +264,7 @@ func (pbox *PrincipalBox) AddTextChild(child *TextBox, at int) error {
 	if child == nil {
 		return ErrNullChild
 	}
-	err := pbox.addChildContainer(child, at)
+	err := pbox.addChildContainer(&child.ContainerBase, at)
 	// if err == nil {
 	// 	if pbox.innerMode.Contains(InlineMode) {
 	// 		child.outerMode.Set(InlineMode)
@@ -260,7 +275,7 @@ func (pbox *PrincipalBox) AddTextChild(child *TextBox, at int) error {
 	return err
 }
 
-func (pbox *PrincipalBox) addChildContainer(child frame.Container, at int) error {
+func (pbox *PrincipalBox) addChildContainer(child *frame.ContainerBase, at int) error {
 	if child == nil {
 		return ErrNullChild
 	}
@@ -303,8 +318,9 @@ func (pbox *PrincipalBox) AppendChild(child *PrincipalBox) {
 }
 
 func (pbox *PrincipalBox) PresetContained() bool {
-	if pbox.Context() == nil {
-		tracer().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(pbox))
+	if pbox.Context == nil {
+		tracer().Errorf("[%s] has no context yet, cannot preset children boxes",
+			ContainerName(&pbox.ContainerBase))
 		return false
 	}
 	children := pbox.TreeNode().Children(true)
@@ -328,11 +344,11 @@ func (pbox *PrincipalBox) PresetContained() bool {
 			}
 			if doAdd.(bool) {
 				b.CSSBox().Max.W = pbox.CSSBox().W
-				pbox.Context().AddContained(b)
+				pbox.Context.AddContained(&b.ContainerBase)
 				hasAdded = true
 			}
 		case *TextBox:
-			pbox.Context().AddContained(b)
+			pbox.Context.AddContained(&b.ContainerBase)
 		case AnonymousBox:
 			tracer().Errorf("unexpected anonymous box child")
 		}
@@ -347,13 +363,13 @@ func (pbox *PrincipalBox) PresetContained() bool {
 // From the spec: "If a container box (inline or block) has a block-level box inside it,
 // then we force it to have only block-level boxes inside it."
 //
-// These block-level boxes are anonymous boxes. There are anonymous inline-level boxes,
-// too. Both are not directly stylable by the user, but rather inherit the styles of
-// their principal boxes.
+// These block-level boxes may be anonymous boxes, wrapping line boxes. There are anonymous
+// inline-level boxes, too. Both are not directly stylable by the user, but rather inherit the
+// styles of their principal boxes.
 type AnonymousBox struct {
 	frame.ContainerBase
-	Box     *frame.Box // an anoymous box cannot be styled
-	context frame.Context
+	Box *frame.Box // an anoymous box cannot be styled
+	//context frame.Context
 	//displayMode frame.DisplayMode // container lives in this mode (block or inline)
 	// ChildInxFrom uint32            // this box represents children starting at #ChildInxFrom of the principal box
 	// ChildInxTo   uint32            // this box represents children to #ChildInxTo
@@ -399,9 +415,9 @@ func (anon *AnonymousBox) CSSBox() *frame.Box {
 // }
 
 // Type returns TypeAnonymous
-func (anon *AnonymousBox) Type() frame.ContainerType {
-	return TypeAnonymous
-}
+// func (anon *AnonymousBox) Type() frame.ContainerType {
+// 	return TypeAnonymous
+// }
 
 // func (anon *AnonymousBox) String() string {
 // 	if anon == nil {
@@ -418,13 +434,13 @@ func (anon *AnonymousBox) Type() frame.ContainerType {
 // 	return int(anon.childInx)
 // }
 
-func (anon *AnonymousBox) Context() frame.Context {
-	return anon.context
-}
+// func (anon *AnonymousBox) Context() frame.Context {
+// 	return anon.context
+// }
 
-func (anon *AnonymousBox) SetContext(ctx frame.Context) {
-	anon.context = ctx
-}
+// func (anon *AnonymousBox) SetContext(ctx frame.Context) {
+// 	anon.context = ctx
+// }
 
 func NewAnonymousBox(mode css.DisplayMode) *AnonymousBox {
 	anon := &AnonymousBox{}
@@ -435,8 +451,9 @@ func NewAnonymousBox(mode css.DisplayMode) *AnonymousBox {
 }
 
 func (anon *AnonymousBox) PresetContained() bool {
-	if anon.Context() == nil {
-		tracer().Errorf("[%s] has no context yet, cannot preset children boxes", ContainerName(anon))
+	if anon.Context == nil {
+		tracer().Errorf("[%s] has no context yet, cannot preset children boxes",
+			ContainerName(&anon.ContainerBase))
 		return false
 	}
 	children := anon.TreeNode().Children(true)
@@ -460,11 +477,11 @@ func (anon *AnonymousBox) PresetContained() bool {
 			}
 			if doAdd.(bool) {
 				b.CSSBox().Max.W = anon.CSSBox().W
-				anon.Context().AddContained(b)
+				anon.Context.AddContained(&b.ContainerBase)
 				hasAdded = true
 			}
 		case *TextBox:
-			anon.Context().AddContained(b)
+			anon.Context.AddContained(&b.ContainerBase)
 		case AnonymousBox:
 			tracer().Errorf("unexpected anonymous box child")
 		}
@@ -508,9 +525,9 @@ func (tbox *TextBox) CSSBox() *frame.Box {
 }
 
 // Type returns TypeText
-func (tbox *TextBox) Type() frame.ContainerType {
-	return TypeText
-}
+// func (tbox *TextBox) Type() frame.ContainerType {
+// 	return TypeText
+// }
 
 // TreeNode returns the underlying tree node for a box.
 // func (tbox *TextBox) TreeNode() *tree.Node {
@@ -554,9 +571,9 @@ func (tbox *TextBox) PresetContained() bool {
 
 // ----------------------------------------------------------------------------------
 
-func ContainerName(c frame.Container) string {
-	if c.Type() == TypeText {
-		return shortText(c.(*TextBox))
+func ContainerName(c *frame.ContainerBase) string {
+	if IsText(c.RenderNode()) {
+		return shortText(c.RenderNode().(*TextBox))
 	}
 	if c.DOMNode() == nil {
 		return "anon-box"

@@ -39,7 +39,7 @@ func reposition(node *tree.Node, unused *tree.Node) (match *tree.Node, err error
 			css.PositionFloatRight: true,
 			option.Some:            false,
 		}); nonflow.(bool) {
-			tracer().Debugf("box has to be re-ordered: %s (%v)", boxname(pbox), pos)
+			tracer().Debugf("box has to be re-ordered: %s (%v)", boxname(&pbox.ContainerBase), pos)
 			match = pbox.TreeNode()
 		}
 	}
@@ -51,9 +51,10 @@ func anchor(anchorCandidate *tree.Node, node *tree.Node) (match *tree.Node, err 
 	if node == nil || anchorCandidate == nil {
 		panic("one of node, anchor is nil")
 	}
-	positionedChild := node.Payload.(frame.Container)
-	possibleAnchor := anchorCandidate.Payload.(frame.Container)
-	if positionedChild.Type() != TypePrincipal || possibleAnchor.Type() != TypePrincipal {
+	positionedChild := node.Payload.(*frame.ContainerBase)
+	possibleAnchor := anchorCandidate.Payload.(*frame.ContainerBase)
+	//if positionedChild.Type() != TypePrincipal || possibleAnchor.Type() != TypePrincipal {
+	if !IsPrincipal(positionedChild.RenderNode()) || !IsPrincipal(possibleAnchor.RenderNode()) {
 		return
 	}
 	tracer().Debugf("trying to re-attach %s node", boxname(positionedChild))
@@ -75,7 +76,7 @@ func anchor(anchorCandidate *tree.Node, node *tree.Node) (match *tree.Node, err 
 		return ok.(bool), nil
 	}
 	anchorCandidateIsFlowRoot := func(interface{}) (interface{}, error) {
-		return possibleAnchor.Context().IsFlowRoot(), nil
+		return possibleAnchor.Context.IsFlowRoot(), nil
 	}
 	position := css.PositionOption(positionedChild.DOMNode())
 	found, err := position.Match(option.Of{
@@ -87,10 +88,10 @@ func anchor(anchorCandidate *tree.Node, node *tree.Node) (match *tree.Node, err 
 	if err != nil || !(found.(bool)) {
 		return
 	}
-	anchor = possibleAnchor.(*PrincipalBox)
+	anchor = possibleAnchor.RenderNode().(*PrincipalBox)
 	if anchor != nil {
 		positionedChild.TreeNode().Isolate()
-		anchor.AppendChild(positionedChild.(*PrincipalBox)) // TODO will lose ordering !
+		anchor.AppendChild(positionedChild.RenderNode().(*PrincipalBox)) // TODO will lose ordering !
 	}
 	return
 }

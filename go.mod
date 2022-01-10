@@ -12,7 +12,7 @@ require (
 	github.com/flopp/go-findfont v0.0.0-20201114153133-e7393a00c15b
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/npillmayer/arithm v0.1.0
-	github.com/npillmayer/cords v0.1.0
+	github.com/npillmayer/cords v0.1.2-0.20220109180132-269f8eb15547
 	github.com/npillmayer/schuko v0.2.0-alpha.3.0.20211209143531-2d524c4964ff
 	github.com/npillmayer/uax v0.2.1-0.20211209145128-97711de03a50
 	github.com/stretchr/testify v1.7.0

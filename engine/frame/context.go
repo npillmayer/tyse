@@ -19,9 +19,9 @@ const (
 //
 type Context interface {
 	Type() FormattingContextType
-	Container() Container                    // container which creates this formatting context
-	Contained() []Container                  // contained children
-	AddContained(Container)                  // add a child to contain
+	Container() *ContainerBase               // container which creates this formatting context
+	Contained() []*ContainerBase             // contained children
+	AddContained(*ContainerBase)             // add a child to contain
 	Layout(*FlowRoot) error                  // layout sub-container
 	Measure() (Size, css.DimenT, css.DimenT) // return dimensions of context bounding box
 	IsFlowRoot() bool                        // this is a self-contained BFC
@@ -35,7 +35,7 @@ type FlowRoot struct {
 
 type ContextBase struct {
 	*tree.Node
-	C         Container
+	C         *ContainerBase
 	IsRootCtx bool
 	flowRoot  *FlowRoot
 }
@@ -46,7 +46,7 @@ func MakeContextBase() ContextBase {
 	return ctx
 }
 
-func (ctx ContextBase) Container() Container {
+func (ctx ContextBase) Container() *ContainerBase {
 	return ctx.C
 }
 
@@ -69,10 +69,10 @@ func (ctx ContextBase) FlowRoot() *FlowRoot {
 	return ctx.flowRoot
 }
 
-func (ctx ContextBase) Contained() []Container {
-	c := make([]Container, 0, ctx.TreeNode().ChildCount())
+func (ctx ContextBase) Contained() []*ContainerBase {
+	c := make([]*ContainerBase, 0, ctx.TreeNode().ChildCount())
 	for _, node := range ctx.TreeNode().Children(true) {
-		c = append(c, node.Payload.(Container))
+		c = append(c, node.Payload.(*ContainerBase))
 	}
 	return c
 }

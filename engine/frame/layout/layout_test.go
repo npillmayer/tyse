@@ -30,7 +30,7 @@ func TestLayout(t *testing.T) {
 	boxes, err := boxtree.BuildBoxTree(domroot)
 	checkBoxTree(boxes, err, t)
 	v := View{Width: 8 * dimen.CM}
-	r := BoxTreeToLayoutTree(boxes.(*boxtree.PrincipalBox), &v)
+	r := BoxTreeToLayoutTree(boxes.RenderNode().(*boxtree.PrincipalBox), &v)
 	if r.lastErr != nil {
 		t.Errorf("layout tree: resulting error is: %v", r.lastErr)
 	}
@@ -87,7 +87,7 @@ func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
 	return tmpfile
 }
 
-func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
+func checkBoxTree(boxes *frame.ContainerBase, err error, t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	} else if boxes == nil {
@@ -101,14 +101,14 @@ func checkBoxTree(boxes frame.Container, err error, t *testing.T) {
 	t.Logf("root node = %+v", boxes)
 }
 
-func dottyLayoutTree(root frame.Container, t *testing.T, tracer tracing.Trace) *os.File {
+func dottyLayoutTree(root *frame.ContainerBase, t *testing.T, tracer tracing.Trace) *os.File {
 	tmpfile, err := ioutil.TempFile(".", "layouttree.*.dot")
 	if err != nil {
 		log.Fatal(err)
 	}
 	//defer os.Remove(tmpfile.Name()) // clean up
 	fmt.Printf("writing BoxTree to %s\n", tmpfile.Name())
-	framedebug.ToGraphViz(root.(*boxtree.PrincipalBox), tmpfile, tracer)
+	framedebug.ToGraphViz(root.RenderNode().(*boxtree.PrincipalBox), tmpfile, tracer)
 	defer tmpfile.Close()
 	cmd := exec.Command("dot", "-Tsvg", "-olayouttree.svg", tmpfile.Name())
 	cmd.Stdout = os.Stdout

@@ -28,7 +28,7 @@ type ParagraphBox struct {
 	khipu   *khipu.Khipu     // khipu knots made from paragraph text // TOOD duplicate ?
 }
 
-var _ frame.Container = &ParagraphBox{}
+var _ frame.RenderTreeNode = &ParagraphBox{}
 
 // TreeNode returns the underlying tree node for a box.
 func (pbox *ParagraphBox) TreeNode() *tree.Node {
@@ -109,7 +109,7 @@ type infoIRS struct {
 // Returns a paragraphs's text, a list of block level containers which are
 // children of c, or possibly an error.
 //
-func paragraphTextFromBox(c frame.Container) (*Paragraph, []frame.Container, error) {
+func paragraphTextFromBox(c *frame.ContainerBase) (*Paragraph, []*frame.ContainerBase, error) {
 	para := &Paragraph{
 		irs: infoIRS{
 			irsElems: make(map[uint64]bidi.Direction),
@@ -128,19 +128,19 @@ func paragraphTextFromBox(c frame.Container) (*Paragraph, []frame.Container, err
 	return para, blocks, err
 }
 
-func containedText(c frame.Container, irs *infoIRS) (*styled.Text, []frame.Container, error) {
+func containedText(c *frame.ContainerBase, irs *infoIRS) (*styled.Text, []*frame.ContainerBase, error) {
 	if c == nil {
-		return styled.TextFromString(""), []frame.Container{}, cords.ErrIllegalArguments
+		return styled.TextFromString(""), []*frame.ContainerBase{}, cords.ErrIllegalArguments
 	}
 	b := styled.NewTextBuilder()
-	var blocks []frame.Container
+	var blocks []*frame.ContainerBase
 	tracer().Debugf("collecting contained text of [%s]", boxtree.ContainerName(c))
 	collectContainedText(c, c, b, irs, blocks)
 	return b.Text(), blocks, nil
 }
 
-func collectContainedText(root, c frame.Container, b *styled.TextBuilder, irs *infoIRS,
-	blocks []frame.Container) {
+func collectContainedText(root, c *frame.ContainerBase, b *styled.TextBuilder, irs *infoIRS,
+	blocks []*frame.ContainerBase) {
 	//
 	if c.DOMNode() != nil && c.DOMNode().NodeType() == html.TextNode {
 		leaf := createLeaf(c.DOMNode())
@@ -155,14 +155,14 @@ func collectContainedText(root, c frame.Container, b *styled.TextBuilder, irs *i
 		}
 		//text.Style(styleset, pos, pos+l.Weight())
 		b.Append(leaf, styleset)
-	} else if c != root && c.DisplayMode().Outer() == css.BlockMode {
+	} else if c != root && c.Display.Outer() == css.BlockMode {
 		b.Append(&nonReplacableElementLeaf{c.DOMNode()}, frame.StyleSet{})
 	} else {
 		tracer().Debugf("styled paragraph: collect text of <%s>", c.DOMNode().NodeName())
-		if c.Context() == nil {
+		if c.Context == nil {
 			panic("container without context")
 		}
-		children := c.Context().Contained()
+		children := c.Context.Contained()
 		for _, childContainer := range children {
 			collectContainedText(root, childContainer, b, irs, blocks)
 		}

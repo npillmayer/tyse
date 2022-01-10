@@ -36,7 +36,7 @@ type BlockContext struct {
 	frame.ContextBase
 }
 
-func NewBlockContext(c frame.Container, isRoot bool) *BlockContext {
+func NewBlockContext(c *frame.ContainerBase, isRoot bool) *BlockContext {
 	ctx := &BlockContext{}
 	ctx.IsRootCtx = isRoot
 	ctx.C = c
@@ -55,8 +55,8 @@ func (ctx *BlockContext) Type() frame.FormattingContextType {
 	return TypeBlockFormattingContext
 }
 
-func (ctx *BlockContext) AddContained(c frame.Container) {
-	if c.DisplayMode().Outer() == css.InlineMode {
+func (ctx *BlockContext) AddContained(c *frame.ContainerBase) {
+	if c.Display.Outer() == css.InlineMode {
 		anon := boxtree.NewAnonymousBox(css.BlockMode | css.InnerInlineMode)
 		c.TreeNode().Isolate()
 		anon.AddChild(c.TreeNode())
@@ -130,10 +130,10 @@ var _ frame.Context = &BlockContext{}
 
 type InlineContext struct {
 	frame.ContextBase
-	lines []frame.Container
+	lines []*frame.ContainerBase
 }
 
-func NewInlineContext(c frame.Container, isRoot bool) *InlineContext {
+func NewInlineContext(c *frame.ContainerBase, isRoot bool) *InlineContext {
 	ctx := &InlineContext{}
 	ctx.IsRootCtx = isRoot
 	ctx.C = c
@@ -152,12 +152,12 @@ func (ctx *InlineContext) Type() frame.FormattingContextType {
 	return TypeInlineFormattingContext
 }
 
-func (ctx *InlineContext) AddContained(c frame.Container) {
-	if c.DisplayMode().Outer() == css.BlockMode {
+func (ctx *InlineContext) AddContained(c *frame.ContainerBase) {
+	if c.Display.Outer() == css.BlockMode {
 		ctx.AddChild(c.TreeNode())
 		tracer().Debugf("inline context added block [%v]", c.DOMNode().NodeName())
 		return
-	} else if c.DisplayMode().Outer() != css.InlineMode {
+	} else if c.Display.Outer() != css.InlineMode {
 		anon := boxtree.NewAnonymousBox(css.InlineMode | css.InnerInlineMode)
 		anon.CSSBox().W = css.DimenOption(style.Property("fit-content"))
 		c.TreeNode().Isolate()
@@ -175,7 +175,7 @@ func (ctx *InlineContext) AddContained(c frame.Container) {
 	ctx.AddChild(c.TreeNode())
 }
 
-func (ctx *InlineContext) addLines(lines ...frame.Container) {
+func (ctx *InlineContext) addLines(lines ...*frame.ContainerBase) {
 	boxcnt := len(ctx.Contained())
 	//size, _, mBot := ctx.Measure()
 	size := ctx.Container().CSSBox().Size
@@ -209,7 +209,7 @@ func (ctx *InlineContext) addLines(lines ...frame.Container) {
 }
 
 func (ctx *InlineContext) Layout(flowRoot *frame.FlowRoot) error {
-	para, blocks, err := inline.TextOfParagraph(ctx.Container())
+	para, blocks, err := inline.EncodeTextOfParagraph(ctx.Container())
 	if err != nil {
 		return err
 	} else if len(blocks) > 0 {
@@ -274,11 +274,11 @@ A new root (block) formatting context is created by:
  *  column-span: all should always create a new formatting context, even when the column-span: all element isn't contained by a multicol container (Spec change, Chrome bug).
 
 */
-func needsRootContext(c frame.Container) bool {
+func needsRootContext(c *frame.ContainerBase) bool {
 	root := false
-	if c.DisplayMode().Inner().Contains(css.FlowRootMode) {
+	if c.Display.Inner().Contains(css.FlowRootMode) {
 		root = true
-	} else if c.DisplayMode().Contains(css.InlineMode | css.InnerBlockMode) { // "inline-root"
+	} else if c.Display.Contains(css.InlineMode | css.InnerBlockMode) { // "inline-root"
 		root = true
 	}
 	if c.DOMNode() != nil {
@@ -301,11 +301,11 @@ func needsRootContext(c frame.Container) bool {
 
 // NewContextFor creates a formatting context for a container.
 // If c already has a context set, this context will  be returned.
-func NewContextFor(c frame.Container) frame.Context {
-	if c.Context() != nil {
-		return c.Context()
+func NewContextFor(c *frame.ContainerBase) frame.Context {
+	if c.Context != nil {
+		return c.Context
 	}
-	inner := c.DisplayMode().Inner()
+	inner := c.Display.Inner()
 	isroot := needsRootContext(c)
 	if inner.Contains(css.InnerInlineMode) {
 		tracer().Debugf("providing inline context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
@@ -320,7 +320,7 @@ func NewContextFor(c frame.Container) frame.Context {
 			children := c.TreeNode().Children(true)
 			tracer().Debugf("context: children = %+v", children)
 			for _, ch := range children {
-				if childContainer, ok := ch.Payload.(frame.Container); ok {
+				if childContainer, ok := ch.Payload.(frame.ContainerInterf); ok {
 					modes &= childContainer.DisplayMode().Outer()
 				}
 			}
