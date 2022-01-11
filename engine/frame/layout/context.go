@@ -36,7 +36,7 @@ type BlockContext struct {
 	frame.ContextBase
 }
 
-func NewBlockContext(c *frame.ContainerBase, isRoot bool) *BlockContext {
+func NewBlockContext(c *frame.Container, isRoot bool) *BlockContext {
 	ctx := &BlockContext{}
 	ctx.IsRootCtx = isRoot
 	ctx.C = c
@@ -55,7 +55,7 @@ func (ctx *BlockContext) Type() frame.FormattingContextType {
 	return TypeBlockFormattingContext
 }
 
-func (ctx *BlockContext) AddContained(c *frame.ContainerBase) {
+func (ctx *BlockContext) AddContained(c *frame.Container) {
 	if c.Display.Outer() == css.InlineMode {
 		anon := boxtree.NewAnonymousBox(css.BlockMode | css.InnerInlineMode)
 		c.TreeNode().Isolate()
@@ -130,10 +130,10 @@ var _ frame.Context = &BlockContext{}
 
 type InlineContext struct {
 	frame.ContextBase
-	lines []*frame.ContainerBase
+	lines []*frame.Container
 }
 
-func NewInlineContext(c *frame.ContainerBase, isRoot bool) *InlineContext {
+func NewInlineContext(c *frame.Container, isRoot bool) *InlineContext {
 	ctx := &InlineContext{}
 	ctx.IsRootCtx = isRoot
 	ctx.C = c
@@ -152,7 +152,7 @@ func (ctx *InlineContext) Type() frame.FormattingContextType {
 	return TypeInlineFormattingContext
 }
 
-func (ctx *InlineContext) AddContained(c *frame.ContainerBase) {
+func (ctx *InlineContext) AddContained(c *frame.Container) {
 	if c.Display.Outer() == css.BlockMode {
 		ctx.AddChild(c.TreeNode())
 		tracer().Debugf("inline context added block [%v]", c.DOMNode().NodeName())
@@ -175,7 +175,7 @@ func (ctx *InlineContext) AddContained(c *frame.ContainerBase) {
 	ctx.AddChild(c.TreeNode())
 }
 
-func (ctx *InlineContext) addLines(lines ...*frame.ContainerBase) {
+func (ctx *InlineContext) addLines(lines ...*frame.Container) {
 	boxcnt := len(ctx.Contained())
 	//size, _, mBot := ctx.Measure()
 	size := ctx.Container().CSSBox().Size
@@ -274,7 +274,7 @@ A new root (block) formatting context is created by:
  *  column-span: all should always create a new formatting context, even when the column-span: all element isn't contained by a multicol container (Spec change, Chrome bug).
 
 */
-func needsRootContext(c *frame.ContainerBase) bool {
+func needsRootContext(c *frame.Container) bool {
 	root := false
 	if c.Display.Inner().Contains(css.FlowRootMode) {
 		root = true
@@ -301,7 +301,7 @@ func needsRootContext(c *frame.ContainerBase) bool {
 
 // NewContextFor creates a formatting context for a container.
 // If c already has a context set, this context will  be returned.
-func NewContextFor(c *frame.ContainerBase) frame.Context {
+func NewContextFor(c *frame.Container) frame.Context {
 	if c.Context != nil {
 		return c.Context
 	}
@@ -320,8 +320,8 @@ func NewContextFor(c *frame.ContainerBase) frame.Context {
 			children := c.TreeNode().Children(true)
 			tracer().Debugf("context: children = %+v", children)
 			for _, ch := range children {
-				if childContainer, ok := ch.Payload.(frame.ContainerInterf); ok {
-					modes &= childContainer.DisplayMode().Outer()
+				if childContainer, ok := ch.Payload.(*frame.Container); ok {
+					modes &= childContainer.Display.Outer()
 				}
 			}
 			if modes.Contains(css.InlineMode) {

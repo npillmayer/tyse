@@ -9,23 +9,23 @@ import (
 // --- Container -----------------------------------------------------------------------
 
 // ContainerInterf is an interface type for render tree nodes, i.e., boxes.
-type ContainerInterf interface {
-	Type() ContainerType
-	DOMNode() *dom.W3CNode
-	TreeNode() *tree.Node
-	CSSBox() *Box
-	DisplayMode() css.DisplayMode // CSS display property
-	// Context() Context             // return the containers formatting context
-	// SetContext(Context)           // context will be injected
-	PresetContained() bool // pre-set contraints for children containers
-	// ChildIndex() int
-}
+// type ContainerInterf interface {
+// 	Type() ContainerType
+// 	DOMNode() *dom.W3CNode
+// 	TreeNode() *tree.Node
+// 	CSSBox() *Box
+// 	DisplayMode() css.DisplayMode // CSS display property
+// 	// Context() Context             // return the containers formatting context
+// 	// SetContext(Context)           // context will be injected
+// 	PresetContained() bool // pre-set contraints for children containers
+// 	// ChildIndex() int
+// }
 
-type ContainerType uint8
+// type ContainerType uint8
 
-const (
-	TypeUnknown ContainerType = iota
-)
+// const (
+// 	TypeUnknown ContainerType = iota
+// )
 
 type RenderTreeNode interface {
 	CSSBox() *Box
@@ -33,9 +33,9 @@ type RenderTreeNode interface {
 	PresetContained() bool // pre-set contraints for children containers
 }
 
-// --- Base Box type ---------------------------------------------------------
+// --- Container type --------------------------------------------------------
 
-type ContainerBase struct {
+type Container struct {
 	tree.Node                  // a container is a node within the layout tree
 	ChildInx   uint32          // this box represents child #childInx of the parent principal box
 	Display    css.DisplayMode // inner and outer display mode
@@ -44,7 +44,7 @@ type ContainerBase struct {
 }
 
 // TreeNode returns the underlying tree node for a box.
-func (b *ContainerBase) TreeNode() *tree.Node {
+func (b *Container) TreeNode() *tree.Node {
 	if b == nil {
 		return nil
 	}
@@ -52,7 +52,7 @@ func (b *ContainerBase) TreeNode() *tree.Node {
 }
 
 // RenderNode returns the underlying tree node for a box.
-func (b *ContainerBase) RenderNode() RenderTreeNode {
+func (b *Container) RenderNode() RenderTreeNode {
 	if b == nil {
 		return nil
 	}
@@ -64,14 +64,14 @@ func (b *ContainerBase) RenderNode() RenderTreeNode {
 // 	return b.Display
 // }
 
-func (b *ContainerBase) DOMNode() *dom.W3CNode {
+func (b *Container) DOMNode() *dom.W3CNode {
 	if b == nil || b.renderNode == nil {
 		return nil
 	}
 	return b.renderNode.DOMNode()
 }
 
-func (b *ContainerBase) CSSBox() *Box {
+func (b *Container) CSSBox() *Box {
 	if b == nil || b.renderNode == nil {
 		return nil
 	}

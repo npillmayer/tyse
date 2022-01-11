@@ -39,7 +39,7 @@ func reposition(node *tree.Node, unused *tree.Node) (match *tree.Node, err error
 			css.PositionFloatRight: true,
 			option.Some:            false,
 		}); nonflow.(bool) {
-			tracer().Debugf("box has to be re-ordered: %s (%v)", boxname(&pbox.ContainerBase), pos)
+			tracer().Debugf("box has to be re-ordered: %s (%v)", boxname(&pbox.Container), pos)
 			match = pbox.TreeNode()
 		}
 	}
@@ -51,8 +51,8 @@ func anchor(anchorCandidate *tree.Node, node *tree.Node) (match *tree.Node, err 
 	if node == nil || anchorCandidate == nil {
 		panic("one of node, anchor is nil")
 	}
-	positionedChild := node.Payload.(*frame.ContainerBase)
-	possibleAnchor := anchorCandidate.Payload.(*frame.ContainerBase)
+	positionedChild := node.Payload.(*frame.Container)
+	possibleAnchor := anchorCandidate.Payload.(*frame.Container)
 	//if positionedChild.Type() != TypePrincipal || possibleAnchor.Type() != TypePrincipal {
 	if !IsPrincipal(positionedChild.RenderNode()) || !IsPrincipal(possibleAnchor.RenderNode()) {
 		return

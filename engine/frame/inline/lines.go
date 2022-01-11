@@ -17,14 +17,14 @@ import (
 // --- Line Boxes ------------------------------------------------------------
 
 // TypeLine and TypeParagraph are additional container types defined in this package.
-const (
-	TypeLine      frame.ContainerType = 200
-	TypeParagraph frame.ContainerType = 201
-)
+// const (
+// 	TypeLine      frame.ContainerType = 200
+// 	TypeParagraph frame.ContainerType = 201
+// )
 
 // LineBox is a type for CSS inline text boxes.
 type LineBox struct {
-	frame.ContainerBase
+	frame.Container
 	//tree.Node
 	Box     *frame.Box
 	khipu   *khipu.Khipu
@@ -70,9 +70,9 @@ func (lbox *LineBox) CSSBox() *frame.Box {
 }
 
 // Type returns TypeLine
-func (pbox *LineBox) Type() frame.ContainerType {
-	return TypeLine
-}
+// func (pbox *LineBox) Type() frame.ContainerType {
+// 	return TypeLine
+// }
 
 // IsAnonymous will always return true for a line box.
 // func (lbox *LineBox) IsAnonymous() bool {
@@ -124,7 +124,7 @@ var _ frame.RenderTreeNode = &LineBox{}
 // If an error occurs during line-breaking, a pbox of nil is returned, together with the
 // error value.
 //
-func BreakParagraph(para *Paragraph, box *frame.Box) ([]*frame.ContainerBase, error) {
+func BreakParagraph(para *Paragraph, box *frame.Box) ([]*frame.Container, error) {
 	//
 	// TODO
 	// find all children with align=left or align=right and collect their boxes
@@ -147,7 +147,7 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]*frame.ContainerBase, er
 	// assemble the broken line segments into anonymous line boxes
 	tracer().Debugf("     |---------+---------+---------+---------+---------50--------|")
 	j := int64(0)
-	var lines []*frame.ContainerBase
+	var lines []*frame.Container
 	for i := 1; i < len(breakpoints); i++ {
 		pos := breakpoints[i].Position()
 		tracer().Debugf("%3d: %s", i, para.Khipu.Text(j, pos))
@@ -155,7 +155,7 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]*frame.ContainerBase, er
 		indent := dimen.DU(0) // TODO derive from parshape
 		linebox := NewLineBox(para.Khipu, breakpoints[i].Position(), l, indent)
 		linebox.Box.W = box.W
-		lines = append(lines, &linebox.ContainerBase)
+		lines = append(lines, &linebox.Container)
 		//linebox.AppendToPrincipalBox(pbox)
 		j = breakpoints[i].Position()
 	}
@@ -163,11 +163,11 @@ func BreakParagraph(para *Paragraph, box *frame.Box) ([]*frame.ContainerBase, er
 	return lines, nil
 }
 
-func EncodeTextOfParagraph(c *frame.ContainerBase) (*Paragraph, []*frame.ContainerBase, error) {
+func EncodeTextOfParagraph(c *frame.Container) (*Paragraph, []*frame.Container, error) {
 	paraText, blocks, err := paragraphTextFromBox(c)
 	if err != nil {
 		tracer().Errorf(err.Error())
-		return nil, []*frame.ContainerBase{}, err
+		return nil, []*frame.Container{}, err
 	}
 	paraText.Regs = parameters.NewTypesettingRegisters()
 	paraText.Regs = adaptTypesettingRegisters(paraText.Regs, c)
@@ -175,25 +175,25 @@ func EncodeTextOfParagraph(c *frame.ContainerBase) (*Paragraph, []*frame.Contain
 		monospace.Shaper(11*dimen.PT, nil), nil, paraText.Regs)
 	if err != nil || paraText.Khipu == nil {
 		tracer().Errorf("lines: khipu resulting from paragraph is nil")
-		return nil, []*frame.ContainerBase{}, err
+		return nil, []*frame.Container{}, err
 	}
 	return paraText, blocks, err
 }
 
 func XFindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
-	[]*frame.ContainerBase, frame.Context, error) {
+	[]*frame.Container, frame.Context, error) {
 	//
-	paraText, blocks, err := paragraphTextFromBox(&pbox.ContainerBase)
+	paraText, blocks, err := paragraphTextFromBox(&pbox.Container)
 	if err != nil {
 		tracer().Errorf(err.Error())
-		return []*frame.ContainerBase{}, rootctx, err
+		return []*frame.Container{}, rootctx, err
 	}
 	regs := parameters.NewTypesettingRegisters()
-	regs = adaptTypesettingRegisters(regs, &pbox.ContainerBase)
+	regs = adaptTypesettingRegisters(regs, &pbox.Container)
 	k, err := khipu.EncodeParagraph(paraText.Paragraph, 0, monospace.Shaper(11*dimen.PT, nil), nil, regs)
 	if err != nil || k == nil {
 		tracer().Errorf("lines: khipu resulting from paragraph is nil")
-		return []*frame.ContainerBase{}, rootctx, err
+		return []*frame.Container{}, rootctx, err
 	}
 	pbox.para = paraText
 	pbox.khipu = k
@@ -227,7 +227,7 @@ func XFindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
 	*/
 }
 
-func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, c *frame.ContainerBase) *parameters.TypesettingRegisters {
+func adaptTypesettingRegisters(regs *parameters.TypesettingRegisters, c *frame.Container) *parameters.TypesettingRegisters {
 	return regs
 }
 
@@ -253,9 +253,9 @@ func collectFloatBoxes(pbox *boxtree.PrincipalBox) ([]*frame.Box, []*frame.Box) 
 	return []*frame.Box{}, []*frame.Box{}
 }
 
-func Layout(c frame.ContainerInterf) {
+func Layout(c *frame.Container) {
 	tracer().Debugf("Layout of sub-block")
-	if c.DisplayMode().Inner().Contains(css.InlineMode) {
+	if c.Display.Inner().Contains(css.InlineMode) {
 		// call layout paragraph
 	} else {
 		// call layout block

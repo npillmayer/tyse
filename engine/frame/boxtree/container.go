@@ -52,7 +52,7 @@ func IsText(c frame.RenderTreeNode) bool {
 // PrincipalBox is a (CSS-)styled box which may contain other boxes.
 // It references a node in the styled tree, i.e., a stylable DOM element node.
 type PrincipalBox struct {
-	frame.ContainerBase
+	frame.Container
 	Box     *frame.StyledBox // styled box for a DOM node
 	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
 }
@@ -254,7 +254,7 @@ var ErrAnonBoxNotFound = fmt.Errorf("no anonymous box found for index")
 // The child is a principal box itself, i.e. references a styleable DOM node.
 // The child must have its child index set.
 func (pbox *PrincipalBox) AddChild(child *PrincipalBox, at int) error {
-	return pbox.addChildContainer(&child.ContainerBase, at)
+	return pbox.addChildContainer(&child.Container, at)
 }
 
 // AddTextChild appends a child box to its parent principal box.
@@ -264,7 +264,7 @@ func (pbox *PrincipalBox) AddTextChild(child *TextBox, at int) error {
 	if child == nil {
 		return ErrNullChild
 	}
-	err := pbox.addChildContainer(&child.ContainerBase, at)
+	err := pbox.addChildContainer(&child.Container, at)
 	// if err == nil {
 	// 	if pbox.innerMode.Contains(InlineMode) {
 	// 		child.outerMode.Set(InlineMode)
@@ -275,7 +275,7 @@ func (pbox *PrincipalBox) AddTextChild(child *TextBox, at int) error {
 	return err
 }
 
-func (pbox *PrincipalBox) addChildContainer(child *frame.ContainerBase, at int) error {
+func (pbox *PrincipalBox) addChildContainer(child *frame.Container, at int) error {
 	if child == nil {
 		return ErrNullChild
 	}
@@ -320,7 +320,7 @@ func (pbox *PrincipalBox) AppendChild(child *PrincipalBox) {
 func (pbox *PrincipalBox) PresetContained() bool {
 	if pbox.Context == nil {
 		tracer().Errorf("[%s] has no context yet, cannot preset children boxes",
-			ContainerName(&pbox.ContainerBase))
+			ContainerName(&pbox.Container))
 		return false
 	}
 	children := pbox.TreeNode().Children(true)
@@ -344,11 +344,11 @@ func (pbox *PrincipalBox) PresetContained() bool {
 			}
 			if doAdd.(bool) {
 				b.CSSBox().Max.W = pbox.CSSBox().W
-				pbox.Context.AddContained(&b.ContainerBase)
+				pbox.Context.AddContained(&b.Container)
 				hasAdded = true
 			}
 		case *TextBox:
-			pbox.Context.AddContained(&b.ContainerBase)
+			pbox.Context.AddContained(&b.Container)
 		case AnonymousBox:
 			tracer().Errorf("unexpected anonymous box child")
 		}
@@ -367,7 +367,7 @@ func (pbox *PrincipalBox) PresetContained() bool {
 // inline-level boxes, too. Both are not directly stylable by the user, but rather inherit the
 // styles of their principal boxes.
 type AnonymousBox struct {
-	frame.ContainerBase
+	frame.Container
 	Box *frame.Box // an anoymous box cannot be styled
 	//context frame.Context
 	//displayMode frame.DisplayMode // container lives in this mode (block or inline)
@@ -453,7 +453,7 @@ func NewAnonymousBox(mode css.DisplayMode) *AnonymousBox {
 func (anon *AnonymousBox) PresetContained() bool {
 	if anon.Context == nil {
 		tracer().Errorf("[%s] has no context yet, cannot preset children boxes",
-			ContainerName(&anon.ContainerBase))
+			ContainerName(&anon.Container))
 		return false
 	}
 	children := anon.TreeNode().Children(true)
@@ -477,11 +477,11 @@ func (anon *AnonymousBox) PresetContained() bool {
 			}
 			if doAdd.(bool) {
 				b.CSSBox().Max.W = anon.CSSBox().W
-				anon.Context.AddContained(&b.ContainerBase)
+				anon.Context.AddContained(&b.Container)
 				hasAdded = true
 			}
 		case *TextBox:
-			anon.Context.AddContained(&b.ContainerBase)
+			anon.Context.AddContained(&b.Container)
 		case AnonymousBox:
 			tracer().Errorf("unexpected anonymous box child")
 		}
@@ -496,7 +496,7 @@ func (anon *AnonymousBox) PresetContained() bool {
 // Text boxes will in a later stage be replaced by line boxes, which will subsume
 // all text boxes under a common parent.
 type TextBox struct {
-	frame.ContainerBase
+	frame.Container
 	//tree.Node              // a text box is a node within the layout tree
 	Box        *frame.Box   // text box cannot be explicitely styled
 	domNode    *dom.W3CNode // the DOM text-node this box refers to
@@ -571,7 +571,7 @@ func (tbox *TextBox) PresetContained() bool {
 
 // ----------------------------------------------------------------------------------
 
-func ContainerName(c *frame.ContainerBase) string {
+func ContainerName(c *frame.Container) string {
 	if IsText(c.RenderNode()) {
 		return shortText(c.RenderNode().(*TextBox))
 	}

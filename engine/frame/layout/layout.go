@@ -76,13 +76,13 @@ func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthes
 	if !boxRoot.Display.Outer().Contains(css.BlockMode) {
 		syn.lastErr = errors.New("layout root expected to have display mode block")
 	}
-	boxRoot.SetContext(NewContextFor(&boxRoot.ContainerBase))
+	boxRoot.SetContext(NewContextFor(&boxRoot.Container))
 	// This should be deferred to CalcBlockWidths, even for #document ?!
 	if !boxRoot.Context.IsFlowRoot() {
 		syn.lastErr = errors.New("layout root expected to be flow root")
 	} else {
 		params.flowRoot = boxRoot.Context.FlowRoot()
-		syn = CalcBlockWidths(&boxRoot.ContainerBase, params)
+		syn = CalcBlockWidths(&boxRoot.Container, params)
 	}
 	if syn.lastErr != nil {
 		tracer().Errorf("layout tree error: %v", syn.lastErr)
@@ -94,7 +94,7 @@ func BoxTreeToLayoutTree(boxRoot *boxtree.PrincipalBox, view *View) (syn synthes
 }
 
 // Potentially recursive call to nested containers
-func CalcBlockWidths(c *frame.ContainerBase, inherited inheritedParams) (syn synthesizedParams) {
+func CalcBlockWidths(c *frame.Container, inherited inheritedParams) (syn synthesizedParams) {
 	if c.Context == nil {
 		c.Context = NewContextFor(c)
 	}
@@ -260,11 +260,11 @@ func solveWidthTopDown(c frame.Container, inherited inheritedParams) (syn synthe
 }
 */
 
-func solveWidthForContent(c *frame.ContainerBase, inherited inheritedParams) (syn synthesizedParams) {
+func solveWidthForContent(c *frame.Container, inherited inheritedParams) (syn synthesizedParams) {
 	panic("TODO")
 }
 
-func SolveWidthBottomUp(c *frame.ContainerBase, enclosing dimen.DU) (*frame.Box, error) {
+func SolveWidthBottomUp(c *frame.Container, enclosing dimen.DU) (*frame.Box, error) {
 	panic("TODO")
 }
 

@@ -49,12 +49,12 @@ func ToGraphViz(boxroot *boxtree.PrincipalBox, w io.Writer, tracer tracing.Trace
 	if err != nil {
 		panic(err)
 	}
-	dict := make(map[*frame.ContainerBase]string, 4096)
-	boxes(&boxroot.ContainerBase, w, dict, &gparams, tracer)
+	dict := make(map[*frame.Container]string, 4096)
+	boxes(&boxroot.Container, w, dict, &gparams, tracer)
 	w.Write([]byte("}\n"))
 }
 
-func boxes(c *frame.ContainerBase, w io.Writer, dict map[*frame.ContainerBase]string, gparams *graphParamsType,
+func boxes(c *frame.Container, w io.Writer, dict map[*frame.Container]string, gparams *graphParamsType,
 	tracer tracing.Trace) {
 	//
 	gparams.cnt++
@@ -71,13 +71,13 @@ func boxes(c *frame.ContainerBase, w io.Writer, dict map[*frame.ContainerBase]st
 	}
 }
 
-func children(c *frame.ContainerBase) []*frame.ContainerBase {
+func children(c *frame.Container) []*frame.Container {
 	if c.Context != nil {
 		// This is for the layout tree instead of the box tree:
 		// instead of iterating over tree children, iterate over context children
 		return c.Context.Contained()
 	}
-	kids := make([]*frame.ContainerBase, 0, 16)
+	kids := make([]*frame.Container, 0, 16)
 	n := c.TreeNode()
 	for i := 0; i < n.ChildCount(); i++ {
 		ch, ok := n.Child(i)
@@ -86,13 +86,13 @@ func children(c *frame.ContainerBase) []*frame.ContainerBase {
 		} else if ch == nil {
 			tracing.Debugf("Child at #%d is nil", i)
 		} else {
-			kids = append(kids, ch.Payload.(*frame.ContainerBase))
+			kids = append(kids, ch.Payload.(*frame.Container))
 		}
 	}
 	return kids
 }
 
-func box(c *frame.ContainerBase, w io.Writer, dict map[*frame.ContainerBase]string, gparams *graphParamsType) {
+func box(c *frame.Container, w io.Writer, dict map[*frame.Container]string, gparams *graphParamsType) {
 	name := dict[c]
 	if name == "" {
 		sz := len(dict) + 1
@@ -116,7 +116,7 @@ func box(c *frame.ContainerBase, w io.Writer, dict map[*frame.ContainerBase]stri
 
 // Helper structs
 type cbox struct {
-	C    *frame.ContainerBase
+	C    *frame.Container
 	N    w3cdom.Node
 	Name string
 }
@@ -148,7 +148,7 @@ type cedge struct {
 	N1, N2 cbox
 }
 
-func edge(c1, c2 *frame.ContainerBase, w io.Writer, dict map[*frame.ContainerBase]string,
+func edge(c1, c2 *frame.Container, w io.Writer, dict map[*frame.Container]string,
 	gparams *graphParamsType) {
 	//
 	name1 := dict[c1]
@@ -161,7 +161,7 @@ func edge(c1, c2 *frame.ContainerBase, w io.Writer, dict map[*frame.ContainerBas
 
 // ---------------------------------------------------------------------------
 
-func label(c *frame.ContainerBase) string {
+func label(c *frame.Container) string {
 	switch b := c.RenderNode().(type) {
 	case *boxtree.PrincipalBox:
 		return "\"" + PrincipalLabel(b) + "\""
@@ -190,7 +190,7 @@ func AnonLabel(c *boxtree.AnonymousBox) string {
 	return fmt.Sprintf("%s %s", outerSym, innerSym)
 }
 
-func isTextBox(c *frame.ContainerBase) bool {
+func isTextBox(c *frame.Container) bool {
 	_, ok := c.RenderNode().(*boxtree.TextBox)
 	return ok
 }

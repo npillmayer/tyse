@@ -6,16 +6,16 @@ import (
 
 type FloatList struct {
 	mutex  *sync.Mutex
-	floats []ContainerInterf
+	floats []*Container
 }
 
-func (l *FloatList) AppendFloat(float ContainerInterf) {
+func (l *FloatList) AppendFloat(float *Container) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	l.floats = append(l.floats, float)
 }
 
-func (l *FloatList) Contains(float ContainerInterf) bool {
+func (l *FloatList) Contains(float *Container) bool {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	for _, f := range l.floats {
@@ -26,7 +26,7 @@ func (l *FloatList) Contains(float ContainerInterf) bool {
 	return false
 }
 
-func (l *FloatList) Remove(float ContainerInterf) bool {
+func (l *FloatList) Remove(float *Container) bool {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	for i, f := range l.floats {
@@ -38,10 +38,10 @@ func (l *FloatList) Remove(float ContainerInterf) bool {
 	return false
 }
 
-func (l *FloatList) Floats() []ContainerInterf {
+func (l *FloatList) Floats() []*Container {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	floats := make([]ContainerInterf, len(l.floats))
+	floats := make([]*Container, len(l.floats))
 	copy(floats, l.floats)
 	return floats
 }

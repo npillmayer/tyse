@@ -102,7 +102,7 @@ func buildTestDOM(hh string, t *testing.T) *dom.W3CNode {
 	return dom
 }
 
-func checkBoxTree(boxes *frame.ContainerBase, err error, t *testing.T) {
+func checkBoxTree(boxes *frame.Container, err error, t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	} else if boxes == nil {
@@ -116,7 +116,7 @@ func checkBoxTree(boxes *frame.ContainerBase, err error, t *testing.T) {
 	t.Logf("root node = %+v", boxes)
 }
 
-func findParaContainer(boxes *frame.ContainerBase, t *testing.T) (bool, *frame.ContainerBase) {
+func findParaContainer(boxes *frame.Container, t *testing.T) (bool, *frame.Container) {
 	switch boxes.RenderNode().(type) {
 	case *boxtree.PrincipalBox:
 		if boxes.DOMNode().NodeName() == "p" {
@@ -125,7 +125,7 @@ func findParaContainer(boxes *frame.ContainerBase, t *testing.T) (bool, *frame.C
 	}
 	ch := boxes.TreeNode().Children(true)
 	for _, c := range ch {
-		subc := c.Payload.(*frame.ContainerBase)
+		subc := c.Payload.(*frame.Container)
 		found, p := findParaContainer(subc, t)
 		if found {
 			return true, p
@@ -134,7 +134,7 @@ func findParaContainer(boxes *frame.ContainerBase, t *testing.T) (bool, *frame.C
 	return false, nil
 }
 
-func recursiveContextAndPreset(c *frame.ContainerBase, t *testing.T) {
+func recursiveContextAndPreset(c *frame.Container, t *testing.T) {
 	ctx := newContext(c, true)
 	if ctx == nil {
 		t.Error("no context created")
@@ -143,23 +143,23 @@ func recursiveContextAndPreset(c *frame.ContainerBase, t *testing.T) {
 	c.RenderNode().PresetContained()
 	ch := c.TreeNode().Children(true)
 	for _, c := range ch {
-		subc := c.Payload.(*frame.ContainerBase)
+		subc := c.Payload.(*frame.Container)
 		recursiveContextAndPreset(subc, t)
 	}
 }
 
-func children(c *frame.ContainerBase, t *testing.T) []*frame.ContainerBase {
+func children(c *frame.Container, t *testing.T) []*frame.Container {
 	if c.Context != nil {
 		// This is for the layout tree instead of the box tree:
 		// instead of iterating over tree children, iterate over context children
 		return c.Context.Contained()
 	}
-	kids := make([]*frame.ContainerBase, 0, 16)
+	kids := make([]*frame.Container, 0, 16)
 	n := c.TreeNode()
 	for i := 0; i < n.ChildCount(); i++ {
 		ch, ok := n.Child(i)
 		if ok {
-			kids = append(kids, ch.Payload.(*frame.ContainerBase))
+			kids = append(kids, ch.Payload.(*frame.Container))
 		} else {
 			t.Errorf("cannot retrieve child #%d from component [%v]", i, boxtree.ContainerName(c))
 		}
@@ -172,10 +172,10 @@ func children(c *frame.ContainerBase, t *testing.T) []*frame.ContainerBase {
 type testContext struct {
 	typ frame.FormattingContextType
 	frame.ContextBase
-	containers []*frame.ContainerBase
+	containers []*frame.Container
 }
 
-func newContext(c *frame.ContainerBase, isRoot bool) *testContext {
+func newContext(c *frame.Container, isRoot bool) *testContext {
 	ctx := &testContext{ContextBase: frame.MakeContextBase()}
 	ctx.typ = frame.FormattingContextType(1)
 	ctx.IsRootCtx = isRoot
@@ -188,11 +188,11 @@ func (ctx *testContext) Type() frame.FormattingContextType {
 	return ctx.typ
 }
 
-func (ctx *testContext) AddContained(c *frame.ContainerBase) {
+func (ctx *testContext) AddContained(c *frame.Container) {
 	ctx.containers = append(ctx.containers, c)
 }
 
-func (ctx *testContext) Contained() []*frame.ContainerBase {
+func (ctx *testContext) Contained() []*frame.Container {
 	return ctx.containers
 }
 

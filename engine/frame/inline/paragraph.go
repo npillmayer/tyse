@@ -20,7 +20,7 @@ import (
 )
 
 type ParagraphBox struct {
-	frame.ContainerBase
+	frame.Container
 	Box     *frame.StyledBox // styled box for a DOM node
 	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
 	context frame.Context    // principal boxes may establish a context
@@ -46,9 +46,9 @@ func (pbox *ParagraphBox) CSSBox() *frame.Box {
 }
 
 // Type returns TypeParagraph
-func (pbox *ParagraphBox) Type() frame.ContainerType {
-	return TypeParagraph
-}
+// func (pbox *ParagraphBox) Type() frame.ContainerType {
+// 	return TypeParagraph
+// }
 
 // IsAnonymous will always return false for a paragraph container.
 // func (pbox *ParagraphBox) IsAnonymous() bool {
@@ -109,7 +109,7 @@ type infoIRS struct {
 // Returns a paragraphs's text, a list of block level containers which are
 // children of c, or possibly an error.
 //
-func paragraphTextFromBox(c *frame.ContainerBase) (*Paragraph, []*frame.ContainerBase, error) {
+func paragraphTextFromBox(c *frame.Container) (*Paragraph, []*frame.Container, error) {
 	para := &Paragraph{
 		irs: infoIRS{
 			irsElems: make(map[uint64]bidi.Direction),
@@ -128,19 +128,19 @@ func paragraphTextFromBox(c *frame.ContainerBase) (*Paragraph, []*frame.Containe
 	return para, blocks, err
 }
 
-func containedText(c *frame.ContainerBase, irs *infoIRS) (*styled.Text, []*frame.ContainerBase, error) {
+func containedText(c *frame.Container, irs *infoIRS) (*styled.Text, []*frame.Container, error) {
 	if c == nil {
-		return styled.TextFromString(""), []*frame.ContainerBase{}, cords.ErrIllegalArguments
+		return styled.TextFromString(""), []*frame.Container{}, cords.ErrIllegalArguments
 	}
 	b := styled.NewTextBuilder()
-	var blocks []*frame.ContainerBase
+	var blocks []*frame.Container
 	tracer().Debugf("collecting contained text of [%s]", boxtree.ContainerName(c))
 	collectContainedText(c, c, b, irs, blocks)
 	return b.Text(), blocks, nil
 }
 
-func collectContainedText(root, c *frame.ContainerBase, b *styled.TextBuilder, irs *infoIRS,
-	blocks []*frame.ContainerBase) {
+func collectContainedText(root, c *frame.Container, b *styled.TextBuilder, irs *infoIRS,
+	blocks []*frame.Container) {
 	//
 	if c.DOMNode() != nil && c.DOMNode().NodeType() == html.TextNode {
 		leaf := createLeaf(c.DOMNode())

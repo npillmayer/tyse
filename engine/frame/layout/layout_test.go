@@ -87,7 +87,7 @@ func dottyDOM(doc *dom.W3CNode, t *testing.T) *os.File {
 	return tmpfile
 }
 
-func checkBoxTree(boxes *frame.ContainerBase, err error, t *testing.T) {
+func checkBoxTree(boxes *frame.Container, err error, t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	} else if boxes == nil {
@@ -101,7 +101,7 @@ func checkBoxTree(boxes *frame.ContainerBase, err error, t *testing.T) {
 	t.Logf("root node = %+v", boxes)
 }
 
-func dottyLayoutTree(root *frame.ContainerBase, t *testing.T, tracer tracing.Trace) *os.File {
+func dottyLayoutTree(root *frame.Container, t *testing.T, tracer tracing.Trace) *os.File {
 	tmpfile, err := ioutil.TempFile(".", "layouttree.*.dot")
 	if err != nil {
 		log.Fatal(err)
