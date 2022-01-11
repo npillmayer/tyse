@@ -11,17 +11,16 @@ import (
 	"github.com/npillmayer/tyse/engine/tree"
 )
 
-var _ frame.RenderTreeNode = &PrincipalBox{}
-var _ frame.RenderTreeNode = &AnonymousBox{}
-var _ frame.RenderTreeNode = &TextBox{}
-
 // const (
 // 	TypePrincipal frame.ContainerType = 100
 // 	TypeAnonymous frame.ContainerType = 101
 // 	TypeText      frame.ContainerType = 102
 // )
 
-// IsPrincipal returns true if this is a principal box.
+// --- PrincipalBox --------------------------------------------------------------------
+
+// PrincipalBox is a (CSS-)styled box which may contain other boxes.
+// It references a node in the styled tree, i.e., a stylable DOM element node.
 //
 // Some HTML elements create a mini-hierachy of boxes for rendering. The outermost box
 // is called the principal box. It will always refer to the styled node.
@@ -29,32 +28,10 @@ var _ frame.RenderTreeNode = &TextBox{}
 // list item marker and one for the item's text/content. Another example are anonymous
 // boxes, which will be generated for reconciling context/level-discrepancies.
 //
-func IsPrincipal(c frame.RenderTreeNode) bool {
-	_, ok := c.(*PrincipalBox)
-	return ok
-}
-
-// IsAnonymous returns true if this box is an anonymous box created by the layout algorithm.
-func IsAnonymous(c frame.RenderTreeNode) bool {
-	_, ok := c.(*AnonymousBox)
-	return ok
-}
-
-// IsText returns true if the underlying box is a text box.
-// Text boxes reference text nodes in the DOM.
-func IsText(c frame.RenderTreeNode) bool {
-	_, ok := c.(*TextBox)
-	return ok
-}
-
-// --- PrincipalBox --------------------------------------------------------------------
-
-// PrincipalBox is a (CSS-)styled box which may contain other boxes.
-// It references a node in the styled tree, i.e., a stylable DOM element node.
 type PrincipalBox struct {
-	frame.Container
-	Box     *frame.StyledBox // styled box for a DOM node
-	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
+	frame.Container                  // a principal box is also a layout container
+	Box             *frame.StyledBox // styled box for a DOM node
+	domNode         *dom.W3CNode     // the DOM node this PrincipalBox refers to
 }
 
 // NewPrincipalBox creates either a block-level container or an inline-level container
@@ -62,9 +39,10 @@ func NewPrincipalBox(domnode *dom.W3CNode, mode css.DisplayMode) *PrincipalBox {
 	pbox := &PrincipalBox{
 		domNode: domnode,
 	}
+	pbox.Container = frame.MakeContainer(pbox)
 	pbox.Display = mode
 	pbox.Box = &frame.StyledBox{}
-	pbox.Payload = pbox // always points to itself: tree node -> box
+	pbox.Payload = &pbox.Container // always points to itself
 	return pbox
 }
 
@@ -444,9 +422,10 @@ func (anon *AnonymousBox) CSSBox() *frame.Box {
 
 func NewAnonymousBox(mode css.DisplayMode) *AnonymousBox {
 	anon := &AnonymousBox{}
+	anon.Container = frame.MakeContainer(anon)
 	anon.Box = frame.InitEmptyBox(anon.CSSBox())
 	anon.Display = mode
-	anon.Payload = anon // always points to itself: tree node -> box
+	anon.Payload = &anon.Container // always points to itself
 	return anon
 }
 
@@ -508,9 +487,10 @@ type TextBox struct {
 
 func NewTextBox(domnode *dom.W3CNode) *TextBox {
 	tbox := &TextBox{domNode: domnode}
+	tbox.Container = frame.MakeContainer(tbox)
 	tbox.Box = frame.InitEmptyBox(tbox.CSSBox())
 	tbox.Display = css.InlineMode | css.InnerInlineMode
-	tbox.Payload = tbox // always points to itself: tree node -> box
+	tbox.Payload = &tbox.Container // always points to itself
 	return tbox
 }
 
@@ -671,3 +651,28 @@ func (rl runlength) String() string {
 	return b.String()
 }
 */
+
+// ---------------------------------------------------------------------------
+
+// IsPrincipal returns true if this is a principal box.
+func IsPrincipal(c frame.RenderTreeNode) bool {
+	_, ok := c.(*PrincipalBox)
+	return ok
+}
+
+// IsAnonymous returns true if this box is an anonymous box created by the layout algorithm.
+func IsAnonymous(c frame.RenderTreeNode) bool {
+	_, ok := c.(*AnonymousBox)
+	return ok
+}
+
+// IsText returns true if the underlying box is a text box.
+// Text boxes reference text nodes in the DOM.
+func IsText(c frame.RenderTreeNode) bool {
+	_, ok := c.(*TextBox)
+	return ok
+}
+
+var _ frame.RenderTreeNode = &PrincipalBox{}
+var _ frame.RenderTreeNode = &AnonymousBox{}
+var _ frame.RenderTreeNode = &TextBox{}

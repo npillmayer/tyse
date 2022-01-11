@@ -27,20 +27,26 @@ import (
 // 	TypeUnknown ContainerType = iota
 // )
 
+// RenderTreeNode represents a node of the render tree, i.e. boxes.
 type RenderTreeNode interface {
-	CSSBox() *Box
-	DOMNode() *dom.W3CNode
+	DOMNode() *dom.W3CNode // boxes link back to nodes in the DOM.
+	CSSBox() *Box          // CSS box which is the visual representation of this node
 	PresetContained() bool // pre-set contraints for children containers
 }
 
 // --- Container type --------------------------------------------------------
 
+// Container is a type for layout of the render tree.
 type Container struct {
 	tree.Node                  // a container is a node within the layout tree
-	ChildInx   uint32          // this box represents child #childInx of the parent principal box
-	Display    css.DisplayMode // inner and outer display mode
-	Context    Context         // boxes may establish a context
+	Display    css.DisplayMode // computed inner and outer display mode
+	Context    Context         // containers may establish a context
 	renderNode RenderTreeNode
+	//ChildInx   uint32          // this box represents child #childInx of the parent principal box
+}
+
+func MakeContainer(renderNode RenderTreeNode) Container {
+	return Container{renderNode: renderNode}
 }
 
 // TreeNode returns the underlying tree node for a box.
@@ -59,11 +65,6 @@ func (b *Container) RenderNode() RenderTreeNode {
 	return b.renderNode
 }
 
-// DisplayMode returns the computed display mode of this box.
-// func (b *ContainerBase) DisplayMode() css.DisplayMode {
-// 	return b.Display
-// }
-
 func (b *Container) DOMNode() *dom.W3CNode {
 	if b == nil || b.renderNode == nil {
 		return nil
@@ -77,6 +78,11 @@ func (b *Container) CSSBox() *Box {
 	}
 	return b.renderNode.CSSBox()
 }
+
+// DisplayMode returns the computed display mode of this box.
+// func (b *ContainerBase) DisplayMode() css.DisplayMode {
+// 	return b.Display
+// }
 
 // ChildIndex returns the index of this container within the children of the enclosing container.
 // func (b *ContainerBase) ChildIndex() int {
