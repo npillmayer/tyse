@@ -6,7 +6,7 @@ License
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
 
-Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
+Copyright © 2017–2022 Norbert Pillmayer <norbert@pillmayer.com>
 
 */
 package dimen
@@ -100,10 +100,10 @@ func (r Rect) Height() DU {
 
 var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[cminpxtc]{2})?$`)
 
-// ParseDimen parses a string to return a dimension. Syntax is CSS Unit.
+// Parse parses a string to return a dimension. Syntax is CSS Unit.
 // If a percentage value is given (`80%`), the second return value will be true.
 //
-func ParseDimen(s string) (DU, bool, error) {
+func Parse(s string) (DU, bool, error) {
 	d := dimenPattern.FindStringSubmatch(s)
 	if len(d) < 2 {
 		return 0, false, errors.New("format error parsing dimension")
