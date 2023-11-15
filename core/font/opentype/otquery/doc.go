@@ -9,8 +9,7 @@ Clients of this package will, amongst other, be:
 
 ▪︎ glyph rasterizers, such as FreeType (https://github.com/golang/freetype)
 
-
-Status
+# Status
 
 Work in progress. Handling fonts is fiddly and fonts have become complex software
 applications in their own right. I often need a break from the vast desert of
@@ -19,14 +18,12 @@ where I talk to myself and ask, this is what you do in your spare time? Really?
 
 No font collections nor variable fonts are supported yet.
 
-License
+# License
 
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
 
-Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
-
-
+Copyright © Norbert Pillmayer <norbert@pillmayer.com>
 */
 package otquery
 

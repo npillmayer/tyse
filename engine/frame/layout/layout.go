@@ -174,7 +174,7 @@ func CalcBlockWidths(c *frame.Container, inherited inheritedParams) (syn synthes
 	return
 }
 
-func LayoutBlockFormattingContext(ctx frame.Context, flowRoot *frame.FlowRoot) *frame.Box {
+func LayoutBlockFormattingContext(ctx frame.ContextInterf, flowRoot *frame.FlowRoot) *frame.Box {
 	// C = ctx.container
 	// C.w is already set
 	if ctx.IsFlowRoot() {
@@ -202,7 +202,7 @@ func LayoutBlockFormattingContext(ctx frame.Context, flowRoot *frame.FlowRoot) *
 	return nil
 }
 
-func LayoutInlineFormattingContext(ctx frame.Context, flowRoot *frame.FlowRoot) *frame.Box {
+func LayoutInlineFormattingContext(ctx frame.ContextInterf, flowRoot *frame.FlowRoot) *frame.Box {
 	// C = ctx.container
 	// C.w is already set
 	if ctx.IsFlowRoot() {

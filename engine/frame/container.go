@@ -38,10 +38,10 @@ type RenderTreeNode interface {
 
 // Container is a type for layout of the render tree.
 type Container struct {
-	tree.Node                  // a container is a node within the layout tree
-	Display    css.DisplayMode // computed inner and outer display mode
-	Context    Context         // containers may establish a context
-	renderNode RenderTreeNode
+	tree.Node[*Container]                 // a container is a node within the layout tree
+	Display               css.DisplayMode // computed inner and outer display mode
+	Context               ContextInterf   // containers may establish a context
+	renderNode            RenderTreeNode
 	//ChildInx   uint32          // this box represents child #childInx of the parent principal box
 }
 
@@ -50,7 +50,7 @@ func MakeContainer(renderNode RenderTreeNode) Container {
 }
 
 // TreeNode returns the underlying tree node for a box.
-func (b *Container) TreeNode() *tree.Node {
+func (b *Container) TreeNode() *tree.Node[*Container] {
 	if b == nil {
 		return nil
 	}

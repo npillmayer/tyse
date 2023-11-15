@@ -9,10 +9,21 @@ import (
 
 // Font represents the internal structure of an OpenType font.
 // It is used to navigate properties of a font for typesetting tasks.
+//
+// We only support OpenType fonts with advanced layout, i.e. fonts containing tables
+// GSUB, GPOS, etc.
 type Font struct {
 	F      *font.ScalableFont
 	Header *FontHeader
 	tables map[Tag]Table
+	CMap   *CMapTable // CMAP table is mandatory
+	Layout struct {   // OpenType core layout tables
+		GSub *GSubTable // OpenType layout GSUB
+		GPos *GPosTable // OpenType layout GPOS
+		GDef *GDefTable // OpenType layout GDEF
+		Base *BaseTable // OpenType layout BASE
+		// TODO JSTF
+	}
 }
 
 // FontHeader is a directory of the top-level tables in a font. If the font file
@@ -41,8 +52,8 @@ type FontHeader struct {
 //
 // For example to receive the `OS/2` and the `loca` table, clients may call
 //
-//    os2  := otf.Table(ot.T("OS/2"))
-//    loca := otf.Table(ot.T("loca")).Self().AsLoca()
+//	os2  := otf.Table(ot.T("OS/2"))
+//	loca := otf.Table(ot.T("loca")).Self().AsLoca()
 //
 // Table tag names are case-sensitive, following the names in the OpenType specification,
 // i.e., one of:
@@ -50,7 +61,6 @@ type FontHeader struct {
 // avar BASE CBDT CBLC CFF CFF2 cmap COLR CPAL cvar cvt DSIG EBDT EBLC EBSC fpgm fvar
 // gasp GDEF glyf GPOS GSUB gvar hdmx head hhea hmtx HVAR JSTF kern loca LTSH MATH
 // maxp MERG meta MVAR name OS/2 PCLT post prep sbix STAT SVG VDMX vhea vmtx VORG VVAR
-//
 func (otf *Font) Table(tag Tag) Table {
 	if t, ok := otf.tables[tag]; ok {
 		return t
@@ -70,17 +80,6 @@ func (otf *Font) TableTags() []Tag {
 // GlyphIndex is a glyph index in a font.
 type GlyphIndex uint16
 
-// GlyphIndex returns the glyph index for the given rune.
-//
-// It returns (0, nil) if there is no glyph for r.
-// https://www.microsoft.com/typography/OTSPEC/cmap.htm says that "Character
-// codes that do not correspond to any glyph in the font should be mapped to
-// glyph index 0. The glyph at this location must be a special glyph
-// representing a missing character, commonly known as .notdef."
-// func (otf *Font) GlyphIndex(codePoint rune) (GlyphIndex, error) {
-// 	return otf.glyphIndex(otf, codePoint)
-// }
-
 // --- Tag -------------------------------------------------------------------
 
 // Tag is defined by the spec as:
@@ -91,8 +90,7 @@ type Tag uint32
 // MakeTag creates a Tag from 4 bytes, e.g.,
 // If b is shorter or longer, it will be silently extended or cut as appropriate
 //
-//    MakeTag([]byte("cmap"))
-//
+//	MakeTag([]byte("cmap"))
 func MakeTag(b []byte) Tag {
 	if b == nil {
 		b = []byte{0, 0, 0, 0}
@@ -143,7 +141,6 @@ func (t Tag) String() string {
 //
 // Currently not used/supported:
 // SVG font table, bitmap glyph tables, color font tables, font variations.
-//
 type Table interface {
 	Extent() (uint32, uint32) // offset and byte size within the font's binary data
 	Binary() []byte           // the bytes of this table; should be treatet as read-only by clients
@@ -208,92 +205,100 @@ type TableSelf struct {
 }
 
 // NameTag returns the 4-letter name of a table.
-func (self TableSelf) NameTag() Tag {
-	return self.tableBase.name
+func (tself TableSelf) NameTag() Tag {
+	return tself.tableBase.name
 }
 
-func safeSelf(self TableSelf) interface{} {
-	if self.tableBase == nil || self.tableBase.self == nil {
+func safeSelf(tself TableSelf) interface{} {
+	if tself.tableBase == nil || tself.tableBase.self == nil {
 		return TableSelf{}
 	}
-	return self.tableBase.self
+	return tself.tableBase.self
 }
 
 // AsCMap returns this table as a cmap table, or nil.
-func (self TableSelf) AsCMap() *CMapTable {
-	if k, ok := safeSelf(self).(*CMapTable); ok {
+func (tself TableSelf) AsCMap() *CMapTable {
+	if k, ok := safeSelf(tself).(*CMapTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsGPos returns this table as a GPOS table, or nil.
-func (self TableSelf) AsGPos() *GPosTable {
-	if g, ok := safeSelf(self).(*GPosTable); ok {
+func (tself TableSelf) AsGPos() *GPosTable {
+	if g, ok := safeSelf(tself).(*GPosTable); ok {
 		return g
 	}
 	return nil
 }
 
 // AsGSub returns this table as a GSUB table, or nil.
-func (self TableSelf) AsGSub() *GSubTable {
-	if g, ok := safeSelf(self).(*GSubTable); ok {
+func (tself TableSelf) AsGSub() *GSubTable {
+	if g, ok := safeSelf(tself).(*GSubTable); ok {
 		return g
 	}
 	return nil
 }
 
 // AsGDef returns this table as a GDEF table, or nil.
-func (self TableSelf) AsGDef() *GDefTable {
-	if g, ok := safeSelf(self).(*GDefTable); ok {
+func (tself TableSelf) AsGDef() *GDefTable {
+	if g, ok := safeSelf(tself).(*GDefTable); ok {
 		return g
 	}
 	return nil
 }
 
+// AsBase returns this table as a BASE table, or nil.
+func (tself TableSelf) AsBase() *BaseTable {
+	if k, ok := safeSelf(tself).(*BaseTable); ok {
+		return k
+	}
+	return nil
+}
+
 // AsLoca returns this table as a kern table, or nil.
-func (self TableSelf) AsLoca() *LocaTable {
-	if k, ok := safeSelf(self).(*LocaTable); ok {
+func (tself TableSelf) AsLoca() *LocaTable {
+	if k, ok := safeSelf(tself).(*LocaTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsMaxP returns this table as a kern table, or nil.
-func (self TableSelf) AsMaxP() *MaxPTable {
-	if k, ok := safeSelf(self).(*MaxPTable); ok {
+func (tself TableSelf) AsMaxP() *MaxPTable {
+	if k, ok := safeSelf(tself).(*MaxPTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsKern returns this table as a kern table, or nil.
-func (self TableSelf) AsKern() *KernTable {
-	if k, ok := safeSelf(self).(*KernTable); ok {
+func (tself TableSelf) AsKern() *KernTable {
+	if k, ok := safeSelf(tself).(*KernTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsHead returns this table as a head table, or nil.
-func (self TableSelf) AsHead() *HeadTable {
-	if k, ok := safeSelf(self).(*HeadTable); ok {
+func (tself TableSelf) AsHead() *HeadTable {
+	if k, ok := safeSelf(tself).(*HeadTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsHHea returns this table as a hhea table, or nil.
-func (self TableSelf) AsHHea() *HHeaTable {
-	if k, ok := safeSelf(self).(*HHeaTable); ok {
+func (tself TableSelf) AsHHea() *HHeaTable {
+	if k, ok := safeSelf(tself).(*HHeaTable); ok {
 		return k
 	}
 	return nil
 }
 
 // AsHMtx returns this table as a hmtx table, or nil.
-func (self TableSelf) AsHMtx() *HMtxTable {
-	if k, ok := safeSelf(self).(*HMtxTable); ok {
+func (tself TableSelf) AsHMtx() *HMtxTable {
+	if k, ok := safeSelf(tself).(*HMtxTable); ok {
 		return k
 	}
 	return nil
@@ -305,12 +310,11 @@ func (self TableSelf) AsHMtx() *HMtxTable {
 // Only a small subset of fields are made public by HeadTable, as they are
 // needed for consistency-checks. To read any of the other fields of table 'head' use:
 //
-//     head   := otf.Table(T("head"))
-//     fields := head.Fields().Get(n)     // get nth field value
-//     fields := head.Fields().All()      // get a slice with all field values
+//	head   := otf.Table(T("head"))
+//	fields := head.Fields().Get(n)     // get nth field value
+//	fields := head.Fields().All()      // get a slice with all field values
 //
 // See also type `Navigator`.
-//
 type HeadTable struct {
 	tableBase
 	Flags            uint16 // see https://docs.microsoft.com/en-us/typography/opentype/spec/head

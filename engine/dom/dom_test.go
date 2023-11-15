@@ -8,6 +8,7 @@ import (
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/tyse/engine/dom"
 	"github.com/npillmayer/tyse/engine/dom/domdbg"
+	"github.com/npillmayer/tyse/engine/dom/styledtree"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
@@ -75,7 +76,9 @@ func TestW3CTextContent1(t *testing.T) {
 	defer teardown()
 	//
 	root := buildDOM(t)
-	root.Walk().DescendentsWith(tree.NodeIsLeaf).BottomUp(tree.CalcRank).Promise()()
+	isLeaf := tree.NodeIsLeaf[*styledtree.StyNode]()
+	calcRank := tree.CalcRank[*styledtree.StyNode]
+	root.Walk().DescendentsWith(isLeaf).BottomUp(calcRank).Promise()()
 	n, _ := dom.NodeAsTreeNode(root)
 	t.Logf("DOM has size=%d", n.Rank)
 	text, err := root.TextContent()

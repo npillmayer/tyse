@@ -1,52 +1,25 @@
 package style
 
 /*
-BSD License
+License
 
-Copyright (c) 2017–21, Norbert Pillmayer
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-All rights reserved.
+Copyright © 2017–2022 Norbert Pillmayer <norbert@pillmayer.com>
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/tyse/engine/tree"
 )
 
-// T traces to a global engine tracer.
-func T() tracing.Trace {
-	return gtrace.EngineTracer
+// tracer will return a tracer. We are tracing to 'tyse.dom'
+func tracer() tracing.Trace {
+	return tracing.Select("tyse.dom")
 }
 
 // Property is a raw value for a CSS property. For example, with
@@ -330,7 +303,7 @@ func SplitCompoundProperty(key string, value Property) ([]KeyValue, error) {
 	case "border-radius":
 		return feazeCompound4("border", "style", fourCorners, fields)
 	}
-	return nil, fmt.Errorf("Not recognized as compound property: %s", key)
+	return nil, fmt.Errorf("not recognized as compound property: %s", key)
 }
 
 // CSS logic to distribute individual values from compound shortcuts is as
@@ -338,9 +311,9 @@ func SplitCompoundProperty(key string, value Property) ([]KeyValue, error) {
 func feazeCompound4(pre string, suf string, dirs [4]string, fields []string) ([]KeyValue, error) {
 	l := len(fields)
 	if l == 0 || l > 4 {
-		return nil, fmt.Errorf("Expecting 1-3 values for %s-%s", pre, suf)
+		return nil, fmt.Errorf("expecting 1-3 values for %s-%s", pre, suf)
 	}
-	r := make([]KeyValue, 4, 4)
+	r := make([]KeyValue, 4)
 	r[0] = KeyValue{p(pre, suf, dirs[0]), Property(fields[0])}
 	if l >= 2 {
 		r[1] = KeyValue{p(pre, suf, dirs[1]), Property(fields[1])}
@@ -413,7 +386,7 @@ func (pmap *PropertyMap) Group(groupname string) *PropertyGroup {
 	if pmap == nil {
 		return nil
 	}
-	group, _ := pmap.m[groupname]
+	group := pmap.m[groupname]
 	return group
 }
 
@@ -427,36 +400,6 @@ func (pmap *PropertyMap) Property(key string) (Property, bool) {
 		return NullStyle, false
 	}
 	return group.Get(key)
-}
-
-// GetPropertyValue returns the property value for a given key.
-// If the property is inherited, it may cascade.
-func (pmap *PropertyMap) GetPropertyValue(key string, node *tree.Node, styler Interf) Property {
-	p, ok := pmap.Property(key)
-	if ok {
-		if p != "inherit" {
-			return p
-		}
-	}
-	// not found in local dicts => cascade, if allowed
-	if p == "inherit" || IsCascading(key) {
-		groupname := GroupNameFromPropertyKey(key)
-		T().P("key", key).Debugf("styling: cascading for key %s", key)
-		T().P("key", key).Debugf("styling: cascading with property group %s", groupname)
-		var group *PropertyGroup
-		//func (pg *PropertyGroup) Cascade(key string) *PropertyGroup {
-		for node != nil && group == nil {
-			styler := styler(node)
-			group = styler.Styles().Group(groupname)
-			node = node.Parent()
-		}
-		if group == nil {
-			return NullStyle
-		}
-		p, _ := group.Cascade(key).Get(key)
-		return p
-	}
-	return NullStyle
 }
 
 // AddAllFromGroup transfers all style properties from a property group
@@ -488,7 +431,9 @@ func (pmap *PropertyMap) AddAllFromGroup(group *PropertyGroup, overwrite bool) *
 }
 
 // Add adds a property to this property map, e.g.,
+//
 //    pm.Add("funny-margin", "big")
+//
 func (pmap *PropertyMap) Add(key string, value Property) {
 	if pmap == nil {
 		return
@@ -501,35 +446,3 @@ func (pmap *PropertyMap) Add(key string, value Property) {
 	}
 	group.Set(key, value)
 }
-
-// --------------------------------------------------------------------------
-
-// Signature for being able to cache a fragment.
-// Caching is currently not implemented.
-//
-// Class values have to be sorted.
-//
-// Returns hash and number of ID+class attributes.
-//
-// TODO
-/*
-func HashSignatureAttributes(htmlNode *html.Node) (uint32, uint8) {
-	var hash uint32 = 0
-	var count uint8 = 0
-	signature := ""
-	for _, a := range htmlNode.Attr {
-		if a.Key == "id" {
-			signature += a.Key
-			count += 1
-		}
-	}
-	for _, a := range htmlNode.Attr {
-		if a.Key == "class" {
-			signature += a.Key
-			count += 1
-		}
-	}
-	hash = xxhash.Checksum32([]byte(signature))
-	return hash, count
-}
-*/

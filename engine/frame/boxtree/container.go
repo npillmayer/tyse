@@ -122,7 +122,7 @@ func (pbox *PrincipalBox) CSSBox() *frame.Box {
 // return pbox.context
 // }
 
-func (pbox *PrincipalBox) SetContext(ctx frame.Context) {
+func (pbox *PrincipalBox) SetContext(ctx frame.ContextInterf) {
 	pbox.Context = ctx
 }
 
@@ -530,11 +530,11 @@ func (tbox *TextBox) CSSBox() *frame.Box {
 // 	return frame.InlineMode
 // }
 
-func (tbox *TextBox) Context() frame.Context {
+func (tbox *TextBox) Context() frame.ContextInterf {
 	return nil
 }
 
-func (tbox *TextBox) SetContext(frame.Context) {
+func (tbox *TextBox) SetContext(frame.ContextInterf) {
 	// do nothing
 }
 

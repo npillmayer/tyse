@@ -1,14 +1,6 @@
 package frame
 
-import (
-	"testing"
-
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
-	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/engine/dom/style/css"
-	"github.com/stretchr/testify/assert"
-)
-
+/*
 func TestBoxNullbox(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame")
 	defer teardown()
@@ -171,3 +163,4 @@ func TestConstraints2(t *testing.T) {
 	assert.True(t, box.HasFixedBorderBoxWidth(false))
 	assert.Equal(t, 180*dimen.PT, box.W.Unwrap())
 }
+*/

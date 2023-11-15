@@ -1,56 +1,8 @@
 package styledtree
 
-/*
-BSD License
-
-Copyright (c) 2017–21, Norbert Pillmayer
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-// https://github.com/antchfx/xpath       XPath for parser
-// https://github.com/antchfx/htmlquery   HTML DOM XPath
-// https://github.com/ChrisTrenkamp/goxpath/tree/master/tree
-// https://github.com/santhosh-tekuri/xpathparser  XPath parser
-//
-// https://github.com/beevik/etree        XPath for XML ("easy tree"), does this :-( :
-// type Token interface {
-//    Parent() *Element
-//    // contains filtered or unexported methods
-//}
-//
-// https://github.com/mmbros/treepath     (kind-of-)XPath for tree interface, BROKEN !
-//
-// https://godoc.org/github.com/jiangmitiao/ebook-go
-
 import (
+	"strings"
+
 	"github.com/npillmayer/tyse/engine/dom/style"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
@@ -58,15 +10,26 @@ import (
 
 // StyNode is a style node, the building block of the styled tree.
 type StyNode struct {
-	tree.Node      // we build on top of general purpose tree
-	htmlNode       *html.Node
-	computedStyles *style.PropertyMap
+	tree.Node[*StyNode] // we build on top of general purpose tree
+	htmlNode            *html.Node
+	computedStyles      *style.PropertyMap
 }
 
-var _ style.Styler = &StyNode{}
+func (sn *StyNode) String() string {
+	h := sn.htmlNode
+	switch h.Type {
+	case html.DocumentNode:
+		return "[#document]"
+	case html.ElementNode:
+		return "[" + h.Data + "]"
+	case html.TextNode:
+		return "[#text:" + shortText(h) + "]"
+	}
+	return "[styled node]"
+}
 
 // NewNodeForHTMLNode creates a new styled node linked to an HTML node.
-func NewNodeForHTMLNode(html *html.Node) *tree.Node {
+func NewNodeForHTMLNode(html *html.Node) *tree.Node[*StyNode] {
 	sn := &StyNode{}
 	sn.Payload = sn // Payload will always reference the node itself
 	sn.htmlNode = html
@@ -74,32 +37,23 @@ func NewNodeForHTMLNode(html *html.Node) *tree.Node {
 }
 
 // Node gets the styled node from a generic tree node.
-func Node(n *tree.Node) *StyNode {
+func Node(n *tree.Node[*StyNode]) *StyNode {
 	if n == nil {
 		return nil
 	}
-	sn, ok := n.Payload.(*StyNode)
-	if ok {
-		return sn
-	}
-	return nil
-}
-
-// AsStyler returns a styled tree node as 'style.Styler'.
-func (sn *StyNode) AsStyler() style.Styler {
-	return sn
+	return n.Payload
 }
 
 // HTMLNode gets the HTML DOM node corresponding to this styled node.
 func (sn *StyNode) HTMLNode() *html.Node {
-	return sn.Payload.(*StyNode).htmlNode
+	return sn.Payload.htmlNode
 }
 
 // StylesCascade gets the upwards to the enclosing style set.
-func (sn *StyNode) StylesCascade() style.Styler {
-	enclosingStyles := Node(sn.Parent())
-	return enclosingStyles.AsStyler()
-}
+// func (sn *StyNode) StylesCascade() *style.Styler {
+// 	enclosingStyles := Node(sn.Parent())
+// 	return enclosingStyles.AsStyler()
+// }
 
 // Styles is part of interface style.Styler.
 func (sn *StyNode) Styles() *style.PropertyMap {
@@ -111,28 +65,71 @@ func (sn *StyNode) SetStyles(styles *style.PropertyMap) {
 	sn.computedStyles = styles
 }
 
-// --- styled-node creator ---------------------------------------------------
+// GetPropertyValue returns the property value for a given key.
+// If the property is inherited, it may cascade.
+//func (pmap *style.PropertyMap) GetPropertyValue(key string, node *tree.Node[*styledtree.StyNode]) style.Property {
+func (sn *StyNode) GetPropertyValue(key string, pmap *style.PropertyMap) style.Property {
+	p, ok := pmap.Property(key)
+	if ok {
+		if p != "inherit" {
+			return p
+		}
+	}
+	// not found in local dicts => cascade, if allowed
+	if p == "inherit" || style.IsCascading(key) {
+		groupname := style.GroupNameFromPropertyKey(key)
+		tracer().P("key", key).Debugf("styling: cascading for key %s", key)
+		tracer().P("key", key).Debugf("styling: cascading with property group %s", groupname)
+		var group *style.PropertyGroup
+		for sn != nil && group == nil {
+			sn = sn.Parent().Payload
+		}
+		if group == nil {
+			return style.NullStyle
+		}
+		p, _ := group.Cascade(key).Get(key)
+		return p
+	}
+	return style.NullStyle
+}
+
+// --- Helpers ---------------------------------------------------------------
 
 // Creator returns a style-creator for use in CSSOM.
 // The returned style.NodeCreator will then build up an instance of a styled tree
 // with node type styledtree.StyNode.
 //
+/*
 func Creator() style.NodeCreator {
 	return creator{}
 }
 
 type creator struct{}
 
-func (c creator) ToStyler(n *tree.Node) style.Styler {
+func (c creator) ToStyler(n *tree.Node[*StyNode]) style.Styler {
 	return Node(n)
 }
 
-func (c creator) StyleForHTMLNode(htmlnode *html.Node) *tree.Node {
+func (c creator) StyleForHTMLNode(htmlnode *html.Node) *tree.Node[*StyNode] {
 	return NewNodeForHTMLNode(htmlnode)
 }
 
-func (c creator) SetStyles(n *tree.Node, m *style.PropertyMap) {
+func (c creator) SetStyles(n *tree.Node[*StyNode], m *style.PropertyMap) {
 	Node(n).SetStyles(m)
 }
 
 var _ style.NodeCreator = creator{}
+*/
+
+func shortText(h *html.Node) string {
+	s := "\"\\\""
+	if len(h.Data) > 10 {
+		s += h.Data[:10] + "...\\\"\""
+	} else {
+		s += h.Data + "\\\"\""
+	}
+	s = strings.Replace(s, "\n", `\\n`, -1)
+	s = strings.Replace(s, "\t", `\\t`, -1)
+	s = strings.Replace(s, " ", "\u2423", -1)
+	return s
+}

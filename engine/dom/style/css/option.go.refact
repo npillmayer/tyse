@@ -1,0 +1,499 @@
+package css
+
+import (
+	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/npillmayer/fp/core/option"
+	"github.com/npillmayer/fp/dom/style"
+	"github.com/npillmayer/tyse/core/dimen"
+)
+
+// PropertyType is a helper type for special values of properties, e.g.:
+//
+//     auto
+//     initial
+//     inherit
+//
+type PropertyType int
+
+// Auto, Inherit and Initial are constant values for options-matching.
+// Use with
+//     option.Of{
+//          style.Auto: …   // will match a CSS property option-type with value "auto"
+//     }
+const (
+	Auto          PropertyType = 1 // for option matching
+	Inherit       PropertyType = 2 // for option matching
+	Initial       PropertyType = 3 // for option matching
+	FontScaled    PropertyType = 4 // for option matching: dimension is font-dependent
+	ViewScaled    PropertyType = 5 // for option matching: dimension is viewport-dependent
+	ContentScaled PropertyType = 6 // for option matching: dimension is content-dependent
+	FixedValue    PropertyType = 7 // for option matching: dimension has fixed value
+)
+
+const (
+	dimenNone uint32 = 0
+
+	dimenAbsolute uint32 = 0x0001
+	dimenAuto     uint32 = 0x0002
+	dimenInherit  uint32 = 0x0003
+	dimenInitial  uint32 = 0x0004
+
+	// Flags for content dependent dimensions
+	DimenContentMax uint32 = 0x0010
+	DimenContentMin uint32 = 0x0020
+	DimenContentFit uint32 = 0x0030
+	contentMask     uint32 = 0x00f0
+
+	dimenEM      uint32 = 0x0100
+	dimenEX      uint32 = 0x0200
+	dimenCH      uint32 = 0x0300
+	dimenREM     uint32 = 0x0400
+	dimenVW      uint32 = 0x0500
+	dimenVH      uint32 = 0x0600
+	dimenVMIN    uint32 = 0x0700
+	dimenVMAX    uint32 = 0x0800
+	dimenPRCNT   uint32 = 0x0900
+	relativeMask uint32 = 0xff00
+)
+
+// --- DimenT-----------------------------------------------------------------
+
+// DimenT is an option type for CSS dimensions.
+type DimenT struct {
+	d     dimen.DU
+	flags uint32
+}
+
+// SomeDimen creates an optional dimen with an initial value of x.
+func SomeDimen(x dimen.DU) DimenT {
+	return DimenT{d: x, flags: dimenAbsolute}
+}
+
+// Dimen creates an optional dimen without an initial value.
+func Dimen() DimenT {
+	return DimenT{d: 0}
+}
+
+// Match is part of interface option.Type.
+func (o DimenT) Match(choices interface{}) (value interface{}, err error) {
+	return option.Match(o, choices)
+}
+
+var errResultInvalidDimension error = errors.New("match-result is invalid dimension")
+
+// MatchToDimen performs a match and returnes the match-result as a dimen.Dimen.
+// If the match-result is not a legal dimension, dimen.Zero will be returned,
+// together with an error.
+func (o DimenT) MatchToDimen(choices interface{}) (value dimen.DU, err error) {
+	v, err := option.Match(o, choices)
+	if err != nil {
+		return dimen.Zero, err
+	} else if v == nil {
+		return dimen.Zero, errResultInvalidDimension
+	}
+	switch d := v.(type) {
+	case dimen.DU:
+		value = d
+	default:
+		value = dimen.Zero
+		err = errResultInvalidDimension
+	}
+	return
+}
+
+// Equals is part of interface option.Type.
+func (o DimenT) Equals(other interface{}) bool {
+	//T().Debugf("Dimen EQUALS %v ? %v", o, other)
+	switch i := other.(type) {
+	case DimenT:
+		return o.d == i.d && o.flags == i.flags
+	case dimen.DU:
+		return o.Unwrap() == i
+	case int32:
+		return o.Unwrap() == dimen.DU(i)
+	case int:
+		return o.Unwrap() == dimen.DU(i)
+	case PropertyType:
+		switch i {
+		case Auto:
+			return o.flags&dimenAuto > 0
+		case Initial:
+			return o.flags&dimenInitial > 0
+		case Inherit:
+			return o.flags&dimenInherit > 0
+		case FontScaled:
+			return o.flags&dimenEM > 0 || o.flags&dimenEX > 0 ||
+				o.flags&dimenREM > 0 || o.flags&dimenCH > 0
+		case ViewScaled:
+			return o.flags&dimenVW > 0 || o.flags&dimenVH > 0 ||
+				o.flags&dimenVMIN > 0 || o.flags&dimenVMAX > 0
+		case ContentScaled:
+			return o.flags&contentMask > 0
+		case FixedValue:
+			return o.IsAbsolute()
+		}
+	case string:
+		switch i {
+		case "%":
+			return o.flags&dimenPRCNT > 0
+		}
+	}
+	return false
+}
+
+// Unwrap returns the underlying dimension of o.
+func (o DimenT) Unwrap() dimen.DU {
+	return o.d
+}
+
+// IsNone returns true if o is unset.
+func (o DimenT) IsNone() bool {
+	return o.flags == dimenNone
+}
+
+// IsRelative returns true if o represents a valid relative dimension (`%`, `em`, etc.).
+func (o DimenT) IsRelative() bool {
+	return o.flags&relativeMask > 0
+}
+
+// IsPercent returns true if o represents a percentage dimension (`%`).
+func (o DimenT) IsPercent() bool {
+	return o.flags&dimenPRCNT > 0
+}
+
+// IsAbsolute returns true if o represents a valid absolute dimension.
+func (o DimenT) IsAbsolute() bool {
+	return o.flags == dimenAbsolute
+}
+
+// TODO
+func (o DimenT) ScaleFromFont(font string) DimenT {
+	if o.IsRelative() {
+		switch o.UnitString() {
+		case "EM", "REM":
+			return SomeDimen(10 * dimen.PT)
+		case "EX":
+			return SomeDimen(5 * 10 * dimen.PT)
+		case "CH":
+			return SomeDimen(8 * 10 * dimen.PT)
+		}
+	}
+	return o
+}
+
+func (o DimenT) ScaleFromViewport(w, h dimen.DU) DimenT {
+	if o.IsRelative() {
+		switch o.UnitString() {
+		case "VW":
+			return SomeDimen(o.Unwrap() * w / 100)
+		case "VH":
+			return SomeDimen(o.Unwrap() * h / 100)
+		case "VMIN":
+			return SomeDimen(o.Unwrap() * dimen.Min(w, h) / 100)
+		case "VMAX":
+			return SomeDimen(o.Unwrap() * dimen.Max(w, h) / 100)
+		}
+	}
+	return o
+}
+
+// UnitString returns 'sp' (scaled points) for non-relative dimensions and a string
+// denoting the defined unit for relative dimensions.
+func (o DimenT) UnitString() string {
+	if o.IsRelative() {
+		if unit, ok := relUnitMap[o.flags&relativeMask]; ok {
+			return unit
+		}
+	}
+	return "sp"
+}
+
+func (o DimenT) String() string {
+	if o.IsNone() {
+		return "DimenT.None"
+	}
+	switch o.flags & 0x000f {
+	case dimenAuto:
+		return "auto"
+	case dimenInitial:
+		return "initial"
+	case dimenInherit:
+		return "inherit"
+	}
+	switch o.flags & contentMask {
+	case DimenContentFit:
+		return "fit-content"
+	}
+	if o.IsRelative() {
+		if unit, ok := relUnitMap[o.flags&relativeMask]; ok {
+			if unit == "%" {
+				unit = "pcnt"
+			}
+			return fmt.Sprintf("%d%s", o.d, unit)
+		}
+	}
+	return fmt.Sprintf("%dsp", o.d)
+}
+
+var relUnitMap map[uint32]string = map[uint32]string{
+	dimenEM:    "em",
+	dimenEX:    "ex",
+	dimenCH:    "ch",
+	dimenREM:   "rem",
+	dimenVW:    "vw",
+	dimenVH:    "vh",
+	dimenVMIN:  "vmin",
+	dimenVMAX:  "vmax",
+	dimenPRCNT: "%",
+}
+
+var relUnitStringMap map[string]uint32 = map[string]uint32{
+	"em":   dimenEM,
+	"ex":   dimenEX,
+	"ch":   dimenCH,
+	"rem":  dimenREM,
+	"vw":   dimenVW,
+	"vh":   dimenVH,
+	"vmin": dimenVMIN,
+	"vmax": dimenVMAX,
+	`%`:    dimenPRCNT,
+}
+
+// DimenOption returns an optional dimension type from a property string.
+// It will never return an error, even with illegal input, but instead will then
+// return an unset dimension.
+func DimenOption(p style.Property) DimenT {
+	switch p {
+	case style.NullStyle:
+		return Dimen()
+	case "auto":
+		return DimenT{flags: dimenAuto}
+	case "initial":
+		return DimenT{flags: dimenInitial}
+	case "inherit":
+		return DimenT{flags: dimenInherit}
+	case "fit-content":
+		return DimenT{flags: DimenContentFit}
+	}
+	d, err := ParseDimen(string(p))
+	if err != nil {
+		T().Errorf("dimension option from property '%s': %v", p, err)
+		return Dimen()
+	}
+	return d
+}
+
+var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[a-zA-Z]{2,4})?$`)
+
+// ParseDimen parses a string to return an optional dimension. Syntax is CSS Unit.
+// Valid dimensions are
+//
+//     15px
+//     80%
+//     -33rem
+//
+func ParseDimen(s string) (DimenT, error) {
+	//T().Debugf("PARSE DIMEN STRING = '%s'", s)
+	if s == "" || s == "none" {
+		return Dimen(), nil
+	}
+	switch s {
+	case "thin":
+		return SomeDimen(dimen.PX / 2), nil
+	case "medium":
+		return SomeDimen(dimen.PX), nil
+	case "thick":
+		return SomeDimen(dimen.PX * 2), nil
+	}
+	d := dimenPattern.FindStringSubmatch(s)
+	if len(d) < 2 {
+		return Dimen(), errors.New("format error parsing dimension")
+	}
+	scale := dimen.SP
+	dim := SomeDimen(0)
+	if len(d) > 2 {
+		switch d[2] {
+		case "pt", "PT":
+			scale = dimen.PT
+		case "mm", "MM":
+			scale = dimen.MM
+		case "bp", "px", "BP", "PX":
+			scale = dimen.BP
+		case "cm", "CM":
+			scale = dimen.CM
+		case "in", "IN":
+			scale = dimen.IN
+		case "", "sp", "SP":
+			scale = dimen.SP
+		default:
+			u := strings.ToLower(d[2])
+			if unit, ok := relUnitStringMap[u]; ok {
+				dim = Dimen()
+				dim.flags = unit
+			} else {
+				return Dimen(), errors.New("format error parsing dimension")
+			}
+		}
+	}
+	n, err := strconv.Atoi(d[1])
+	if err != nil { // this cannot happen
+		return Dimen(), errors.New("format error parsing dimension")
+	}
+	dim.d = dimen.DU(n) * scale
+	return dim, nil
+}
+
+// MaxDimen returns the greater of two dimensions.
+func MaxDimen(d1, d2 DimenT) DimenT {
+	max, _ := d1.Match(option.Maybe{
+		option.None: d2,
+		option.Some: option.Safe(d2.Match(option.Maybe{
+			option.None: d1,
+			option.Some: dimen.Max(d1.Unwrap(), d2.Unwrap()),
+		})),
+	})
+	return max.(DimenT)
+}
+
+// MinDimen returns the lesser of two dimensions.
+func MinDimen(d1, d2 DimenT) DimenT {
+	max, _ := d1.Match(option.Maybe{
+		option.None: d2,
+		option.Some: option.Safe(d2.Match(option.Maybe{
+			option.None: d1,
+			option.Some: dimen.Min(d1.Unwrap(), d2.Unwrap()),
+		})),
+	})
+	return max.(DimenT)
+}
+
+// --- PositionT -------------------------------------------------------------
+
+// Position is an enum type for the CSS position property.
+type Position uint16
+
+// Enum values for type Position
+const (
+	PositionUnknown    Position = iota
+	PositionStatic              // CSS static (default)
+	PositionRelative            // CSS relative
+	PositionAbsolute            // CSS absolute
+	PositionFixed               // CSS fixed
+	PositionSticky              // CSS sticky, currently mapped to relative
+	PositionFloatLeft           // CSS float property
+	PositionFloatRight          // CSS float property
+)
+
+// PositionT is an option type for CSS positions.
+type PositionT struct {
+	p       Position
+	Offsets []DimenT
+}
+
+// SomePosition creates an optional position with an initial value of x.
+func SomePosition(x Position) PositionT {
+	return PositionT{p: x}
+}
+
+// Match is part of interface option.Type.
+func (o PositionT) Match(choices interface{}) (value interface{}, err error) {
+	return option.Match(o, choices)
+}
+
+// Equals is part of interface option.Type.
+func (o PositionT) Equals(other interface{}) bool {
+	//T().Debugf("Position EQUALS %v ? %v", o, other)
+	switch p := other.(type) {
+	case Position:
+		return o.Unwrap() == p
+	case string:
+		if pp, ok := positionStringMap[p]; ok {
+			return o.p == pp
+		}
+	}
+	return false
+}
+
+// Unwrap returns the underlying position of o.
+func (o PositionT) Unwrap() Position {
+	return o.p
+}
+
+// IsNone returns true if o is unset.
+func (o PositionT) IsNone() bool {
+	return o.p == PositionUnknown
+}
+
+func (o PositionT) String() string {
+	if o.IsNone() {
+		return "PositionT.None"
+	}
+	if p, ok := positionMap[o.p]; ok {
+		return p
+	}
+	return "PositionT.None"
+}
+
+var positionMap map[Position]string = map[Position]string{
+	PositionStatic:     "static",
+	PositionRelative:   "relative",
+	PositionAbsolute:   "absolute",
+	PositionFixed:      "fixed",
+	PositionSticky:     "sticky",
+	PositionFloatLeft:  "float",
+	PositionFloatRight: "float",
+}
+
+var positionStringMap map[string]Position = map[string]Position{
+	"static":   PositionStatic,
+	"relative": PositionRelative,
+	"absolute": PositionAbsolute,
+	"fixed":    PositionFixed,
+	"sticky":   PositionSticky,
+	"float":    PositionFloatLeft,
+}
+
+// ParsePosition parses a string and returns an option-type for positions.
+// It will never return an error, but rather an unset position in case of illegal input.
+func ParsePosition(s string) PositionT {
+	if p, ok := positionStringMap[s]; ok {
+		return SomePosition(p)
+	}
+	return PositionT{}
+}
+
+// PositionOption returns an optional position type from properties.
+// Properties `top`, `right`, `bottom` and `left` will be made accessable as option types,
+// if appropriate.
+//
+// Will never return an error, even with illegal input, but instead will then
+// return an unset position.
+//
+func PositionOption(styler style.Styler) PositionT {
+	pos := GetLocalProperty(styler.Styles(), "position")
+	float := GetLocalProperty(styler.Styles(), "float")
+	if pos == style.NullStyle {
+		if float != style.NullStyle {
+			if float == "left" {
+				return SomePosition(PositionFloatLeft)
+			} else if float == "right" {
+				return SomePosition(PositionFloatRight)
+			} // TODO bidi variants
+		}
+		return PositionT{}
+	}
+	p := ParsePosition(string(pos))
+	if !p.IsNone() && p.Unwrap() != PositionStatic {
+		p.Offsets = make([]DimenT, 4)
+		p.Offsets[0] = DimenOption(GetLocalProperty(styler.Styles(), "top"))
+		p.Offsets[1] = DimenOption(GetLocalProperty(styler.Styles(), "right"))
+		p.Offsets[2] = DimenOption(GetLocalProperty(styler.Styles(), "bottom"))
+		p.Offsets[3] = DimenOption(GetLocalProperty(styler.Styles(), "left"))
+	}
+	return p
+}

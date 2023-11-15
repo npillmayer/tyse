@@ -1,87 +1,78 @@
 package otquery
 
 import (
+	"path/filepath"
 	"testing"
 
-	"github.com/npillmayer/schuko/schukonf/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
-	"github.com/npillmayer/tyse/core"
 	"github.com/npillmayer/tyse/core/font"
 	"github.com/npillmayer/tyse/core/font/opentype/ot"
-	"github.com/npillmayer/tyse/core/locate/resources"
-	"golang.org/x/text/language"
+	"github.com/stretchr/testify/suite"
+	"golang.org/x/image/font/sfnt"
 )
 
-func TestGlyphIndex(t *testing.T) {
+// --- Test Suite Preparation ------------------------------------------------
+
+type MetricsTestEnviron struct {
+	suite.Suite
+	calibri *ot.Font
+}
+
+// listen for 'go test' command --> run test methods
+func TestMetricsFunctions(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
 	defer teardown()
-	//
+	suite.Run(t, new(MetricsTestEnviron))
+}
+
+// run once, before test suite methods
+func (env *MetricsTestEnviron) SetupSuite() {
+	env.T().Log("Setting up test suite")
 	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelError)
-	otf := loadCalibri(t)
-	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelDebug)
-	gid := GlyphIndex(otf, 'A')
-	if gid != 4 {
-		t.Errorf("expected glyph index of 'A' to be 4, is %d", gid)
-	}
+	env.calibri = loadLocalFont(env.T(), "Calibri.ttf")
+	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelInfo)
 }
 
-func TestGlyphMetrics(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
-	defer teardown()
-	//
-	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelError)
-	otf := loadCalibri(t)
-	tracing.Select("tyse.fonts").SetTraceLevel(tracing.LevelDebug)
-	gid := GlyphIndex(otf, 'A')
-	m, err := GlyphMetrics(otf, gid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("metrics = %v", m)
+// run once, after test suite methods
+func (env *MetricsTestEnviron) TearDownSuite() {
+	env.T().Log("Tearing down test suite")
 }
 
-func TestScriptMatch(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "tyse.fonts")
-	defer teardown()
-	//
-	f := loadTestFont(t, "calibri")
-	otf, err := ot.Parse(f.F.Binary)
-	if err != nil {
-		core.UserError(err)
-		t.Fatal(err)
-	}
-	tracer().Infof("========= loading done =================")
-	scr, err := language.ParseScript("Latn")
-	if err != nil {
-		t.Fatal(err)
-	}
-	SupportsScript(otf, scr)
-	t.Fail()
+// --- Tests -----------------------------------------------------------------
+
+func (env *MetricsTestEnviron) TestGlyphIndex() {
+	gid := GlyphIndex(env.calibri, 'A')
+	env.Equal(ot.GlyphIndex(4), gid, "expected glyph index of 'A' in test font to be 4")
 }
 
-// ---------------------------------------------------------------------------
+func (env *MetricsTestEnviron) TestGlyphMetrics() {
+	gid := GlyphIndex(env.calibri, 'A')
+	m := GlyphMetrics(env.calibri, gid)
+	env.T().Logf("metrics = %v", m)
+	env.Equal(sfnt.Units(1185), m.Advance, "expected font.Advance for 'A' to be 1185 units")
+}
 
-func loadTestFont(t *testing.T, pattern string) *ot.Font {
-	level := tracer().GetTraceLevel()
-	tracer().SetTraceLevel(tracing.LevelInfo)
-	defer tracer().SetTraceLevel(level)
-	//
-	otf := &ot.Font{}
-	if pattern == "fallback" {
-		otf.F = font.FallbackFont()
-	} else {
-		conf := testconfig.Conf{
-			"fontconfig": "/usr/local/bin/fc-list",
-			"app-key":    "tyse-test",
-		}
-		loader := resources.ResolveTypeCase(conf, pattern, font.StyleNormal, font.WeightNormal, 10.0)
-		tyc, err := loader.TypeCase()
-		if err != nil {
-			t.Fatal(err)
-		}
-		otf.F = tyc.ScalableFontParent()
+func (env *MetricsTestEnviron) TestLanguageMatch() {
+	script, lang := SupportsScript(env.calibri, ot.T("latn"), ot.T("TRK"))
+	env.Equal("latn", script.String(), "expected Latin script in test font")
+	env.Equal("TRK ", lang.String(), "expected Turkish language support in test font")
+}
+
+// --- Helpers ---------------------------------------------------------------
+
+func loadLocalFont(t *testing.T, fontFileName string) *ot.Font {
+	path := filepath.Join("..", "testdata", fontFileName)
+	f, err := font.LoadOpenTypeFont(path)
+	if err != nil {
+		t.Fatalf("cannot load test font %s: %s", fontFileName, err)
 	}
-	t.Logf("loaded font = %s", otf.F.Fontname)
+	t.Logf("loaded SFNT font = %s", f.Fontname)
+	otf, err := ot.Parse(f.Binary)
+	if err != nil {
+		t.Fatalf("cannot decode test font %s: %s", fontFileName, err)
+	}
+	otf.F = f
+	t.Logf("parsed OpenType font = %s", otf.F.Fontname)
 	return otf
 }

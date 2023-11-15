@@ -18,19 +18,19 @@ An example is "Helvetica regular 11pt, Latin, en_US".
 Please note that Go (Golang) does use the terms "font" and "face"
 differently–actually more or less in an opposite manner.
 
-Status
+# Status
 
 Does not yet contain methods for font collections (*.ttc), e.g.,
 /System/Library/Fonts/Helvetica.ttc on Mac OS.
 
-Links
+# Links
 
 OpenType explained:
 https://docs.microsoft.com/en-us/typography/opentype/
 
 ______________________________________________________________________
 
-License
+# License
 
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
@@ -41,7 +41,7 @@ package font
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/npillmayer/schuko/tracing"
@@ -78,7 +78,7 @@ type ScalableFont struct {
 	SFNT     *sfnt.Font // the font's container // TODO: not threadsafe???
 }
 
-//TypeCase represents a font at a specific point size, e.g. "Helvetica bold 10pt".
+// TypeCase represents a font at a specific point size, e.g. "Helvetica bold 10pt".
 type TypeCase struct {
 	scalableFontParent *ScalableFont
 	font               xfont.Face // Go uses 'face' and 'font' in an inverse manner
@@ -96,7 +96,7 @@ func NullTypeCase() *TypeCase {
 
 // LoadOpenTypeFont loads an OpenType font (TTF or OTF) from a file.
 func LoadOpenTypeFont(fontfile string) (*ScalableFont, error) {
-	bytez, err := ioutil.ReadFile(fontfile)
+	bytez, err := os.ReadFile(fontfile)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,9 @@ func ParseOpenTypeFont(fbytes []byte) (f *ScalableFont, err error) {
 	if err != nil {
 		return nil, err
 	}
-	f.Fontname, _ = f.SFNT.Name(nil, sfnt.NameIDFull)
+	if f.Fontname, err = f.SFNT.Name(nil, sfnt.NameIDFull); err == nil {
+		tracer().Debugf("loaded and parsed SFNT %s", f.Fontname)
+	}
 	return
 }
 

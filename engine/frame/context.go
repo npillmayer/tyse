@@ -2,7 +2,6 @@ package frame
 
 import (
 	"github.com/npillmayer/tyse/engine/dom/style/css"
-	"github.com/npillmayer/tyse/engine/tree"
 )
 
 type FormattingContextType uint8
@@ -11,13 +10,13 @@ const (
 	NoContext FormattingContextType = iota
 )
 
-// Context establishes a CSS formatting context.
+// ContextInterf establishes a CSS formatting context.
 //
 // “Boxes in the normal flow belong to a formatting context, which may be block or
 // inline, but not both simultaneously. Block-level boxes participate in a block
 // formatting context. Inline-level boxes participate in an inline formatting context.”
 //
-type Context interface {
+type ContextInterf interface {
 	Type() FormattingContextType
 	Container() *Container                   // container which creates this formatting context
 	Contained() []*Container                 // contained children
@@ -34,7 +33,7 @@ type FlowRoot struct {
 }
 
 type ContextBase struct {
-	*tree.Node
+	//*tree.Node
 	C         *Container
 	IsRootCtx bool
 	flowRoot  *FlowRoot
@@ -42,7 +41,7 @@ type ContextBase struct {
 
 func MakeContextBase() ContextBase {
 	ctx := ContextBase{}
-	ctx.Node = tree.NewNode(nil)
+	//ctx.Node = tree.NewNode(nil)
 	return ctx
 }
 
@@ -57,9 +56,9 @@ func (ctx ContextBase) Container() *Container {
 // 	return ctx.container.Context()
 // }
 
-func (ctx ContextBase) TreeNode() *tree.Node {
-	return ctx.Node
-}
+// func (ctx ContextBase) TreeNode() *tree.Node {
+// 	return ctx.Node
+// }
 
 func (ctx ContextBase) IsFlowRoot() bool {
 	return ctx.IsRootCtx
@@ -70,9 +69,10 @@ func (ctx ContextBase) FlowRoot() *FlowRoot {
 }
 
 func (ctx ContextBase) Contained() []*Container {
-	c := make([]*Container, 0, ctx.TreeNode().ChildCount())
-	for _, node := range ctx.TreeNode().Children(true) {
-		c = append(c, node.Payload.(*Container))
-	}
-	return c
+	// c := make([]*Container, 0, ctx.TreeNode().ChildCount())
+	// for _, node := range ctx.TreeNode().Children(true) {
+	// 	c = append(c, node.Payload.(*Container))
+	// }
+	// return c
+	return nil
 }

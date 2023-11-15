@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/styledtree"
 )
 
 // GetCascadedProperty gets the value of a property. The search cascades to
@@ -16,7 +17,7 @@ import (
 // The call to GetCascadedProperty will flag an error if the style property
 // isn't found (which should not happen, as every property should be included
 // in the 'user-agent' default style properties).
-func GetCascadedProperty(node style.Styler, key string) (style.Property, error) {
+func GetCascadedProperty(node *styledtree.StyNode, key string) (style.Property, error) {
 	// key has to be found in a property group of type G.
 	// For cascading, we will start at the currenty style-tree node and walk
 	// upwards until we find a node with a property-group G attached.
@@ -27,7 +28,7 @@ func GetCascadedProperty(node style.Styler, key string) (style.Property, error) 
 	var group *style.PropertyGroup
 	for node != nil && group == nil {
 		group = node.Styles().Group(groupname)
-		node = node.StylesCascade()
+		node = node.Parent().Payload
 	}
 	if group == nil {
 		errmsg := fmt.Sprintf("Cannot find ancestor with prop-group %s -- did you create global properties?", groupname)
@@ -44,14 +45,14 @@ func GetCascadedProperty(node style.Styler, key string) (style.Property, error) 
 // The call to GetProperty will flag an error if the style property isn't found
 // (which should not happen, as every property should be included in the
 // 'user-agent' default style properties).
-func GetProperty(node style.Styler, key string) (style.Property, error) {
+func GetProperty(node *styledtree.StyNode, key string) (style.Property, error) {
 	if style.IsCascading(key) {
 		return GetCascadedProperty(node, key)
 	}
 	//T().Debugf("css get property: %s is not inherited", key)
 	p := GetLocalProperty(node.Styles(), key)
 	if p == style.NullStyle {
-		p = style.GetUserAgentDefaultProperty(node, key)
+		p = style.GetUserAgentDefaultProperty(node.HTMLNode(), key)
 	}
 	//T().Debugf("css get property: local property value = %+v", p)
 	return p, nil

@@ -1,38 +1,13 @@
 package tree
 
 /*
-BSD License
+License
 
-Copyright (c) 2017–20, Norbert Pillmayer
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-All rights reserved.
+Copyright © 2017–2022 Norbert Pillmayer <norbert@pillmayer.com>
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
@@ -40,22 +15,29 @@ import (
 	"sync"
 )
 
+/*
+We manage a tree of mutable nodes. Each nodes carries a payload of type parameter T.
+Nodes maintain a slice of children.
+
+In the future, we may move to immutable nodes to reduce lock contention, but first let's get
+some experience with this one.
+*/
+
 // Node is the base type our tree is built of.
-type Node struct {
-	parent   *Node         // parent node of this node
-	children childrenSlice // mutex-protected slice of children nodes
-	Payload  interface{}   // nodes may carry a payload of arbitrary type
-	Rank     uint32        // rank is used for preserving sequence
+type Node[T comparable] struct {
+	parent   *Node[T]         // parent node of this node
+	children childrenSlice[T] // mutex-protected slice of children nodes
+	Payload  T                // nodes may carry a payload of arbitrary type
+	Rank     uint32           // rank is used for preserving sequence
 }
 
 // NewNode creates a new tree node with a given payload.
-func NewNode(payload interface{}) *Node {
-	return &Node{Payload: payload}
+func NewNode[T comparable](payload T) *Node[T] {
+	return &Node[T]{Payload: payload}
 }
 
-// String is a simple Stringer which the node's Payload packaged in a string.
-func (node *Node) String() string {
-	return fmt.Sprintf("(Node #ch=%d)", node.ChildCount())
+func (node *Node[T]) String() string {
+	return fmt.Sprintf("(Node #ch=%d %v)", node.ChildCount(), node.Payload)
 }
 
 // AddChild inserts a new child node into the tree.
@@ -63,7 +45,7 @@ func (node *Node) String() string {
 // It returns the parent node to allow for chaining.
 //
 // This operation is concurrency-safe.
-func (node *Node) AddChild(ch *Node) *Node {
+func (node *Node[T]) AddChild(ch *Node[T]) *Node[T] {
 	if ch != nil {
 		node.children.addChild(ch, node)
 	}
@@ -77,7 +59,7 @@ func (node *Node) AddChild(ch *Node) *Node {
 // It returns the parent node to allow for chaining.
 //
 // This operation is concurrency-safe.
-func (node *Node) SetChildAt(i int, ch *Node) *Node {
+func (node *Node[T]) SetChildAt(i int, ch *Node[T]) *Node[T] {
 	if ch != nil {
 		node.children.setChild(i, ch, node)
 	}
@@ -91,7 +73,7 @@ func (node *Node) SetChildAt(i int, ch *Node) *Node {
 // It returns the parent node to allow for chaining.
 //
 // This operation is concurrency-safe.
-func (node *Node) InsertChildAt(i int, ch *Node) *Node {
+func (node *Node[T]) InsertChildAt(i int, ch *Node[T]) *Node[T] {
 	if ch != nil {
 		node.children.insertChildAt(i, ch, node)
 	}
@@ -99,13 +81,13 @@ func (node *Node) InsertChildAt(i int, ch *Node) *Node {
 }
 
 // Parent returns the parent node or nil (for the root of the tree).
-func (node *Node) Parent() *Node {
+func (node *Node[T]) Parent() *Node[T] {
 	return node.parent
 }
 
 // Isolate removes a node from its parent.
 // Isolate returns the isolated node.
-func (node *Node) Isolate() *Node {
+func (node *Node[T]) Isolate() *Node[T] {
 	if node != nil && node.parent != nil {
 		node.parent.children.remove(node)
 	}
@@ -114,12 +96,12 @@ func (node *Node) Isolate() *Node {
 
 // ChildCount returns the number of children-nodes for a node
 // (concurrency-safe).
-func (node *Node) ChildCount() int {
+func (node *Node[T]) ChildCount() int {
 	return node.children.length()
 }
 
 // Child is a concurrency-safe way to get a children-node of a node.
-func (node *Node) Child(n int) (*Node, bool) {
+func (node *Node[T]) Child(n int) (*Node[T], bool) {
 	if n < 0 || node.children.length() <= n {
 		return nil, false
 	}
@@ -129,13 +111,13 @@ func (node *Node) Child(n int) (*Node, bool) {
 
 // Children returns a slice with all children of a node.
 // If omitNilChildren is set, empty children aren't included in the slice
-func (node *Node) Children(omitNilChildren bool) []*Node {
+func (node *Node[T]) Children(omitNilChildren bool) []*Node[T] {
 	return node.children.asSlice(omitNilChildren)
 }
 
 // IndexOfChild returns the index of a child within the list of children
 // of its parent. ch may not be nil.
-func (node *Node) IndexOfChild(ch *Node) int {
+func (node *Node[T]) IndexOfChild(ch *Node[T]) int {
 	if node.ChildCount() > 0 {
 		children := node.Children(false)
 		for i, child := range children {
@@ -149,18 +131,18 @@ func (node *Node) IndexOfChild(ch *Node) int {
 
 // --- Slices of concurrency-safe sets of children ----------------------
 
-type childrenSlice struct {
+type childrenSlice[T comparable] struct {
 	sync.RWMutex
-	slice []*Node
+	slice []*Node[T]
 }
 
-func (chs *childrenSlice) length() int {
+func (chs *childrenSlice[T]) length() int {
 	chs.RLock()
 	defer chs.RUnlock()
 	return len(chs.slice)
 }
 
-func (chs *childrenSlice) addChild(child *Node, parent *Node) {
+func (chs *childrenSlice[T]) addChild(child *Node[T], parent *Node[T]) {
 	if child == nil {
 		return
 	}
@@ -170,7 +152,7 @@ func (chs *childrenSlice) addChild(child *Node, parent *Node) {
 	child.parent = parent
 }
 
-func (chs *childrenSlice) setChild(i int, child *Node, parent *Node) {
+func (chs *childrenSlice[T]) setChild(i int, child *Node[T], parent *Node[T]) {
 	if child == nil {
 		return
 	}
@@ -178,24 +160,13 @@ func (chs *childrenSlice) setChild(i int, child *Node, parent *Node) {
 	defer chs.Unlock()
 	if len(chs.slice) <= i {
 		l := len(chs.slice)
-		chs.slice = append(chs.slice, make([]*Node, i-l+1)...)
-		/*
-			c := make([]*Node, i+1)
-			for j := 0; j <= i; j++ {
-				if j < l {
-					c[j] = chs.slice[j]
-				} else {
-					c[j] = nil
-				}
-			}
-			chs.slice = c
-		*/
+		chs.slice = append(chs.slice, make([]*Node[T], i-l+1)...)
 	}
 	chs.slice[i] = child
 	child.parent = parent
 }
 
-func (chs *childrenSlice) insertChildAt(i int, child *Node, parent *Node) {
+func (chs *childrenSlice[T]) insertChildAt(i int, child *Node[T], parent *Node[T]) {
 	if child == nil {
 		return
 	}
@@ -203,7 +174,7 @@ func (chs *childrenSlice) insertChildAt(i int, child *Node, parent *Node) {
 	defer chs.Unlock()
 	if len(chs.slice) <= i {
 		l := len(chs.slice)
-		chs.slice = append(chs.slice, make([]*Node, i-l+1)...)
+		chs.slice = append(chs.slice, make([]*Node[T], i-l+1)...)
 	} else {
 		chs.slice = append(chs.slice, nil)   // make room for one child
 		copy(chs.slice[i+1:], chs.slice[i:]) // shift i+1..n
@@ -212,7 +183,7 @@ func (chs *childrenSlice) insertChildAt(i int, child *Node, parent *Node) {
 	child.parent = parent
 }
 
-func (chs *childrenSlice) remove(node *Node) {
+func (chs *childrenSlice[T]) remove(node *Node[T]) {
 	chs.Lock()
 	defer chs.Unlock()
 	for i, ch := range chs.slice {
@@ -224,7 +195,7 @@ func (chs *childrenSlice) remove(node *Node) {
 	}
 }
 
-func (chs *childrenSlice) child(n int) *Node {
+func (chs *childrenSlice[T]) child(n int) *Node[T] {
 	if chs.length() == 0 || n < 0 || n >= chs.length() {
 		return nil
 	}
@@ -233,10 +204,10 @@ func (chs *childrenSlice) child(n int) *Node {
 	return chs.slice[n]
 }
 
-func (chs *childrenSlice) asSlice(omitNilCh bool) []*Node {
+func (chs *childrenSlice[T]) asSlice(omitNilCh bool) []*Node[T] {
 	chs.RLock()
 	defer chs.RUnlock()
-	children := make([]*Node, 0, chs.length())
+	children := make([]*Node[T], 0, chs.length())
 	for _, ch := range chs.slice {
 		if ch != nil || !omitNilCh {
 			children = append(children, ch)

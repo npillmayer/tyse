@@ -1,16 +1,15 @@
 /*
 Package otlayout provides access to OpenType font layout features.
 
-Status
+# Status
 
 Work in progress.
 
+# License
 
-License
+# BSD 3-Clause License
 
-BSD 3-Clause License
-
-Copyright (c) 2020–21, Norbert Pillmayer
+# Copyright (c) Norbert Pillmayer
 
 All rights reserved.
 

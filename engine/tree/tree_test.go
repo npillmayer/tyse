@@ -6,12 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/npillmayer/schuko/schukonf/testconfig"
+	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/schuko/tracing/trace2go"
 )
 
 func TestAddChild(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	parent := NewNode(-1)
 	parent.AddChild(NewNode(0)).AddChild(NewNode(1))
@@ -42,9 +47,10 @@ func TestAddChild(t *testing.T) {
 func TestEmptyWalker(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
-	w := NewWalker(nil)
+	w := NewWalker[int](nil)
 	future := w.Parent().Promise()
 	nodes, err := future()
 	if err != nil {
@@ -58,9 +64,10 @@ func TestEmptyWalker(t *testing.T) {
 	checkRuntime(t, n)
 }
 
-func TestParent(t *testing.T) {
+func TestParentPredicate(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	node1, node2 := NewNode(1), NewNode(2)
@@ -71,7 +78,7 @@ func TestParent(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(nodes) != 1 || !checkNodes(nodes, 1) {
+	if len(nodes) != 1 || !checkNodes[int](nodes, 1) {
 		t.Errorf("did not find parent, nodes = %v", nodes)
 	}
 	checkRuntime(t, n)
@@ -80,6 +87,7 @@ func TestParent(t *testing.T) {
 func TestParentOfRoot(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	node1 := NewNode(1)
@@ -98,12 +106,13 @@ func TestParentOfRoot(t *testing.T) {
 func TestAncestor(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	node1, node2 := NewNode(1), NewNode(2)
 	node1.AddChild(node2) // simple tree: (1)-->(2)
 	w := NewWalker(node2)
-	future := w.AncestorWith(Whatever).Promise()
+	future := w.AncestorWith(Whatever[int]()).Promise()
 	nodes, err := future()
 	if err != nil {
 		t.Error(err)
@@ -111,7 +120,7 @@ func TestAncestor(t *testing.T) {
 	for _, node := range nodes {
 		t.Logf("ancestor = %v\n", node)
 	}
-	if len(nodes) != 1 || !checkNodes(nodes, 1) {
+	if len(nodes) != 1 || !checkNodes[int](nodes, 1) {
 		t.Errorf("did not find single ancestor (parent), nodes = %v", nodes)
 	}
 	checkRuntime(t, n)
@@ -120,6 +129,7 @@ func TestAncestor(t *testing.T) {
 func TestDescendents(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	node1, node2, node3, node4 := NewNode(1), NewNode(2), NewNode(3), NewNode(4)
@@ -132,8 +142,8 @@ func TestDescendents(t *testing.T) {
 	node1.AddChild(node2)
 	node2.AddChild(node3)
 	node1.AddChild(node4)
-	gr3 := func(node *Node, n *Node) (*Node, error) {
-		val := node.Payload.(int)
+	gr3 := func(node *Node[int], n *Node[int]) (*Node[int], error) {
+		val := node.Payload
 		if val >= 3 { // match nodes (3) and (4)
 			return node, nil
 		}
@@ -148,7 +158,7 @@ func TestDescendents(t *testing.T) {
 	for _, node := range nodes {
 		t.Logf("descendent = %v\n", node)
 	}
-	if len(nodes) != 2 || !checkNodes(nodes, 3, 4) {
+	if len(nodes) != 2 || !checkNodes[int](nodes, 3, 4) {
 		t.Errorf("did not find descendents (3) and (4), nodes = %v", nodes)
 	}
 	checkRuntime(t, n)
@@ -167,8 +177,8 @@ func ExampleWalker_Promise() {
 	root.AddChild(n2).AddChild(n4)
 	n2.AddChild(n3)
 	// Define our ad-hoc predicate
-	greater5 := func(node *Node, n *Node) (*Node, error) {
-		val := node.Payload.(int)
+	greater5 := func(node *Node[int], n *Node[int]) (*Node[int], error) {
+		val := node.Payload
 		if val > 5 { // match nodes with value > 5
 			return node, nil
 		}
@@ -182,7 +192,7 @@ func ExampleWalker_Promise() {
 		fmt.Print(err)
 	}
 	for _, node := range nodes {
-		fmt.Printf("matching descendent found: (Node %d)\n", node.Payload.(int))
+		fmt.Printf("matching descendent found: (Node %d)\n", node.Payload)
 	}
 	// Output:
 	// matching descendent found: (Node 10)
@@ -192,6 +202,7 @@ func ExampleWalker_Promise() {
 func TestTopDown1(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
@@ -203,7 +214,7 @@ func TestTopDown1(t *testing.T) {
 	root.AddChild(n2).AddChild(n4)
 	n2.AddChild(n3)
 	i := 0
-	myaction := func(n *Node, parent *Node, position int) (*Node, error) {
+	myaction := func(n *Node[int], parent *Node[int], position int) (*Node[int], error) {
 		tracer().Debugf("input node is %v", n)
 		i++
 		return n, nil
@@ -222,6 +233,7 @@ func TestTopDown1(t *testing.T) {
 func TestBottomUp1(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
@@ -234,9 +246,9 @@ func TestBottomUp1(t *testing.T) {
 	n2.AddChild(n3)
 	i := 0
 	nodevals := make([]int, 4)
-	myaction := func(n *Node, parent *Node, position int) (*Node, error) {
+	myaction := func(n *Node[int], parent *Node[int], position int) (*Node[int], error) {
 		tracer().Debugf("node has value=%v", n.Payload)
-		nodevals[i] = n.Payload.(int)
+		nodevals[i] = n.Payload
 		i++
 		return n, nil
 	}
@@ -255,6 +267,7 @@ func TestBottomUp1(t *testing.T) {
 func TestBottomUp2(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
@@ -267,13 +280,13 @@ func TestBottomUp2(t *testing.T) {
 	n2.AddChild(n3)
 	i := 0
 	nodevals := make([]int, 6)
-	myaction := func(n *Node, parent *Node, position int) (*Node, error) {
+	myaction := func(n *Node[int], parent *Node[int], position int) (*Node[int], error) {
 		tracer().Debugf("node has value=%v", n.Payload)
-		nodevals[i] = n.Payload.(int) // this is unreliably
+		nodevals[i] = n.Payload
 		i++
 		return n, nil
 	}
-	future := NewWalker(root).DescendentsWith(NodeIsLeaf).BottomUp(myaction).Promise()
+	future := NewWalker(root).DescendentsWith(NodeIsLeaf[int]()).BottomUp(myaction).Promise()
 	_, err := future() // will block until walking is finished
 	if err != nil {
 		t.Error(err)
@@ -285,45 +298,10 @@ func TestBottomUp2(t *testing.T) {
 	checkRuntime(t, n)
 }
 
-func TestAttribute1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
-	defer teardown()
-	//
-	n := checkRuntime(t, -1)
-	node1 := NewNode(1)
-	w := NewWalker(node1)
-	w.SetAttributeHandler(attr{})
-	future := w.AttributeIs("num", 1).Promise()
-	nodes, err := future()
-	if err != nil {
-		t.Error(err)
-	}
-	if len(nodes) != 1 {
-		t.Errorf("attribute for node 1 should have been detected, nodes = %v", nodes)
-	}
-	checkRuntime(t, n)
-}
-
-type attr struct{}
-
-func (a attr) GetAttribute(payload interface{}, key interface{}) interface{} {
-	val := payload.(int)
-	return val
-}
-
-func (a attr) AttributesEqual(val1 interface{}, val2 interface{}) bool {
-	v1 := val1.(int)
-	v2 := val2.(int)
-	return v1 == v2
-}
-
-func (a attr) SetAttribute(payload interface{}, key interface{}, value interface{}) bool {
-	return false
-}
-
 func TestRank(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
@@ -334,7 +312,7 @@ func TestRank(t *testing.T) {
 	root, n2, n3, n4 := NewNode(3), NewNode(2), NewNode(1), NewNode(1)
 	root.AddChild(n2).AddChild(n4)
 	n2.AddChild(n3)
-	future := NewWalker(root).DescendentsWith(NodeIsLeaf).BottomUp(CalcRank).Promise()
+	future := NewWalker(root).DescendentsWith(NodeIsLeaf[int]()).BottomUp(CalcRank[int]).Promise()
 	_, err := future() // will block until walking is finished
 	if err != nil {
 		t.Error(err)
@@ -349,6 +327,7 @@ func TestRank(t *testing.T) {
 func TestSerial1(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "tyse.frame.tree")
 	defer teardown()
+	// configureGoTracing(t)
 	//
 	n := checkRuntime(t, -1)
 	// Build a tree:
@@ -362,12 +341,12 @@ func TestSerial1(t *testing.T) {
 	n2.AddChild(n3)
 	n4.AddChild(n5).AddChild(n6)
 	// calculate rank for each node
-	NewWalker(root).DescendentsWith(NodeIsLeaf).BottomUp(CalcRank).Promise()()
+	NewWalker(root).DescendentsWith(NodeIsLeaf[int]()).BottomUp(CalcRank[int]).Promise()()
 	if root.Rank != 6 {
 		t.Errorf("Rank of root node should be 6, is %d", root.Rank)
 	}
-	myaction := func(n *Node, parent *Node, position int) (*Node, error) {
-		t.Logf("rank of node(%d) is %d", n.Payload.(int), n.Rank)
+	myaction := func(n *Node[int], parent *Node[int], position int) (*Node[int], error) {
+		t.Logf("rank of node(%d) is %d", n.Payload, n.Rank)
 		return n, nil
 	}
 	future := NewWalker(root).TopDown(myaction).Promise()
@@ -378,7 +357,7 @@ func TestSerial1(t *testing.T) {
 	z := 0
 	for i, n := range nodes {
 		t.Logf("node #%d is (%v) with rank %d", i, n.Payload, n.Rank)
-		z = z<<4 + n.Payload.(int)
+		z = z<<4 + n.Payload
 	}
 	if z != 1193046 {
 		t.Errorf("checksum = %d, should be 1193046", z)
@@ -389,11 +368,11 @@ func TestSerial1(t *testing.T) {
 // ----------------------------------------------------------------------
 
 // Helper to check if result nodes are the expected ones.
-func checkNodes(nodes []*Node, vals ...int) bool {
+func checkNodes[T comparable](nodes []*Node[int], vals ...int) bool {
 	var found bool
 	for _, node := range nodes {
 		found = false
-		v := node.Payload.(int)
+		v := node.Payload
 		for _, val := range vals {
 			if v == val {
 				found = true
@@ -422,4 +401,16 @@ func checkRuntime(t *testing.T, N int) int {
 		}
 	}
 	return n
+}
+
+func configureGoTracing(t *testing.T) {
+	tracing.RegisterTraceAdapter("go", gologadapter.GetAdapter(), false)
+	conf := &testconfig.Conf{}
+	conf.Set("tracing", "go")
+	conf.Set("trace.tyse.frame.tree", "Debug")
+	if err := trace2go.ConfigureRoot(conf, "trace", trace2go.ReplaceTracers(true)); err != nil {
+		t.Error(err)
+	}
+	tracing.SetTraceSelector(trace2go.Selector())
+	tracer().Debugf("testing: DEBUG ok")
 }

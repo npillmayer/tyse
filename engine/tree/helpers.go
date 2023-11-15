@@ -7,35 +7,35 @@ import (
 
 var errRankOfNullNode = fmt.Errorf("cannot determine rank of null-node")
 
-type rankMap struct {
+type rankMap[T comparable] struct {
 	lock  *sync.RWMutex
-	count map[*Node]uint32
+	count map[*Node[T]]uint32
 }
 
-func newRankMap() *rankMap {
-	return &rankMap{
+func newRankMap[T comparable]() *rankMap[T] {
+	return &rankMap[T]{
 		&sync.RWMutex{},
-		make(map[*Node]uint32),
+		make(map[*Node[T]]uint32),
 	}
 }
 
-func (rmap *rankMap) Put(n *Node, r uint32) (uint32, error) {
+func (rmap *rankMap[T]) Put(n *Node[T], r uint32) (uint32, error) {
 	if n == nil {
 		return 0, errRankOfNullNode
 	}
 	if rmap == nil {
-		rmap = newRankMap()
+		rmap = newRankMap[T]()
 	}
 	rmap.lock.RLock()
 	rank := rmap.count[n]
 	rmap.lock.RUnlock()
-	rmap.lock.Lock()
+	rmap.lock.Lock() // race condition
 	defer rmap.lock.Unlock()
 	rmap.count[n] = r
 	return rank, nil
 }
 
-func (rmap *rankMap) Get(n *Node) uint32 {
+func (rmap *rankMap[T]) Get(n *Node[T]) uint32 {
 	if n == nil || rmap == nil {
 		return 0
 	}
@@ -45,12 +45,12 @@ func (rmap *rankMap) Get(n *Node) uint32 {
 	return rank
 }
 
-func (rmap *rankMap) Inc(n *Node) (uint32, error) {
+func (rmap *rankMap[T]) Inc(n *Node[T]) (uint32, error) {
 	if n == nil {
 		return 0, errRankOfNullNode
 	}
 	if rmap == nil {
-		rmap = newRankMap()
+		rmap = newRankMap[T]()
 	}
 	rmap.lock.Lock()
 	defer rmap.lock.Unlock()
@@ -59,7 +59,7 @@ func (rmap *rankMap) Inc(n *Node) (uint32, error) {
 	return rank, nil
 }
 
-func (rmap *rankMap) Clear(n *Node) uint32 {
+func (rmap *rankMap[T]) Clear(n *Node[T]) uint32 {
 	if n == nil || rmap == nil {
 		return 0
 	}
@@ -73,14 +73,14 @@ func (rmap *rankMap) Clear(n *Node) uint32 {
 // --------------------------------------------------------------------------------
 
 // a helper struct for ordering the resulting nodes and their serials
-type resultSlices struct {
-	nodes   []*Node
+type resultSlices[T comparable] struct {
+	nodes   []*Node[T]
 	serials []uint32
 }
 
-func (rs resultSlices) Len() int           { return len(rs.nodes) }
-func (rs resultSlices) Less(i, j int) bool { return rs.serials[i] < rs.serials[j] }
-func (rs resultSlices) Swap(i, j int) {
+func (rs resultSlices[T]) Len() int           { return len(rs.nodes) }
+func (rs resultSlices[T]) Less(i, j int) bool { return rs.serials[i] < rs.serials[j] }
+func (rs resultSlices[T]) Swap(i, j int) {
 	rs.nodes[i], rs.nodes[j] = rs.nodes[j], rs.nodes[i]
 	rs.serials[i], rs.serials[j] = rs.serials[j], rs.serials[i]
 }

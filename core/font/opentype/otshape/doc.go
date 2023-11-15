@@ -9,12 +9,11 @@ They do not encode information that is constant within the conventions of a part
 typography of a particular script. Information that would be replicated across all fonts in a given
 language belongs in the text-processing application for that language, not in the fonts.
 
+# License
 
-License
+# BSD 3-Clause License
 
-BSD 3-Clause License
-
-Copyright (c) 2020–21, Norbert Pillmayer
+# Copyright (c) Norbert Pillmayer
 
 All rights reserved.
 
@@ -46,14 +45,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package otshape
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/core"
+	"github.com/npillmayer/tyse/core/font/opentype/ot"
 )
 
-// trace traces to a global core-tracer.
-func trace() tracing.Trace {
-	return gtrace.CoreTracer
+// NODEF represents OpenType `.notdef`.
+const NOTDEF = ot.GlyphIndex(0)
+
+// tracer writes to trace with key 'tyse.fonts'
+func tracer() tracing.Trace {
+	return tracing.Select("tyse.fonts")
 }
 
 // errShaper produces user level errors for text shaping.

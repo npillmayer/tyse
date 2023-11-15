@@ -44,7 +44,7 @@ func NewBlockContext(c *frame.Container, isRoot bool) *BlockContext {
 	return ctx
 }
 
-func Block(ctx frame.Context) *BlockContext {
+func Block(ctx frame.ContextInterf) *BlockContext {
 	if block, ok := ctx.(*BlockContext); ok {
 		return block
 	}
@@ -124,7 +124,7 @@ func (ctx *BlockContext) Measure() (frame.Size, css.DimenT, css.DimenT) {
 	return ctx.Container().CSSBox().Size, css.SomeDimen(0), css.SomeDimen(0)
 }
 
-var _ frame.Context = &BlockContext{}
+var _ frame.ContextInterf = &BlockContext{}
 
 // --- Inline Context --------------------------------------------------------
 
@@ -141,7 +141,7 @@ func NewInlineContext(c *frame.Container, isRoot bool) *InlineContext {
 	return ctx
 }
 
-func Inline(ctx frame.Context) *InlineContext {
+func Inline(ctx frame.ContextInterf) *InlineContext {
 	if inline, ok := ctx.(*InlineContext); ok {
 		return inline
 	}
@@ -301,7 +301,7 @@ func needsRootContext(c *frame.Container) bool {
 
 // NewContextFor creates a formatting context for a container.
 // If c already has a context set, this context will  be returned.
-func NewContextFor(c *frame.Container) frame.Context {
+func NewContextFor(c *frame.Container) frame.ContextInterf {
 	if c.Context != nil {
 		return c.Context
 	}
@@ -320,9 +320,10 @@ func NewContextFor(c *frame.Container) frame.Context {
 			children := c.TreeNode().Children(true)
 			tracer().Debugf("context: children = %+v", children)
 			for _, ch := range children {
-				if childContainer, ok := ch.Payload.(*frame.Container); ok {
-					modes &= childContainer.Display.Outer()
-				}
+				// if childContainer, ok := ch.Payload.(*frame.Container); ok {
+				// 	modes &= childContainer.Display.Outer()
+				// }
+				modes &= ch.Payload.Display.Outer()
 			}
 			if modes.Contains(css.InlineMode) {
 				tracer().Debugf("providing inline context (root=%v) for [%v]", isroot, boxtree.ContainerName(c))
@@ -336,7 +337,7 @@ func NewContextFor(c *frame.Container) frame.Context {
 	return nil
 }
 
-func lastbox(ctx frame.Context) *frame.Box {
+func lastbox(ctx frame.ContextInterf) *frame.Box {
 	children := ctx.Contained()
 	if len(children) == 0 {
 		return nil

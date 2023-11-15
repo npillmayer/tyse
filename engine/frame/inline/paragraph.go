@@ -21,11 +21,11 @@ import (
 
 type ParagraphBox struct {
 	frame.Container
-	Box     *frame.StyledBox // styled box for a DOM node
-	domNode *dom.W3CNode     // the DOM node this PrincipalBox refers to
-	context frame.Context    // principal boxes may establish a context
-	para    *Paragraph       // text of the paragraph
-	khipu   *khipu.Khipu     // khipu knots made from paragraph text // TOOD duplicate ?
+	Box     *frame.StyledBox    // styled box for a DOM node
+	domNode *dom.W3CNode        // the DOM node this PrincipalBox refers to
+	context frame.ContextInterf // principal boxes may establish a context
+	para    *Paragraph          // text of the paragraph
+	khipu   *khipu.Khipu        // khipu knots made from paragraph text // TOOD duplicate ?
 }
 
 var _ frame.RenderTreeNode = &ParagraphBox{}
@@ -65,14 +65,14 @@ func (pbox *ParagraphBox) CSSBox() *frame.Box {
 // 	return false
 // }
 
-func (pbox *ParagraphBox) Context() frame.Context {
+func (pbox *ParagraphBox) Context() frame.ContextInterf {
 	// if pbox.context == nil {
 	// 	pbox.context = boxtree.CreateContextForContainer(pbox, false)
 	// }
 	return pbox.context
 }
 
-func (pbox *ParagraphBox) SetContext(ctx frame.Context) {
+func (pbox *ParagraphBox) SetContext(ctx frame.ContextInterf) {
 	pbox.context = ctx
 }
 

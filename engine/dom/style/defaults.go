@@ -1,7 +1,6 @@
 package style
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"golang.org/x/net/html"
 )
 
@@ -51,11 +50,11 @@ var isDimension = map[string]string{
 }
 
 // GetUserAgentDefaultProperty returns the user-agent default property for a given key.
-func GetUserAgentDefaultProperty(styler Styler, key string) Property {
+func GetUserAgentDefaultProperty(node *html.Node, key string) Property {
 	p := NullStyle
 	switch key {
 	case "display":
-		p = DisplayPropertyForHTMLNode(styler.HTMLNode())
+		p = DisplayPropertyForHTMLNode(node)
 	default:
 		if dim, ok := isDimension[key]; ok {
 			return Property(dim)
@@ -85,7 +84,7 @@ func DisplayPropertyForHTMLNode(node *html.Node) Property {
 		return "block"
 	}
 	if node.Type != html.ElementNode {
-		T().Debugf("cannot get display-property for non-element")
+		tracer().Debugf("cannot get display-property for non-element")
 		return "none"
 	}
 	switch node.Data {
@@ -100,7 +99,7 @@ func DisplayPropertyForHTMLNode(node *html.Node) Property {
 	case "i", "b", "span", "strong":
 		return "inline"
 	}
-	gtrace.EngineTracer.Infof("unknown HTML element %s/%d will be set to display: block",
+	tracer().Infof("unknown HTML element %s/%d will be set to display: block",
 		node.Data, node.Type)
 	return "block"
 }

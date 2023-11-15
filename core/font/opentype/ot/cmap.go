@@ -19,7 +19,7 @@ this module.
 // See https://docs.microsoft.com/de-de/typography/opentype/spec/cmap
 //
 // Consulting the cmap table is a very frequent operation on fonts. We therefore
-// construct an internal representation of the looup table. A cmap table may contain
+// construct an internal representation of the lookup table. A cmap table may contain
 // more than one lookup table, but we will only instantiate the most appropriate one.
 // Clients who need access to all the lookup tables will have to parse them themselves.
 type CMapTable struct {
@@ -84,15 +84,15 @@ func platformEncodingWidth(pid, psid uint16) int {
 //
 // Right now we do not support variable fonts nor fallback fonts.
 // All in all, we only support the following plaform/encoding/format combinations:
-//   0 (Unicode)  3    4   Unicode BMB
-//   0 (Unicode)  4    12  Unicode full  (10 from FontForge, error)
-//   3 (Win)      1    4   Unicode BMP
-//   3 (Win)      10   12  Unicode full
+//
+//	0 (Unicode)  3    4   Unicode BMB
+//	0 (Unicode)  4    12  Unicode full  (10 from FontForge, error)
+//	3 (Win)      1    4   Unicode BMP
+//	3 (Win)      10   12  Unicode full
 //
 // Note that FontForge may generate a bogus Platform Specific ID (value 10)
 // for the Unicode Platform ID (value 0). See
 // https://github.com/fontforge/fontforge/issues/2728
-//
 func supportedCmapFormat(format, pid, psid uint16) bool {
 	tracer().Debugf("checking supported cmap format (%d | %d | %d)", pid, psid, format)
 	return (pid == 0 && psid == 3 && format == 4) ||
@@ -127,7 +127,6 @@ type CMapGlyphIndex interface {
 // This format is used when the character codes for the characters represented by a font
 // fall into several contiguous ranges, possibly with holes in some or all of the ranges
 // (that is, some of the codes in a range may not have a representation in the font).
-//
 type format4GlyphIndex struct {
 	segCnt   int
 	entries  []cmapEntry16
@@ -237,7 +236,6 @@ func (f4 format4GlyphIndex) ReverseLookup(gid GlyphIndex) rune {
 // - A four-word header gives parameters for an optimized search of the segment list;
 // - Four parallel arrays describe the segments (one segment for each contiguous range of codes);
 // - A variable-length array of glyph IDs (unsigned words).
-//
 func makeGlyphIndexFormat4(b binarySegm) (CMapGlyphIndex, error) {
 	const headerSize = 14
 	if headerSize > b.Size() {
@@ -336,7 +334,6 @@ func (f12 format12GlyphIndex) ReverseLookup(gid GlyphIndex) rune {
 // Format 12 is similar to format 4 in that it defines segments for sparse representation.
 // It differs, however, in that it uses 32-bit character codes, and Glyph ID lookup
 // and calculation is a lot simpler.
-//
 func makeGlyphIndexFormat12(b binarySegm) (CMapGlyphIndex, error) {
 	const headerSize = 16
 	if headerSize > b.Size() {

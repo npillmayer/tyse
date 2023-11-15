@@ -9,9 +9,7 @@ import (
 	"github.com/npillmayer/tyse/engine/dom/style/cssom"
 	"github.com/npillmayer/tyse/engine/dom/style/cssom/douceuradapter"
 	"github.com/npillmayer/tyse/engine/dom/styledtree"
-	"github.com/npillmayer/tyse/engine/dom/styledtree/xpathadapter"
 	"github.com/npillmayer/tyse/engine/dom/w3cdom"
-	"github.com/npillmayer/tyse/engine/dom/xpath"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 )
@@ -34,7 +32,7 @@ func NodeFromStyledNode(sn *styledtree.StyNode) *W3CNode {
 
 // NodeFromTreeNode creates a new DOM node from a tree node, which should
 // be the inner node of a styledtree.Node.
-func NodeFromTreeNode(tn *tree.Node) (*W3CNode, error) {
+func NodeFromTreeNode(tn *tree.Node[*styledtree.StyNode]) (*W3CNode, error) {
 	if tn == nil {
 		return nil, ErrNotAStyledNode
 	}
@@ -48,7 +46,7 @@ func NodeFromTreeNode(tn *tree.Node) (*W3CNode, error) {
 // ErrNotAStyledNode is returned if a tree node does not belong to a styled tree node.
 var ErrNotAStyledNode = fmt.Errorf("Tree node is not a styled node")
 
-func domify(tn *tree.Node) *W3CNode {
+func domify(tn *tree.Node[*styledtree.StyNode]) *W3CNode {
 	sn := styledtree.Node(tn)
 	if sn != nil {
 		return &W3CNode{sn}
@@ -57,7 +55,7 @@ func domify(tn *tree.Node) *W3CNode {
 }
 
 // NodeAsTreeNode returns the underlying tree.Node from a DOM node.
-func NodeAsTreeNode(domnode w3cdom.Node) (*tree.Node, bool) {
+func NodeAsTreeNode(domnode w3cdom.Node) (*tree.Node[*styledtree.StyNode], bool) {
 	if domnode == nil {
 		return nil, false
 	}
@@ -329,6 +327,7 @@ func (cstyles *computedStyles) HTMLNode() *html.Node {
 	return cstyles.domnode.HTMLNode()
 }
 
+/*
 func (cstyles *computedStyles) StylesCascade() style.Styler {
 	return cstyles.domnode.StylesCascade()
 }
@@ -336,9 +335,10 @@ func (cstyles *computedStyles) StylesCascade() style.Styler {
 var _ style.Styler = &computedStyles{} // implementing style.Styler may be useful
 
 // Helper implementing style.Interf
-func styler(n *tree.Node) style.Styler {
+func styler(n *tree.Node[*styledtree.StyNode]) style.Styler {
 	return styledtree.Node(n)
 }
+*/
 
 // GetPropertyValue returns the property value for a given key.
 // If cstyles is nil or the property could not be found, NullStyle is returned.
@@ -346,11 +346,12 @@ func (cstyles *computedStyles) GetPropertyValue(key string) style.Property {
 	if cstyles == nil {
 		return style.NullStyle
 	}
-	p, err := css.GetProperty(cstyles.domnode.AsStyler(), key)
+	//p, err := css.GetProperty(cstyles.domnode.AsStyler(), key)
+	p, err := css.GetProperty(cstyles.domnode.StyNode, key)
 	if err != nil {
 		tracer().Errorf("W3C node styles: %v", err)
-		node := &cstyles.domnode.Node
-		return cstyles.propsMap.GetPropertyValue(key, node, styler)
+		//return cstyles.propsMap.GetPropertyValue(key, node, styler)
+		return cstyles.domnode.StyNode.GetPropertyValue(key, cstyles.propsMap)
 	}
 	return p
 }
@@ -556,7 +557,7 @@ func FromHTMLParseTree(h *html.Node, css cssom.StyleSheet) *W3CNode {
 	if css != nil {
 		s.AddStylesForScope(nil, css, cssom.Author)
 	}
-	stytree, err := s.Style(h, styledtree.Creator())
+	stytree, err := s.Style(h) //, styledtree.Creator())
 	if err != nil {
 		tracer().Errorf("Cannot style test document: %s", err.Error())
 		return nil
@@ -565,6 +566,7 @@ func FromHTMLParseTree(h *html.Node, css cssom.StyleSheet) *W3CNode {
 	return d
 }
 
+/*
 // XPath creates an xpath navigator with start position w.
 func (w *W3CNode) XPath() *xpath.XPath {
 	if w == nil {
@@ -578,9 +580,10 @@ func (w *W3CNode) XPath() *xpath.XPath {
 	}
 	return xp
 }
+*/
 
 // Walk creates a tree walker set up to traverse the DOM.
-func (w *W3CNode) Walk() *tree.Walker {
+func (w *W3CNode) Walk() *tree.Walker[*styledtree.StyNode, *styledtree.StyNode] {
 	if w == nil {
 		return nil
 	}

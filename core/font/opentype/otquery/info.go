@@ -2,7 +2,6 @@ package otquery
 
 import (
 	"github.com/npillmayer/tyse/core/font/opentype/ot"
-	"golang.org/x/text/language"
 )
 
 // FontType returns the font type, encoded in the font header, as a string.
@@ -26,8 +25,7 @@ func FontType(otf *ot.Font) string {
 // Will include (if available in the font) "family", "subfamily", "version".
 //
 // Parameter `lang` is currently unused.
-//
-func NameInfo(otf *ot.Font, lang language.Tag) map[string]string {
+func NameInfo(otf *ot.Font, lang ot.Tag) map[string]string {
 	table := otf.Table(ot.T("name"))
 	names := make(map[string]string)
 	if table == nil {

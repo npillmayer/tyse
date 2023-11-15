@@ -28,10 +28,10 @@ type LineBox struct {
 	//tree.Node
 	Box     *frame.Box
 	khipu   *khipu.Khipu
-	indent  dimen.DU      // horizontal offset of the text within the line box
-	pos     int64         // start position within the khipu
-	length  int64         // length of the segment for this line
-	context frame.Context // formatting context
+	indent  dimen.DU            // horizontal offset of the text within the line box
+	pos     int64               // start position within the khipu
+	length  int64               // length of the segment for this line
+	context frame.ContextInterf // formatting context
 	//ChildInx uint32      // this box represents a text node at #ChildInx of the principal box
 }
 
@@ -94,11 +94,11 @@ func (lbox *LineBox) CSSBox() *frame.Box {
 // 	return 0, 0
 // }
 
-func (lbox *LineBox) Context() frame.Context {
+func (lbox *LineBox) Context() frame.ContextInterf {
 	return nil
 }
 
-func (lbox *LineBox) SetContext(ctx frame.Context) {
+func (lbox *LineBox) SetContext(ctx frame.ContextInterf) {
 	lbox.context = ctx
 }
 
@@ -180,8 +180,8 @@ func EncodeTextOfParagraph(c *frame.Container) (*Paragraph, []*frame.Container, 
 	return paraText, blocks, err
 }
 
-func XFindParaWidthAndText(pbox *ParagraphBox, rootctx frame.Context) (
-	[]*frame.Container, frame.Context, error) {
+func XFindParaWidthAndText(pbox *ParagraphBox, rootctx frame.ContextInterf) (
+	[]*frame.Container, frame.ContextInterf, error) {
 	//
 	paraText, blocks, err := paragraphTextFromBox(&pbox.Container)
 	if err != nil {

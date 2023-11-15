@@ -11,11 +11,9 @@ Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
 */
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/npillmayer/tyse/core/dimen"
-	"github.com/npillmayer/tyse/core/option"
 	"github.com/npillmayer/tyse/engine/dom/style/css"
 )
 
@@ -85,6 +83,8 @@ func (box *Box) SetWidth(w css.DimenT) {
 	box.W = w
 }
 
+/*
+
 // ContentWidth returns the width of the content box.
 // If this box has box-sizing set to `border-box` and the width dimensions do
 // not have fixed values, an unset dimension is returned.
@@ -129,24 +129,22 @@ func (box *Box) FixContentWidth(w dimen.DU) bool {
 	if !ok {
 		return false
 	}
-	/*
-		if box.BorderBoxSizing {
-			decW := innerDecorationWidth(box)
-			if decW.IsNone() {
-				return false
-			}
-			//w += decW.Unwrap()
-			//
-			// if !box.Padding[Left].IsAbsolute() || !box.Padding[Right].IsAbsolute() ||
-			// 	!box.BorderWidth[Left].IsAbsolute() || !box.BorderWidth[Right].IsAbsolute() {
-			// 	return false
-			// }
-			// w += box.Padding[Left].Unwrap()
-			// w += box.Padding[Right].Unwrap()
-			// w += box.BorderWidth[Left].Unwrap()
-			// w += box.BorderWidth[Right].Unwrap()
-		}
-	*/
+		// if box.BorderBoxSizing {
+		// 	decW := innerDecorationWidth(box)
+		// 	if decW.IsNone() {
+		// 		return false
+		// 	}
+		// 	//w += decW.Unwrap()
+		// 	//
+		// 	// if !box.Padding[Left].IsAbsolute() || !box.Padding[Right].IsAbsolute() ||
+		// 	// 	!box.BorderWidth[Left].IsAbsolute() || !box.BorderWidth[Right].IsAbsolute() {
+		// 	// 	return false
+		// 	// }
+		// 	// w += box.Padding[Left].Unwrap()
+		// 	// w += box.Padding[Right].Unwrap()
+		// 	// w += box.BorderWidth[Left].Unwrap()
+		// 	// w += box.BorderWidth[Right].Unwrap()
+		// }
 	box.W = W
 	return true
 }
@@ -765,3 +763,6 @@ func fixIllegalDimensionSpecifications(box *Box) {
 		}
 	}
 }
+
+
+*/

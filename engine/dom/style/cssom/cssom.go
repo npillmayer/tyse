@@ -8,53 +8,13 @@ import (
 	"sync"
 
 	"github.com/andybalholm/cascadia"
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tyse/engine/dom/style"
+	"github.com/npillmayer/tyse/engine/dom/styledtree"
 	"github.com/npillmayer/tyse/engine/tree"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
-
-/* -----------------------------------------------------------------
-BSD License
-
-Copyright (c) 2017–21, Norbert Pillmayer
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
------------------------------------------------------------------ */
-
-// T returns a global tracer. We trace to the engine tracer.
-func T() tracing.Trace {
-	return gtrace.EngineTracer
-}
 
 // CSSOM is the "CSS Object Model", similar to the DOM for HTML.
 // Our CSSOM consists of a set of stylesheets, each relevant for a sub-tree
@@ -156,10 +116,10 @@ func (rt rulesTreeType) StoreStylesheetForHTMLNode(h *html.Node, sheet StyleShee
 	}
 	sheets := rt.StylesheetsForHTMLNode(h)
 	if sheets == nil {
-		T().Debugf("Adding first style sheet for HTML node %v", h)
+		tracer().Debugf("Adding first style sheet for HTML node %v", h)
 		rt.stylesheets.Store(h, []stylesheetType{{sheet, source}})
 	} else {
-		T().Debugf("Adding another style sheet for HTML node %v", h)
+		tracer().Debugf("Adding another style sheet for HTML node %v", h)
 		sheets = append(sheets, stylesheetType{sheet, source})
 		rt.stylesheets.Store(h, sheets)
 	}
@@ -176,19 +136,23 @@ func (rt *rulesTreeType) Empty() bool {
 		csscnt++
 		return true
 	})
-	T().Debugf("Style sheet entries in rules tree for %d scopes", csscnt)
+	tracer().Debugf("Style sheet entries in rules tree for %d scopes", csscnt)
 	return csscnt == 0
 }
 
 // CompoundPropertiesSplitter splits compound properties into atomic properties.
 // Compunt properties are properties which abbreviate the
 // setting of more fine grained propertes. An example is
-//    padding: 10px 20px
+//
+//     padding: 10px 20px
+//
 // which sets the following detail properties:
-//    padding-top:    10px
-//    padding-right:  20px
-//    padding-bottom: 10px
-//    padding-left:   20px
+//
+//     padding-top:    10px
+//     padding-right:  20px
+//     padding-bottom: 10px
+//     padding-left:   20px
+//
 // Standard CSS compound properties are known by default, but clients are
 // allowed to extend the set of compound properties.
 type CompoundPropertiesSplitter func(string, style.Property) ([]style.KeyValue, error)
@@ -282,9 +246,9 @@ func (rt *rulesTreeType) FilterMatchesFor(h *html.Node) *matchesList {
 	sheets := rt.StylesheetsForHTMLNode(rootElement)
 	for _, s := range sheets {
 		rules := s.stylesheet.Rules()
-		T().Debugf("Stylesheet has %d rules", len(rules))
+		tracer().Debugf("Stylesheet has %d rules", len(rules))
 		for _, rule := range rules {
-			T().Debugf("Now try to match for HTML = %v", h.Data)
+			tracer().Debugf("Now try to match for HTML = %v", h.Data)
 			if rt.matchRuleForHTMLNode(h, rule) {
 				matchingRules = append(matchingRules, rule)
 			}
@@ -313,7 +277,7 @@ func (rt *rulesTreeType) matchRuleForHTMLNode(h *html.Node, rule Rule) bool {
 		var err error
 		sel, err = cascadia.Compile(selectorString)
 		if err != nil {
-			T().Errorf("CSS selector seems not to work: %s", selectorString)
+			tracer().Errorf("CSS selector seems not to work: %s", selectorString)
 			return false
 		}
 		rt.selectors[selectorString] = sel
@@ -338,7 +302,7 @@ func (matches *matchesList) SortProperties(splitters []CompoundPropertiesSplitte
 			value := style.Property(rule.Value(propertyKey))
 			props, err := splitCompoundProperty(splitters, propertyKey, value)
 			if err == nil {
-				//T().Debugf("%s is a compound style", propertyKey)
+				//tracer().Debugf("%s is a compound style", propertyKey)
 				for _, kv := range props {
 					key := kv.Key
 					val := kv.Value
@@ -357,8 +321,8 @@ func (matches *matchesList) SortProperties(splitters []CompoundPropertiesSplitte
 		sort.Sort(byHighestSpecifity(proptable))
 		matches.propertiesTable = proptable
 	}
-	if T().GetTraceLevel() >= tracing.LevelDebug {
-		T().Debugf(matches.String())
+	if tracer().GetTraceLevel() >= tracing.LevelDebug {
+		tracer().Debugf(matches.String())
 	}
 }
 
@@ -409,8 +373,7 @@ func (sp *propertyPlusSpecifityType) calcSpecifity(no int) {
 
 // --- Style Property Groups --------------------------------------------
 
-func (matches *matchesList) createStyleGroups(parent *tree.Node,
-	creator style.NodeCreator) *style.PropertyMap {
+func (matches *matchesList) createStyleGroups(parent *tree.Node[*styledtree.StyNode]) *style.PropertyMap {
 	//
 	pmap := style.NewPropertyMap()
 	done := make(map[string]bool, len(matches.propertiesTable))
@@ -426,8 +389,8 @@ func (matches *matchesList) createStyleGroups(parent *tree.Node,
 		if group != nil {
 			group.Set(pspec.propertyKey, pspec.propertyValue)
 		} else {
-			T().Infof("parent is %s, searching for prop group %s", parent, groupname)
-			_, pg := findAncestorWithPropertyGroup(parent, groupname, creator) // must succeed
+			tracer().Infof("parent is %s, searching for prop group %s", parent, groupname)
+			_, pg := findAncestorWithPropertyGroup(parent, groupname) // must succeed
 			if pg == nil {
 				panic(fmt.Sprintf("Cannot find ancestor with prop-group %s -- did you create global properties?", groupname))
 			}
@@ -453,30 +416,32 @@ func (matches *matchesList) createStyleGroups(parent *tree.Node,
 
 // setupStyledNodeTree sets up the root nodes of the style tree.
 // It creates a "root" node and a node for the HTML-document-node as its child.
-func setupStyledNodeTree(domRoot *html.Node, defaults *style.PropertyMap,
-	creator style.NodeCreator) *tree.Node {
+func setupStyledNodeTree(domRoot *html.Node, defaults *style.PropertyMap) *tree.Node[*styledtree.StyNode] {
 	//
-	rootNode := creator.StyleForHTMLNode(domRoot)
-	creator.SetStyles(rootNode, defaults)
-	//T().Debugf("UA node has styles = %s", creator.ToStyler(rootNode).ComputedStyles())
-	docNode := creator.StyleForHTMLNode(domRoot)
+	//rootNode := creator.StyleForHTMLNode(domRoot)
+	rootNode := styledtree.NewNodeForHTMLNode(domRoot)
+	//creator.SetStyles(rootNode, defaults)
+	rootNode.Payload.SetStyles(defaults)
+	//tracer().Debugf("UA node has styles = %s", creator.ToStyler(rootNode).ComputedStyles())
+	//docNode := creator.StyleForHTMLNode(domRoot)
+	docNode := styledtree.NewNodeForHTMLNode(domRoot)
 	rootNode.AddChild(docNode)
 	return docNode
 }
 
 //func findAncestorWithPropertyGroup(sn StyledNode, group string, builder StyledTreeBuilder) (StyledNode, *style.PropertyGroup) {
-func findAncestorWithPropertyGroup(sn *tree.Node, group string,
-	creator style.NodeCreator) (*tree.Node, *style.PropertyGroup) {
+func findAncestorWithPropertyGroup(sn *tree.Node[*styledtree.StyNode], group string) (*tree.Node[*styledtree.StyNode], *style.PropertyGroup) {
 	//
 	var pg *style.PropertyGroup
 	if sn == nil {
-		T().Errorf("Search for ancestor with property group %s started with nil", group)
+		tracer().Errorf("Search for ancestor with property group %s started with nil", group)
 		return nil, nil
 	}
 	it := sn // start search at styled node itself, then proceed upwards
 	last := sn
 	for it != nil && pg == nil {
-		styles := creator.ToStyler(it).Styles()
+		styles := it.Payload.Styles()
+		//styles := creator.ToStyler(it).Styles()
 		if styles != nil {
 			pg = styles.Group(group)
 		}
@@ -486,10 +451,10 @@ func findAncestorWithPropertyGroup(sn *tree.Node, group string,
 		}
 	}
 	// if it == nil {
-	// 	T().Debugf("At root of tree searching for property group %s", group)
+	// 	tracer().Debugf("At root of tree searching for property group %s", group)
 	// 	if pg == nil {
-	// 		T().Errorf("Property group %s not found", group)
-	// 		T().Debugf("Property map of last node %v =\n%s", last, creator.ToStyler(last).ComputedStyles())
+	// 		tracer().Errorf("Property group %s not found", group)
+	// 		tracer().Debugf("Property map of last node %v =\n%s", last, creator.ToStyler(last).ComputedStyles())
 	// 	}
 	// }
 	return last, pg
@@ -503,25 +468,27 @@ func findAncestorWithPropertyGroup(sn *tree.Node, group string,
 // https://limpet.net/mbrubeck/2014/08/23/toy-layout-engine-4-style.html
 //
 // If either dom or creator are nil, no tree is returned (but an error).
-func (cssom CSSOM) Style(dom *html.Node, creator style.NodeCreator) (*tree.Node, error) {
+func (cssom CSSOM) Style(dom *html.Node) (*tree.Node[*styledtree.StyNode], error) {
 	if dom == nil {
 		return nil, errors.New("Nothing to style: empty document")
 	}
-	if creator == nil {
-		return nil, errors.New("Cannot style: no builder to create styles nodes")
-	}
+	// if creator == nil {
+	// 	return nil, errors.New("Cannot style: no builder to create styles nodes")
+	// }
 	if cssom.rulesTree.Empty() {
-		T().Infof("Styling HTML tree without having any CSS rules")
+		tracer().Infof("Styling HTML tree without having any CSS rules")
 	}
-	T().Debugf("--- Creating style nodes for HTML nodes ----")
-	styledRootNode := setupStyledNodeTree(dom, cssom.defaultProperties, creator)
+	tracer().Debugf("--- Creating style nodes for HTML nodes ----")
+	styledRootNode := setupStyledNodeTree(dom, cssom.defaultProperties)
 	walker := tree.NewWalker(styledRootNode) // create a concurrent tree walker
-	createNodes := func(node *tree.Node, parent *tree.Node, pos int) (*tree.Node, error) {
-		return createStyledChildren(node, cssom.rulesTree, creator) // provide closure with style creator
+	createNodes := func(node *tree.Node[*styledtree.StyNode], parent *tree.Node[*styledtree.StyNode],
+		pos int) (*tree.Node[*styledtree.StyNode], error) {
+		//
+		return createStyledChildren(node, cssom.rulesTree) // provide closure with style creator
 	}
 	future := walker.TopDown(createNodes).Promise() // build the style tree
 	if _, err := future(); err != nil {
-		T().Errorf("Error while creating styled tree: %v", err)
+		tracer().Errorf("Error while creating styled tree: %v", err)
 		return nil, err
 	}
 	// TODO: Possibly do not sync after creating the nodes, but rather
@@ -532,14 +499,14 @@ func (cssom CSSOM) Style(dom *html.Node, creator style.NodeCreator) (*tree.Node,
 	// ancestor (and the parent may point to the same ancestor). This is
 	// a loss of space efficiency, but we may gain performance by
 	// overlapping the operations.
-	T().Debugf("--- Now styling newly created nodes --------")
+	tracer().Debugf("--- Now styling newly created nodes --------")
 	walker = tree.NewWalker(styledRootNode)
-	createStyles := func(node *tree.Node, parent *tree.Node, pos int) (*tree.Node, error) {
-		return createStylesForNode(node, cssom.rulesTree, creator, cssom.compoundSplitters)
+	createStyles := func(node *tree.Node[*styledtree.StyNode], parent *tree.Node[*styledtree.StyNode], pos int) (*tree.Node[*styledtree.StyNode], error) {
+		return createStylesForNode(node, cssom.rulesTree, cssom.compoundSplitters)
 	}
 	future = walker.TopDown(createStyles).Promise() // build the style tree
 	if _, err := future(); err != nil {
-		T().Errorf("Error while creating style properties: %v", err)
+		tracer().Errorf("Error while creating style properties: %v", err)
 		return nil, err
 	}
 	return styledRootNode, nil
@@ -547,21 +514,21 @@ func (cssom CSSOM) Style(dom *html.Node, creator style.NodeCreator) (*tree.Node,
 
 // Pre-condition: sn has been styled and points to an HTML node.
 // Now iterate through the HTML children and create styled nodes for each.
-func createStyledChildren(parent *tree.Node, rulesTree *rulesTreeType,
-	creator style.NodeCreator) (*tree.Node, error) {
+func createStyledChildren(parent *tree.Node[*styledtree.StyNode], rulesTree *rulesTreeType) (*tree.Node[*styledtree.StyNode], error) {
 	//
-	domnode := creator.ToStyler(parent)
-	//domnode := dom.NewRONode(parent, creator.ToStyler) // interface RODomNode
-	T().Debugf("Input node = %v, creating styled children", domnode)
+	domnode := parent.Payload
+	//domnode := creator.ToStyler(parent)
+	tracer().Debugf("Input node = %v, creating styled children", domnode)
 	h := domnode.HTMLNode()
 	if h.Type == html.ElementNode || h.Type == html.DocumentNode {
 		ch := h.FirstChild
 		for ch != nil {
 			if ch.DataAtom == atom.Style { // <style> element
-				T().Infof("<style> nodes have to be extracted in advance")
+				tracer().Infof("<style> nodes have to be extracted in advance")
 			} else if isInDom(ch.Type, ch.DataAtom) {
 				//} else if isStylable(ch.DataAtom) {
-				sn := creator.StyleForHTMLNode(ch)
+				//sn := creator.StyleForHTMLNode(ch)
+				sn := styledtree.NewNodeForHTMLNode(ch)
 				parent.AddChild(sn) // sn will be sent to next pipeline stage
 				if styleAttr := getStyleAttribute(ch); styleAttr != nil {
 					// attach local style attributes
@@ -606,21 +573,23 @@ func isStylable(a atom.Atom) bool {
 	return false
 }
 
-func createStylesForNode(node *tree.Node, rulesTree *rulesTreeType, creator style.NodeCreator,
-	splitters []CompoundPropertiesSplitter) (*tree.Node, error) {
+func createStylesForNode(node *tree.Node[*styledtree.StyNode], rulesTree *rulesTreeType,
+	splitters []CompoundPropertiesSplitter) (*tree.Node[*styledtree.StyNode], error) {
 	//
-	styler := creator.ToStyler(node)
-	h := styler.HTMLNode()
+	//styler := creator.ToStyler(node)
+	h := node.Payload.HTMLNode()
+	//h := styler.HTMLNode()
 	if h.Type == html.DocumentNode || h.Type == html.ElementNode {
 		if isStylable(h.DataAtom) {
-			matchlist := rulesTree.FilterMatchesFor(styler.HTMLNode())
+			matchlist := rulesTree.FilterMatchesFor(h)
 			if matchlist != nil && len(matchlist.matchingRules) != 0 {
 				matchlist.SortProperties(splitters)
-				pmap := matchlist.createStyleGroups(node.Parent(), creator)
-				T().Debugf("Setting styles for node %v =\n%s", node, pmap)
-				creator.SetStyles(node, pmap)
+				pmap := matchlist.createStyleGroups(node.Parent())
+				tracer().Debugf("Setting styles for node %v =\n%s", node, pmap)
+				//creator.SetStyles(node, pmap)
+				node.Payload.SetStyles(pmap)
 			} else {
-				T().Debugf("Node %v matched no style rules", node)
+				tracer().Debugf("Node %v matched no style rules", node)
 			}
 		}
 		return node, nil
@@ -731,7 +700,7 @@ func newLocalPseudoRule(styleAttr string) localPseudoRuleType {
 		if len(st) > 0 {
 			s := strings.Split(st, ":")
 			if len(s) < 2 {
-				T().Errorf("Skipping ill-formed style rule: %s", st)
+				tracer().Errorf("Skipping ill-formed style rule: %s", st)
 			} else {
 				k := strings.TrimSpace(s[0])
 				v := strings.TrimSpace(s[1])

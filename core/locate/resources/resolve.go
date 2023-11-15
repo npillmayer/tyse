@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"path"
 	"strings"
 
@@ -178,7 +178,6 @@ func (loader fontLoader) Descriptor() font.Descriptor {
 //
 // Typecases are not returned synchronously, but rather as a promise
 // of kind TypeCasePromise (async/await-pattern).
-//
 func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight, size float32) TypeCasePromise {
 	// TODO include a context parameter
 	desc := font.Descriptor{
@@ -212,7 +211,7 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 			file, result.err = packaged.Open("packaged/fonts/" + fname)
 			if result.err == nil {
 				defer file.Close()
-				bytez, _ := ioutil.ReadAll(file)
+				bytez, _ := io.ReadAll(file)
 				if f, result.err = font.ParseOpenTypeFont(bytez); result.err == nil {
 					result.desc.Family = fname
 					name = fname
@@ -298,7 +297,6 @@ func ResolveTypeCase(conf schuko.Configuration, pattern string, style xfont.Styl
 // the system's fonts-folders (OS dependent).
 //
 // (Please refer to function `ResolveTypeCase`, too)
-//
 func FindLocalFont(conf schuko.Configuration, pattern string, style xfont.Style, weight xfont.Weight) (
 	desc font.Descriptor, variant string) {
 	//

@@ -52,8 +52,10 @@ func Parse(font []byte) (*Font, error) {
 			return nil, err
 		}
 	}
-	// TODO consistency check
-	//
+	if err := extractLayoutInfo(otf); err != nil {
+		return nil, err
+	}
+	// Collect and centralize font information:
 	// The number of glyphs in the font is restricted only by the value stated in the 'head' table. The order in which glyphs are placed in a font is arbitrary.
 	// Note that a font must have at least two glyphs, and that glyph index 0 musthave an outline. See Glyph Mappings for details.
 	//
@@ -78,6 +80,43 @@ func Parse(font []byte) (*Font, error) {
 		}
 	}
 	return otf, nil
+}
+
+// According to the OpenType spec, the following tables are
+// required for the font to function correctly.
+var RequiredTables = []string{
+	"cmap", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post",
+}
+
+// These are the OpenType tables for advanced layout.
+var LayoutTables = []string{
+	"GSUB", "GPOS", "GDEF",
+	//"GSUB", "GPOS", "GDEF", "BASE", "JSTF",
+}
+
+// Consistency check and shortcuts to essential tables, including layout tables.
+func extractLayoutInfo(otf *Font) error {
+	for _, tag := range RequiredTables {
+		h := otf.tables[T(tag)]
+		if h == nil {
+			return errFontFormat("missing required table " + tag)
+		}
+	}
+	otf.CMap = otf.tables[T("cmap")].Self().AsCMap()
+	// We'll operate on OpenType fonts only, i.e. fonts containing GSUB and GPOS tables.
+	for _, tag := range LayoutTables {
+		h := otf.tables[T(tag)]
+		if h == nil {
+			return errFontFormat("missing advanced layout table " + tag)
+		}
+	}
+	// store shortcuts to layout tables
+	otf.Layout.GSub = otf.tables[T("GSUB")].Self().AsGSub()
+	otf.Layout.GPos = otf.tables[T("GPOS")].Self().AsGPos()
+	otf.Layout.GDef = otf.tables[T("GDEF")].Self().AsGDef()
+	//otf.Layout.Base = otf.tables[T("BASE")].Self().AsBase()
+	//otf.Layout.Jstf = otf.tables[T("JSTF")].Self().AsJstf()
+	return nil
 }
 
 func parseTable(t Tag, b binarySegm, offset, size uint32) (Table, error) {
@@ -211,17 +250,20 @@ func parseBaseAxis(base *BaseTable, hOrV int, link NavLink, err error) error {
 //
 // From Apple: // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html
 // “The use of the Macintosh platformID is currently discouraged. Subtables with a
-//  Macintosh platformID are only required for backwards compatibility.”
+//
+//	Macintosh platformID are only required for backwards compatibility.”
+//
 // and:
 // “The Unicode platform's platform-specific ID 6 was intended to mark a 'cmap' subtable
-//  as one used by a last resort font. This is not required by any Apple platform.”
+//
+//	as one used by a last resort font. This is not required by any Apple platform.”
 //
 // All in all, we only support the following plaform/encoding/format combinations:
-//   0 (Unicode)  3    4   Unicode BMB
-//   0 (Unicode)  4    12  Unicode full
-//   3 (Win)      1    4   Unicode BMP
-//   3 (Win)      10   12  Unicode full
 //
+//	0 (Unicode)  3    4   Unicode BMB
+//	0 (Unicode)  4    12  Unicode full
+//	3 (Win)      1    4   Unicode BMP
+//	3 (Win)      10   12  Unicode full
 func parseCMap(tag Tag, b binarySegm, offset, size uint32) (Table, error) {
 	n, _ := b.u16(2) // number of sub-tables
 	tracer().Debugf("font cmap has %d sub-tables in %d|%d bytes", n, len(b), size)
@@ -508,7 +550,8 @@ Type      Name                            Description
 Offset16  coverageOffset                  Offset to Coverage table - from beginning of AttachList table
 uint16    glyphCount                      Number of glyphs with attachment points
 Offset16  attachPointOffsets[glyphCount]  Array of offsets to AttachPoint tables-from beginning of
-                                          AttachList table-in Coverage Index order
+
+	AttachList table-in Coverage Index order
 */
 func parseAttachmentPointList(gdef *GDefTable, b binarySegm, err error) error {
 	if err != nil {
@@ -703,7 +746,6 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 // uint16  requiredFeatureIndex               Index of a feature required for this language system
 // uint16  featureIndexCount                  Number of feature index values for this language system
 // uint16  featureIndices[featureIndexCount]  Array of indices into the FeatureList, in arbitrary order
-//
 func parseLangSys(b binarySegm, offset int, target string) (langSys, error) {
 	lsys := langSys{}
 	if len(b) < offset+4 {
