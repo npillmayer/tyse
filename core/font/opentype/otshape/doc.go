@@ -62,3 +62,13 @@ func tracer() tracing.Trace {
 func errShaper(x string) error {
 	return core.Error(core.EINVALID, "OpenType text shaping: %s", x)
 }
+
+// assert emulates assertions known from other programming languages.
+// Dealing with fonts and Unicode text sometimes feels quite brittle: a lot of things
+// can go wrong with uncertainties with coding, errors in fonts, etc.
+// Until things work out to be robust enough, we'll be defensive.
+func assert(condition bool, msg string) {
+	if !condition {
+		panic(msg)
+	}
+}

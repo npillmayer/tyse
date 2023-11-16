@@ -62,7 +62,7 @@ func (env *BufferTestEnviron) TearDownTest() {
 
 // --- Tests -----------------------------------------------------------------
 
-func (env *BufferTestEnviron) TestBufferInitialMapping() {
+func (env *BufferTestEnviron) testBufferInitialMapping() {
 	data := []struct {
 		in     string
 		length int
@@ -78,11 +78,29 @@ func (env *BufferTestEnviron) TestBufferInitialMapping() {
 		n := buf.mapGlyphs(pair.in, env.otf, ot.DFLT, ot.DFLT)
 		env.Equal(pair.length, n, "not all codepoints mapped to glyph positions")
 		//env.T().Logf("buffer is %v", buf[:n])
-		env.Equal(pair.want, buf.Glyphs()[:n])
+		env.Equal(pair.want, buf.Glyphs()[:n], "expected different mapping")
 	}
 }
 
-func (env *BufferTestEnviron) TestBufferDraw() {
+func (env *BufferTestEnviron) TestRepresentation() {
+	data := []struct {
+		in     string
+		want   []ot.GlyphIndex
+		prefer int
+	}{
+		{"\u1EC6", []ot.GlyphIndex{1159}, PREFER_COMPOSED},             // Font Calibri has Ệ (U+1EC6) [NFC]
+		{"\u00CA\u0323", []ot.GlyphIndex{1159}, PREFER_COMPOSED},       // Ê ◌̣  merge
+		{"\u0045\u0323\u0302", []ot.GlyphIndex{1159}, PREFER_COMPOSED}, // E ◌̣ ◌̂  merge
+		{"\u1EC6", []ot.GlyphIndex{28, 3634, 506}, PREFER_DECOMPOSED},  // Font Calibri has mark glyphs
+	}
+	for _, d := range data {
+		//env.T().Logf("find representation for %v", d.in)
+		glyphs := findRepresentation([]byte(d.in), env.otf, nil, d.prefer)
+		env.Equal(d.want, glyphs, "expected different glyph representation")
+	}
+}
+
+func (env *BufferTestEnviron) testBufferDraw() {
 	env.imageName = "jelly"
 }
 
