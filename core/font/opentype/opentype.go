@@ -1,21 +1,18 @@
 /*
 Package opentype handles OpenType fonts.
 
-License
+# License
 
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
 
-Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
-
+Copyright © Norbert Pillmayer <norbert@pillmayer.com>
 */
 package opentype
 
 import (
 	"golang.org/x/image/font/sfnt"
 )
-
-// TODO move this to package font ?
 
 // --- Font and glyph metrics ------------------------------------------------
 

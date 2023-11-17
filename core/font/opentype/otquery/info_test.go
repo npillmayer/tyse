@@ -66,7 +66,7 @@ func (env *InfoTestEnviron) TestReverseLookup() {
 }
 
 func (env *InfoTestEnviron) TestGlyphClasses() {
-	clz := GlyphClasses(env.otf, 4) // 4 = 'A'
+	clz := ClassesForGlyph(env.otf, 4) // 4 = 'A'
 	env.Equal(1, clz.Class, "expected class of 'A' to be 1, is %d", clz.Class)
 }
 

@@ -1,4 +1,4 @@
-package otshape
+package otshaper
 
 import (
 	"path/filepath"

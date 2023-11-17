@@ -54,7 +54,7 @@ func (env *MetricsTestEnviron) TestGlyphMetrics() {
 }
 
 func (env *MetricsTestEnviron) TestLanguageMatch() {
-	script, lang := SupportsScript(env.calibri, ot.T("latn"), ot.T("TRK"))
+	script, lang := FontSupportsScript(env.calibri, ot.T("latn"), ot.T("TRK"))
 	env.Equal("latn", script.String(), "expected Latin script in test font")
 	env.Equal("TRK ", lang.String(), "expected Turkish language support in test font")
 }

@@ -85,23 +85,64 @@ func LayoutTables(otf *ot.Font) []string {
 	return lt
 }
 
-// GlyphClass collects glyph class information for a glyph index.
-type GlyphClass struct {
-	Class           int
-	MarkAttachClass int
-	MarkGlyphSet    int
+// GlyphClasses collects glyph class information for a glyph.
+//
+// From the OpenType spec:
+// A Mark Glyph Sets table is used to define sets of mark glyphs that can be used in lookup tables
+// within the GSUB or GPOS table to control how mark glyphs within a glyph sequence are treated by
+// lookups. Mark glyph sets are used in GSUB and GPOS lookups to filter which marks in a string are
+// considered or ignored.
+// Mark glyph sets are used for the same purpose as mark attachment classes, which is as filters
+// for GSUB and GPOS lookups. Mark glyph sets differ from mark attachment classes, however, in
+// that mark glyph sets may intersect as needed by the font developer. As for mark attachment classes,
+// only one mark glyph set can be referenced in any given lookup.
+type GlyphClasses struct {
+	Class          GlyphClass
+	MarkAttachment MarkAttachmentClass
+
+	MarkGlyphSet int // fonts may define arbitrary numbers of sets
 }
 
-// GlyphClasses retrieves glyph class information for a given glyph index.
-func GlyphClasses(otf *ot.Font, gid ot.GlyphIndex) GlyphClass {
+// GlyphClass denotes an OpenType glyph class. From the OpenType Spec:
+//
+// The Glyph Class Definition (GlyphClassDef) table identifies four types of glyphs in a font: base glyphs,
+// ligature glyphs, combining mark glyphs, and glyph components. GSUB and GPOS lookups define and use
+// these glyph classes to differentiate the types of glyphs in a string. For example, GPOS uses
+// the glyph classes to distinguish between a simple base glyph and the mark glyph that follows it.
+// In addition, a client uses class definitions to apply GSUB and GPOS LookupFlag data correctly.
+// For example, a LookupFlag may specify ignoring ligatures and marks during a glyph operation.
+type GlyphClass int16
+
+const (
+	GC_Default        GlyphClass = 0 // unassigned
+	GC_BaseGlyph      GlyphClass = 1 // single character, spacing glyph
+	GC_LigatureGlyph  GlyphClass = 2 // multiple character, spacing glyph
+	GC_MarkGlyph      GlyphClass = 3 // non-spacing combining glyph
+	GC_ComponentGlyph GlyphClass = 4 // part of single character, spacing glyph
+)
+
+// MarkAttachmentClass denotes an OpenType mark attachment class. From the OpenType spec:
+//
+// A Mark Attachment Class Definition Table is used to assign mark glyphs into different classes that
+// can be used in lookup tables within the GSUB or GPOS table to control how mark glyphs within a glyph
+// sequence are treated by lookups.
+type MarkAttachmentClass int16
+
+const (
+	MAC_Top    MarkAttachmentClass = 1 // top mark
+	MAC_Bottom MarkAttachmentClass = 2 // bottom mark
+)
+
+// ClassesForGlyph retrieves glyph class information for a given glyph index.
+func ClassesForGlyph(otf *ot.Font, gid ot.GlyphIndex) GlyphClasses {
 	t := otf.Table(ot.T("GDEF"))
 	if t == nil {
-		return GlyphClass{}
+		return GlyphClasses{}
 	}
 	gdef := t.Self().AsGDef()
-	clz := GlyphClass{
-		Class:           gdef.GlyphClassDef.Lookup(gid),
-		MarkAttachClass: gdef.MarkAttachmentClassDef.Lookup(gid),
+	clz := GlyphClasses{
+		Class:          GlyphClass(gdef.GlyphClassDef.Lookup(gid)),
+		MarkAttachment: MarkAttachmentClass(gdef.MarkAttachmentClassDef.Lookup(gid)),
 	}
 	for _, set := range gdef.MarkGlyphSets {
 		if n, ok := set.Match(gid); ok {

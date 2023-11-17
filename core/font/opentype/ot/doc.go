@@ -35,7 +35,7 @@ upon the OT specification (for example, Calibri has an overflow in a 'kern' tabl
 but an application using it should not fail because of recoverable errors.
 Package `ot` will try to circumvent known bugs in common fonts.
 
-Schrödinger's Cat
+# Schrödinger's Cat
 
 OpenType fonts contain quite a multitude of tables, and a package intended to
 expose the semantics of OT tables ought to wrap each of these into a Go type.
@@ -63,13 +63,13 @@ quantum, however, let's consider an example. The OpenType specification flags th
 not offer a type for it. As a client, how do you access, e.g., OS/2.xAvgCharWidth?
 We start by requesting OS/2 as a vanilla table:
 
-    os2 := myfont.Table[T("OS/2")]
+	os2 := myfont.Table[T("OS/2")]
 
 This should succeed unless `myfont` is broken. From there on, clients will have
 to consult the OpenType specification. That will tell them that xAvgCharWidth is
 the 2nd field (index 1) of table OS/2, right after the version field.
 
-    xAvgCharWidth := os2.Fields().Get(1).U16(0)
+	xAvgCharWidth := os2.Fields().Get(1).U16(0)
 
 This will read xAvgCharWidth as an uint16, which is the data type of xAvgCharWidth
 according to the spec. That sure looks like a complicated way of getting a number
@@ -81,15 +81,15 @@ But I promised you a cat, you say? In fact, the example already had one included
 but's let's head over to a bigger cat. The most complex OT tables, apart from
 glyphs themselves, include the so-called “layout-tables”.
 
-    calibri := ot.Parse(…)                     // find font 'Calibri' on our system
-    gsub := calibri.Table(T("GSUB")).Self().AsGSub()            // semantic Go type
+	calibri := ot.Parse(…)                     // find font 'Calibri' on our system
+	gsub := calibri.Table(T("GSUB")).Self().AsGSub()            // semantic Go type
 
 GSUB is an important table for text shaping, so package `ot` offers a special type.
 However, this type is not exposing GSUB in full depth! Thus we type:
 
-    feats := gsub.ScriptList.LookupTag(T("latn")).Navigate().Map().LookupTag(T("TRK")).Navigate().List()
-    fmt.Println("%d features for Turkish", feats.Len())
-    // => yields 24
+	feats := gsub.ScriptList.LookupTag(T("latn")).Navigate().Map().LookupTag(T("TRK")).Navigate().List()
+	fmt.Println("%d features for Turkish", feats.Len())
+	// => yields 24
 
 If you happen to not know the OpenType specification by heart, I'll help you out:
 We want to know if the font contains features applicable for Latin script with
@@ -98,15 +98,15 @@ The line of code is quite a mouthful, I'll readily concede. However, if you ever
 code to extract information from a font file, you'd probably be used to a lot of error
 branches like this:
 
-    latinScript, ok := GSUB.lookup("latn")                 // pseudo code
-    if !ok {
-        … // opt out
-    }
-    turkishLangRecord, ok := latinScript.lookup("TRK")     // pseudo code
-    if !ok {
-        … // opt out (use default)
-    }
-    // etc …
+	latinScript, ok := GSUB.lookup("latn")                 // pseudo code
+	if !ok {
+	    … // opt out
+	}
+	turkishLangRecord, ok := latinScript.lookup("TRK")     // pseudo code
+	if !ok {
+	    … // opt out (use default)
+	}
+	// etc …
 
 So in effect, we're checking multiple times if the cat is still okay, until we
 eventually reach the box we're looking for. Package `ot` will let you travel the
@@ -129,7 +129,7 @@ abstraction is the best, or which one `ot` would choose.
 At the end of the day we will see if this approach does the job when we gain
 some experience with using it from a client perspective.
 
-Status
+# Status
 
 Work in progress. Handling fonts is fiddly and fonts have become complex software
 applications in their own right. I often need a break from the vast desert of
@@ -138,26 +138,24 @@ where I talk to myself and ask, this is what you do in your spare time? Really?
 
 No font collections nor variable fonts are supported yet, but will be in time.
 
-License
+# License
 
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
 
 Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-
 Some code has originally been copied over from golang.org/x/image/font/sfnt/cmap.go,
 as the cmap-routines are not accessible through the sfnt package's API.
 I understand this to be legally okay as long as the Go license information
 stays intact.
 
-    Copyright 2017 The Go Authors. All rights reserved.
-    Use of this source code is governed by a BSD-style
-    license that can be found in the LICENSE file.
+	Copyright 2017 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
 
 The license file mentioned can be found in file GO-LICENSE at the root folder
 of this module.
-
 */
 package ot
 

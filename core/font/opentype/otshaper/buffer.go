@@ -1,4 +1,4 @@
-package otshape
+package otshaper
 
 import (
 	"slices"
@@ -10,13 +10,19 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// ShapedGlyph is a glyph(-index) from an OpenType font. It is called ‘shaped’ because
+// it has been selected as suitable to display some user-input. It may represent one or
+// more input characters, depending on the font, script and/or language in use.
 type ShapedGlyph struct {
-	ginx    ot.GlyphIndex
-	advance sfnt.Units
+	Index   ot.GlyphIndex // glyph-index pointing into an OpenType font
+	Advance sfnt.Units    // advance-width of this glyph
 }
 
+// Buffer holds a sequence of shaped glyphs, represented as glyph-indices for a given
+// OpenType font. It is the outcome of the process of OpenType-shaping.
 type Buffer []ShapedGlyph
 
+// NewBuffer creates a new Buffer of size n. Negative sizes are interpreted as 0.
 func NewBuffer(n int) Buffer {
 	if n < 0 {
 		n = 0
@@ -24,24 +30,27 @@ func NewBuffer(n int) Buffer {
 	return make([]ShapedGlyph, n)
 }
 
-// Get the glyph indices of the glyphs in a buffer.
-// Allocates a slice of glyh-indices.
+// Glyphs gets the glyph-indices of the glyphs in a buffer.
+// Allocates a slice of glyph-indices, equal in size to the number of shaped glyphs in
+// Buffer b.
 func (b Buffer) Glyphs() []ot.GlyphIndex {
 	glyphs := make([]ot.GlyphIndex, len(b))
 	for i, g := range b {
-		glyphs[i] = g.ginx
+		glyphs[i] = g.Index
 	}
 	return glyphs
 }
 
-const ( // for different scripts or script/language combinations shapers may prefer NFC or NFD
+// For different scripts or script/language combinations shapers may prefer NFC or NFD
+const (
 	PREFER_COMPOSED   = 0
 	PREFER_DECOMPOSED = 1
 )
 
-// Decide wether to compose or de-compose by default.
-// Returns the primary normalizer and its opposite.
-func normalizersFor(script ot.Tag, lang ot.Tag) (norm.Form, int) {
+// Decide wether to compose or de-compose by default, i.e. NFC or NFD.
+// Returns the primary normalizer and a flag denoting wether this script/language
+// combination prefers composed or decomposed representation.
+func normalizerFor(script ot.Tag, lang ot.Tag) (norm.Form, int) {
 	if prefersDecomposed(script, lang) {
 		return norm.NFD, PREFER_DECOMPOSED
 	}
@@ -226,32 +235,50 @@ func (rep representation) appendMark(ch rune, otf *ot.Font) representation {
 	}
 }
 
-// Convert a buffer of codepoints to its initial glyph mapping.
+// mapGlyphs converts a buffer of codepoints to its initial glyph mapping.
 // During the mapping we perform OpenType normalization, as explained here:
 // https://github.com/n8willis/opentype-shaping-documents/blob/master/opentype-shaping-normalization.md
 //
-// TODO: comment this extensively !
+// Selection of glyphs from a font may depend on the script and/or language used.
+//
+// mapGlyphs returns the count of input characters that have been converted.
 func (b Buffer) mapGlyphs(input string, otf *ot.Font, script ot.Tag, lang ot.Tag) int {
 	buf := make([]ot.GlyphIndex, 0, 16)
-	normalizerDefault, normFlag := normalizersFor(script, lang)
+	normalizerDefault, normFlag := normalizerFor(script, lang)
 	//tracer().Debugf("mapping glyphs for input string = %v", []byte(input))
 	clear(b)
 	//tracer().Debugf("shaping buffer is of length %d", len(b))
 	var iterInput norm.Iter
 	iterInput.InitString(normalizerDefault, input)
 	var n int
-	for !iterInput.Done() {
+	for !iterInput.Done() { // now every character is Unicode-normalized NFC or NFD
 		codepoints := iterInput.Next() // get a sequence of code-points
 		tracer().Debugf("read codepoints '%s' (%v)", string(codepoints), codepoints)
 		glyphs := findRepresentation(codepoints, otf, buf, normFlag)
 		tracer().Debugf("glyphs = %v", glyphs)
 		var glyph ot.GlyphIndex
 		for _, glyph = range glyphs {
-			b[n].ginx = glyph
+			b[n].Index = glyph
 			metrics := otquery.GlyphMetrics(otf, glyph)
-			b[n].advance = metrics.Advance
+			b[n].Advance = metrics.Advance
 			n++
 		}
 	}
 	return n
+}
+
+var basicFeatures = []ot.Tag{
+	ot.T("locl"), // Localized Forms
+	ot.T("ccmp"), // Glyph Composition/Decomposition
+	ot.T("rlig"), // Required Ligatures
+}
+
+var typographicSubstitutionFeatures = []ot.Tag{
+	ot.T("rclt"), // Required Contextual Alternates
+	ot.T("calt"), // Contextual Alternates
+	ot.T("clig"), // Contextual Ligatures
+	ot.T("liga"), // Standard Ligatures
+}
+
+func (b Buffer) applySubstitutionFeature(otf *ot.Font, script ot.Tag, lang ot.Tag) {
 }

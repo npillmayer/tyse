@@ -8,11 +8,11 @@ import (
 
 // --- Font Information -------------------------------------------------
 
-// SupportsScript returns a tuple (script-tag, language-tag) for a given input
+// FontSupportsScript returns a tuple (script-tag, language-tag) for a given input
 // of a script tag and a language tag. If the language has no special support in the
 // font, DFLT will be returned. If the script has no support in the font,
 // DFLT will be returned for the script.
-func SupportsScript(otf *ot.Font, scr ot.Tag, lang ot.Tag) (ot.Tag, ot.Tag) {
+func FontSupportsScript(otf *ot.Font, scr ot.Tag, lang ot.Tag) (ot.Tag, ot.Tag) {
 	gsub := otf.Layout.GSub
 	rec := gsub.ScriptList.LookupTag(scr)
 	if rec.IsNull() {
@@ -62,8 +62,8 @@ func FontMetrics(otf *ot.Font) opentype.FontMetricsInfo {
 // --- Glyph Routines --------------------------------------------------------
 
 // GlyphIndex returns the glyph index for a give code-point.
-//
 // If the code-point cannot be found, 0 is returned.
+//
 // From the OpenType specification: character codes that do not correspond to any glyph in
 // the font should be mapped to glyph index 0. The glyph at this location must be a special
 // glyph representing a missing character, commonly known as '.notdef'.

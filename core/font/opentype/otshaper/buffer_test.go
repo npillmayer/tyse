@@ -1,4 +1,4 @@
-package otshape
+package otshaper
 
 import (
 	"image"
@@ -25,6 +25,7 @@ type BufferTestEnviron struct {
 	suite.Suite
 	otf         *ot.Font
 	fontMetrics opentype.FontMetricsInfo
+	buffer      Buffer
 	imageName   string
 }
 
@@ -62,26 +63,6 @@ func (env *BufferTestEnviron) TearDownTest() {
 
 // --- Tests -----------------------------------------------------------------
 
-func (env *BufferTestEnviron) testBufferInitialMapping() {
-	data := []struct {
-		in     string
-		length int
-		want   []ot.GlyphIndex
-	}{
-		{"A", 1, []ot.GlyphIndex{4}},
-		{"é", 1, []ot.GlyphIndex{288}},
-		{"e\u0301", 1, []ot.GlyphIndex{288}}, // NFD é
-		{"Café", 4, []ot.GlyphIndex{18, 258, 296, 288}},
-	}
-	buf := NewBuffer(16)
-	for _, pair := range data {
-		n := buf.mapGlyphs(pair.in, env.otf, ot.DFLT, ot.DFLT)
-		env.Equal(pair.length, n, "not all codepoints mapped to glyph positions")
-		//env.T().Logf("buffer is %v", buf[:n])
-		env.Equal(pair.want, buf.Glyphs()[:n], "expected different mapping")
-	}
-}
-
 func (env *BufferTestEnviron) TestRepresentation() {
 	data := []struct {
 		in     string
@@ -100,8 +81,32 @@ func (env *BufferTestEnviron) TestRepresentation() {
 	}
 }
 
-func (env *BufferTestEnviron) testBufferDraw() {
-	env.imageName = "jelly"
+func (env *BufferTestEnviron) TestBufferInitialMapping() {
+	data := []struct {
+		in     string
+		length int
+		want   []ot.GlyphIndex
+		script ot.Tag
+	}{
+		{"A", 1, []ot.GlyphIndex{4}, ot.T("latn")}, // Latin prefers composed NFC
+		{"é", 1, []ot.GlyphIndex{288}, ot.T("latn")},
+		{"e\u0301", 1, []ot.GlyphIndex{288}, ot.T("latn")}, // NFD é
+		{"Café", 4, []ot.GlyphIndex{18, 258, 296, 288}, ot.T("latn")},
+		{"Café", 5, []ot.GlyphIndex{18, 258, 296, 286, 501}, ot.T("dev2")}, // want de-composed
+	}
+	buf := NewBuffer(16)
+	for _, d := range data {
+		n := buf.mapGlyphs(d.in, env.otf, d.script, ot.DFLT)
+		env.Equal(d.length, n, "not all codepoints mapped to glyph positions")
+		env.T().Logf("buffer is %v", buf[:n])
+		env.Equal(d.want, buf.Glyphs()[:n], "expected different mapping")
+	}
+}
+
+func (env *BufferTestEnviron) TestBufferDraw() {
+	env.imageName = "cafe"
+	buf := NewBuffer(16)
+	buf.mapGlyphs("Café", env.otf, ot.DFLT, ot.DFLT)
 }
 
 // --- Helpers ---------------------------------------------------------------
@@ -129,18 +134,22 @@ func displayBuffer(env *BufferTestEnviron, basename string) {
 		Face: face,
 		Dot:  fixed.P(startingDotX, startingDotY),
 	}
-	env.T().Logf("The dot is at %v\n", d.Dot)
-	d.DrawString("jel")
-	env.T().Logf("The dot is at %v\n", d.Dot)
-	d.DrawString("ly")
-	env.T().Logf("The dot is at %v\n", d.Dot)
+	for _, g := range env.buffer {
+		env.T().Logf("The dot is at %v\n", d.Dot)
+		drawGlyph(d, g.Index)
+		d.Dot = d.Dot.Add(fixed.P(int(g.Advance), 0))
+	}
+	// env.T().Logf("The dot is at %v\n", d.Dot)
+	// d.DrawString("jel")
+	// env.T().Logf("The dot is at %v\n", d.Dot)
+	// d.DrawString("ly")
+	// env.T().Logf("The dot is at %v\n", d.Dot)
 	f, err := os.Create(filepath.Join("..", "testdata", "proofs", basename+".png"))
 	env.Require().NoError(err, "cannot open/create PNG output file")
 	defer f.Close()
 	png.Encode(f, d.Dst)
 }
 
-func drawGlyph(d font.Drawer, glyph ot.GlyphIndex, advance int) font.Drawer {
-	d.Dot = d.Dot.Add(fixed.P(advance, 0))
+func drawGlyph(d font.Drawer, glyph ot.GlyphIndex) font.Drawer {
 	return d
 }
