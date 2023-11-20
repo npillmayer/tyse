@@ -14,7 +14,7 @@ import (
 // DFLT will be returned for the script.
 func FontSupportsScript(otf *ot.Font, scr ot.Tag, lang ot.Tag) (ot.Tag, ot.Tag) {
 	gsub := otf.Layout.GSub
-	rec := gsub.ScriptList.LookupTag(scr)
+	rec := gsub.ScriptList.Map().LookupTag(scr)
 	if rec.IsNull() {
 		tracer().Infof("cannot find script %s in font", scr.String())
 		return ot.DFLT, ot.DFLT

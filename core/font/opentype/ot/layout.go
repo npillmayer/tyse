@@ -15,7 +15,7 @@ These tables use some of the same data formats.
 // OpenType specifies two such tables–GPOS and GSUB–which share some of their
 // structure.
 type LayoutTable struct {
-	ScriptList  TagRecordMap
+	ScriptList  Navigator
 	FeatureList TagRecordMap
 	LookupList  LookupList
 	header      *LayoutHeader
@@ -45,7 +45,6 @@ func (h LayoutHeader) Version() (int, int) {
 // ▪︎ Lookup Section,
 // ▪︎ Feature Variations Section.
 // (see type LayoutTableSectionName)
-//
 func (h *LayoutHeader) offsetFor(which layoutTableSectionName) int {
 	switch which {
 	case layoutScriptSection:
@@ -220,7 +219,6 @@ const (
 // ▪︎ mark glyph sets definitions,
 // ▪︎ item variant section.
 // (see https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-header)
-//
 func (h GDefHeader) offsetFor(which string) int {
 	switch which {
 	case GDefGlyphClassDefSection: // Candidate for a RangeTable
@@ -282,7 +280,6 @@ type AxisTable struct {
 // The GSUB, GPOS, and GDEF tables rely on this notion of coverage. If a glyph does
 // not appear in a Coverage table, the client can skip that subtable and move
 // immediately to the next subtable.
-//
 type Coverage struct {
 	coverageHeader
 	GlyphRange GlyphRange
@@ -541,7 +538,6 @@ var _ Navigator = feature{}
 // clients.
 //
 // LookupList implements the NavList interface.
-//
 type LookupList struct {
 	array
 	base         binarySegm
@@ -609,7 +605,6 @@ func IsGPosLookupType(ltype LayoutTableLookupType) bool {
 // and GPOS supports nine LookupTypes
 //
 // Lookup implements the NavMap interface.
-//
 type Lookup struct {
 	lookupInfo
 	err              error
@@ -680,7 +675,6 @@ func (l Lookup) Subtable(i int) *LookupSubtable {
 //
 // If g is not identified as applicable for the lookup feature, an emtpy byte segment
 // is returned.
-//
 func (l Lookup) Lookup(g uint32) NavLocation {
 	// inx, ok := l.coverage.GlyphRange.Lookup(GlyphIndex(g >> 16))
 	// if !ok {
@@ -726,7 +720,6 @@ var _ NavMap = Lookup{}
 // the Index tables to match glyph sequences suitable for ligature substitution. (see
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#lookuptype-1-single-substitution-subtable).
 // Package `ot` will not do this interpretation, but rather leave it to higher-protocol packages.
-//
 type LookupSubtable struct {
 	LookupType LayoutTableLookupType // may differ from Lookup.Type for Type=Extension
 	Format     uint16                // lookup subtables may come in more than one format
@@ -782,7 +775,6 @@ func lookupAndReturn(index VarArray, ginx int, deep bool) NavLocation {
 // For type 5, the length of each non-void slice will be exactly 1; for type 6/7 they may be of
 // arbitrary length. Its exact allocation will depend on the type/format combination of the lookup
 // subtable.
-//
 type SequenceContext struct {
 	BacktrackCoverage []Coverage         // for format 3
 	InputCoverage     []Coverage         // for format 3

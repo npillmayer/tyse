@@ -712,11 +712,12 @@ func parseScriptList(lytt *LayoutTable, b binarySegm, err error) error {
 	if err != nil {
 		return err
 	}
-	lytt.ScriptList = tagRecordMap16{}
+	//lytt.ScriptList = tagRecordMap16{}
 	link := link16{base: b, offset: uint16(lytt.header.offsetFor(layoutScriptSection))}
 	scripts := link.Jump() // now we stand at the ScriptList table
-	scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
-	lytt.ScriptList = scriptRecords
+	//scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
+	//lytt.ScriptList = scriptRecords
+	lytt.ScriptList = NavigatorFactory("ScriptList", scripts, scripts)
 	return nil
 }
 

@@ -12,7 +12,6 @@ import "fmt"
 // If a previous call in a navigation chain has caused an error, successing Navigator
 // items will remember that error (call to `Error`) and will wrap only void Navigators
 // (nil-safe).
-//
 type Navigator interface {
 	Name() string  // returns the name of the underlying OpenType table
 	Link() NavLink // non-void if Navigator contains a link
@@ -35,7 +34,6 @@ type NavList interface {
 // bytes in such cases).
 //
 // TagRecordMap is a special kind of NavMap.
-//
 type NavMap interface {
 	Lookup(uint32) NavLocation
 	LookupTag(Tag) NavLink
@@ -64,6 +62,12 @@ type TagRecordMap interface {
 func NavigatorFactory(obj string, loc NavLocation, base NavLocation) Navigator {
 	tracer().Debugf("navigator factory for %s", obj)
 	switch obj {
+	case "ScriptList":
+		//scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
+		scriptRecords := parseTagRecordMap16(loc.Bytes(), 0, loc.Bytes(), "ScriptList", "Script")
+		return linkAndMap{
+			tmap: scriptRecords,
+		}
 	case "Script":
 		l, err := parseLink16(loc.Bytes(), 0, loc.Bytes(), "LangSys")
 		if err != nil {
@@ -199,7 +203,7 @@ func errDanglingLink(obj string) error {
 	return fmt.Errorf("cannot resolve link to %s", obj)
 }
 
-//var nullNav = linkAndMap{}
+// var nullNav = linkAndMap{}
 var nullList = u16List{}
 
 type navName struct {

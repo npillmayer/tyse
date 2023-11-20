@@ -79,8 +79,8 @@ func TestParseGPos(t *testing.T) {
 	if gpos.FeatureList.Count() != 27 {
 		t.Errorf("expected 41 features, have %d", gpos.FeatureList.Count())
 	}
-	t.Logf("otf.GPOS: %d scripts:", gpos.ScriptList.Count())
-	_ = gpos.ScriptList.Tags()
+	t.Logf("otf.GPOS: %d scripts:", gpos.ScriptList.Map().AsTagRecordMap().Count())
+	_ = gpos.ScriptList.Map().AsTagRecordMap().Tags()
 	// t.Logf("otf.GPOS: %d scripts:", len(gpos.scripts))
 	// for i, sc := range gpos.scripts {
 	// 	t.Logf("[%d] script '%s'", i, sc.Tag)

@@ -17,9 +17,9 @@ func TestNavLink(t *testing.T) {
 		t.Fatal("cannot locate table GSUB in font")
 	}
 	gsub := table.Self().AsGSub()
-	recname := gsub.ScriptList.LookupTag(T("latn")).Navigate().Name()
+	recname := gsub.ScriptList.Map().LookupTag(T("latn")).Navigate().Name()
 	t.Logf("walked to %s", recname)
-	lang := gsub.ScriptList.LookupTag(T("latn")).Navigate().Map().AsTagRecordMap().LookupTag(T("TRK"))
+	lang := gsub.ScriptList.Map().LookupTag(T("latn")).Navigate().Map().AsTagRecordMap().LookupTag(T("TRK"))
 	langlist := lang.Navigate().List()
 	t.Logf("list is %s of length %v", lang.Name(), langlist.Len())
 	if lang.Name() != "LangSys" || langlist.Len() != 24 {

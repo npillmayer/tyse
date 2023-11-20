@@ -22,7 +22,6 @@ import (
 // A feature uses ‘lookups’ to do operations on glyphs. GSUB and GPOS tables store lookups in a
 // LookupList, into which Features link by maintaining a list of indices into the LookupList.
 // The order of the lookup indices matters.
-//
 type Feature interface {
 	Tag() ot.Tag          // e.g., 'liga'
 	Type() LayoutTagType  // GSUB or GPOS ?
@@ -48,7 +47,6 @@ type feature struct {
 // Returns GSUB features, GPOS features and a possible error condition.
 // The features at index 0 of each slice are the mandatory features (for a script), and may
 // be nil.
-//
 func FontFeatures(otf *ot.Font, script, lang ot.Tag) ([]Feature, []Feature, error) {
 	lytTables, err := getLayoutTables(otf) // get GSUB and GPOS table for font otf
 	if err != nil {
@@ -60,9 +58,9 @@ func FontFeatures(otf *ot.Font, script, lang ot.Tag) ([]Feature, []Feature, erro
 	}
 	for i := 0; i < 2; i++ { // collect features from GSUB and GPOS
 		t := lytTables[i]
-		scr := t.ScriptList.LookupTag(script)
+		scr := t.ScriptList.Map().LookupTag(script)
 		if scr.IsNull() && script != ot.DFLT {
-			scr = t.ScriptList.LookupTag(ot.DFLT)
+			scr = t.ScriptList.Map().LookupTag(ot.DFLT)
 		}
 		if scr.IsNull() {
 			trace().Infof("font %s has no feature-links from script %s", otf.F.Fontname, script)
@@ -160,7 +158,6 @@ func (f feature) LookupIndex(i int) int {
 // GPOS) for the feature. Having the table missing may result in a crash. This should never happen, as
 // extracting the feature will have required the layout table in the first place. Presence of the
 // layout table is not checked again.
-//
 func ApplyFeature(otf *ot.Font, feat Feature, buf []ot.GlyphIndex, pos, alt int) (int, bool, []ot.GlyphIndex) {
 	if feat == nil { // this is legal for unused mandatory feature slots
 		return pos, false, buf
@@ -248,7 +245,6 @@ func applyLookup(lookup *ot.Lookup, feat Feature, buf []ot.GlyphIndex, pos, alt 
 // Format 1 adds a constant delta value to the input glyph index. For the substitutions to
 // occur properly, the glyph indices in the input and output ranges must be in the same order.
 // This format does not use the Coverage index that is returned from the Coverage table.
-//
 func gsubLookupType1Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
@@ -270,7 +266,6 @@ func gsubLookupType1Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 // The substituteGlyphIDs array must contain the same number of glyph indices as the
 // Coverage table. To locate the corresponding output glyph index in the substituteGlyphIDs
 // array, this format uses the Coverage index returned from the Coverage table.
-//
 func gsubLookupType1Fmt2(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
@@ -362,7 +357,6 @@ func gsubLookupType3Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 //
 // As this is a multi-lookup algorithm, calling gsubLookupType4Fmt1 will return a
 // NavLocation which is a LigatureSet, i.e. a list of records of unequal lengths.
-//
 func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//
@@ -428,7 +422,6 @@ func gsubLookupType4Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphI
 // searches for the current glyph in the Coverage table. If found, the corresponding SequenceRuleSet
 // table is retrieved, and the SequenceRule tables for that set are examined to see if the current glyph
 // sequence matches any of the sequence rules. The first matching rule subtable is used.
-//
 func gsubLookupType5Fmt1(l *ot.Lookup, lksub *ot.LookupSubtable, buf []ot.GlyphIndex, pos int) (
 	int, bool, []ot.GlyphIndex) {
 	//

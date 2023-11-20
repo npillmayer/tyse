@@ -149,7 +149,7 @@ func (b binarySegm) u32(i int) (uint32, error) {
 // If an input glyph g is contained in the range, and index and true is returned,
 // false otherwise.
 type GlyphRange interface {
-	Match(g GlyphIndex) (int, bool) // is glyph ID g
+	Match(g GlyphIndex) (int, bool) // is glyph ID g in range?
 	ByteSize() int
 }
 
@@ -309,7 +309,7 @@ func parseLink16(b binarySegm, offset int, base binarySegm, target string) (NavL
 	}, nil
 }
 
-//func makeLink16(b fontBinSegm, offset uint16, base fontBinSegm, target string) Link {
+// func makeLink16(b fontBinSegm, offset uint16, base fontBinSegm, target string) Link {
 func makeLink16(offset uint16, base binarySegm, target string) NavLink {
 	return link16{
 		target: target,
