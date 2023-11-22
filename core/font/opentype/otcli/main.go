@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -61,9 +62,9 @@ func main() {
 	}
 	//
 	// start receiving commands
-	pterm.Info.Println("Quit with <ctrl>D")   // inform user how to stop the CLI
-	tracer().SetTraceLevel(tracing.LevelInfo) // will set the correct level later
-	intp.REPL()                               // go into interactive mode
+	pterm.Info.Println("Quit with <ctrl>D") // inform user how to stop the CLI
+	tracer().SetTraceLevel(tracing.LevelDebug)
+	intp.REPL() // go into interactive mode
 }
 
 // We use pterm for moderately fancy output.
@@ -122,8 +123,9 @@ func (intp *Intp) REPL() {
 }
 
 type Op struct {
-	code int
-	arg  string
+	code   int
+	arg    string
+	format string
 }
 
 type Command struct {
@@ -131,38 +133,47 @@ type Command struct {
 	op    [32]Op
 }
 
+const NOOP = -1
 const (
-	NOOP     = -1
-	QUIT     = 0
-	NAVIGATE = 1
-	TABLE    = 2
-	LIST     = 3
-	SCRIPTS  = 4
+	QUIT int = iota
+	HELP
+	NAVIGATE
+	TABLE
+	LIST
+	MAP
+	SCRIPTS
 )
 
 func (intp *Intp) parseCommand(line string) (*Command, error) {
 	command := &Command{}
-	args := strings.Split(line, " ")
-	command.count = len(args)
-	for i, arg := range args {
+	steps := strings.Split(line, " ")
+	command.count = len(steps)
+	for i, step := range steps {
 		command.op[i].arg = ""
-		switch arg {
+		switch step {
 		case "quit":
 			command.op[i].code = QUIT
 		case "->": // navigate
 			command.op[i].code = NAVIGATE
 		default:
-			c := strings.Split(arg, ":")
-			command.op[i].arg = c[1]
-			switch c[0] {
+			c := strings.Split(step, ":") // e.g.  "scripts:latn:tag" or "list:5:int" or "help:lang" or "map"
+			command.op[i].arg = getOptArg(c, 1)
+			command.op[i].format = getOptArg(c, 2)
+			switch strings.ToLower(c[0]) {
 			case "table":
 				command.op[i].code = TABLE
-				tracer().Infof("op: looking for table '%s'", c[1])
+				tracer().Infof("table: looking for table '%s'", command.op[i].arg)
 			case "map":
+				command.op[i].code = MAP
+				tracer().Infof("map: looking for key '%v'", command.op[i].arg)
 			case "list":
-			case "ScriptList":
+				command.op[i].code = LIST
+				tracer().Infof("list: looking for index '%v'", command.op[i].arg)
+			case "scriptlist", "scripts":
 				command.op[i].code = SCRIPTS
-				tracer().Infof("op: looking for script '%s'", c[1])
+				tracer().Infof("script-list: looking for script '%s'", command.op[i].arg)
+			default:
+				command.op[i].code = HELP
 			}
 		}
 	}
@@ -171,6 +182,10 @@ func (intp *Intp) parseCommand(line string) (*Command, error) {
 
 func (intp *Intp) execute(cmd *Command) (error, bool) {
 	tracer().Infof("cmd = %v", cmd.op)
+	if cmd.op[0].code == HELP {
+		help(cmd.op[0].arg)
+		return nil, false
+	}
 	if cmd.op[0].code == QUIT {
 		return nil, true
 	}
@@ -178,29 +193,16 @@ func (intp *Intp) execute(cmd *Command) (error, bool) {
 		switch c.code {
 		case NAVIGATE:
 			if intp.table == nil {
-				pterm.Error.Println("cannot walk without table set")
+				pterm.Error.Println("cannot walk without table being set")
 			} else if intp.table == intp.lastPathNode().table {
 				tracer().Infof("ignoring '->'")
-			} else if intp.lastPathNode().location == nil {
-				pterm.Error.Println("no location node to walk to")
+			} else if intp.lastPathNode().link == nil {
+				pterm.Error.Println("no link to walk")
 			} else {
-				if c.arg == "" {
-					l := intp.lastPathNode().link
-					if l == nil {
-						tracer().Infof("optional link is null")
-					}
-					loc := l.Navigate()
-					intp.stack = append(intp.stack, pathNode{location: loc})
-					tracer().Infof("landed at %s", loc.Name())
-				} else {
-					nav := intp.lastPathNode().location
-					l := nav.Map().LookupTag(ot.T(c.arg))
-					if l.IsNull() {
-						tracer().Errorf("lookup returns null")
-					}
-					n := pathNode{location: nav, link: l}
-					intp.stack = append(intp.stack, n)
-				}
+				l := intp.lastPathNode().link
+				n := pathNode{location: l.Navigate()}
+				intp.stack = append(intp.stack, n)
+				tracer().Infof("walked to %s", n.location.Name())
 			}
 		case TABLE:
 			tag := c.arg
@@ -208,6 +210,50 @@ func (intp *Intp) execute(cmd *Command) (error, bool) {
 			intp.stack = intp.stack[:0]
 			intp.stack = append(intp.stack, pathNode{table: intp.table})
 			tracer().Infof("setting table: %v", tag)
+		case MAP:
+			if intp.table == nil {
+				pterm.Error.Println("cannot map without table being set")
+			}
+			var target ot.NavLink
+			m := intp.lastPathNode().location.Map()
+			if c.arg != "" {
+				tag := c.arg
+				if m.IsTagRecordMap() {
+					trm := m.AsTagRecordMap()
+					target = trm.LookupTag(ot.T(tag))
+					tracer().Infof("%s map keys = %v", trm.Name(), trm.Tags())
+					pterm.Printfln("%s table maps [tag %v] = %v", trm.Name(), ot.T(tag), target.Name())
+				} else {
+					target = m.LookupTag(ot.T(tag))
+					pterm.Printfln("%s table maps [%v] = %v", m.Name(), ot.T(tag), target.Name())
+				}
+			} else if m.IsTagRecordMap() {
+				trm := m.AsTagRecordMap()
+				pterm.Printfln("%s map keys = %v", trm.Name(), trm.Tags())
+			}
+			n := intp.lastPathNode()
+			n.link = target
+			intp.setLastPathNode(n)
+		case LIST:
+			if intp.table == nil {
+				pterm.Error.Println("cannot list without table being set")
+			}
+			l := intp.lastPathNode().location.List()
+			if c.arg == "" {
+				pterm.Printfln("List has %d entries", l.Len())
+			} else if i, err := strconv.Atoi(c.arg); err == nil {
+				loc := l.Get(i)
+				size := loc.Size()
+				value := decodeLocation(loc)
+				switch value.(type) {
+				case int:
+					pterm.Printfln("%s list index %d holds number = %d", l.Name(), i, value)
+				default:
+					pterm.Printfln("%s list index %d holds data of %d bytes", l.Name(), i, size)
+				}
+			} else {
+				pterm.Error.Printfln("List index not numeric: %v", c.arg)
+			}
 		case SCRIPTS:
 			if err := intp.checkTable(); err != nil {
 				return err, false
@@ -219,8 +265,18 @@ func (intp *Intp) execute(cmd *Command) (error, bool) {
 			if s == nil {
 				return errors.New("table has no script list"), false
 			}
-			pterm.Printfln("scripts: %v", s.Map().AsTagRecordMap().Tags())
-			intp.stack = append(intp.stack, pathNode{location: s})
+			m := s.Map().AsTagRecordMap()
+			pterm.Printfln("ScriptList keys: %v", m.Tags())
+			n := pathNode{location: s}
+			if c.arg != "" {
+				l := m.LookupTag(ot.T(c.arg))
+				if l.IsNull() {
+					tracer().Infof("script lookup [%s] returns null", ot.T(c.arg).String())
+					break
+				}
+				n.link = l
+			}
+			intp.stack = append(intp.stack, n)
 		}
 	}
 	return nil, false
@@ -264,4 +320,75 @@ func (intp *Intp) lastPathNode() pathNode {
 		return pathNode{}
 	}
 	return intp.stack[len(intp.stack)-1]
+}
+
+func (intp *Intp) setLastPathNode(n pathNode) {
+	if len(intp.stack) == 0 {
+		intp.stack = append(intp.stack, n)
+	}
+	intp.stack[len(intp.stack)-1] = n
+}
+
+func decodeLocation(loc ot.NavLocation) interface{} {
+	if loc == nil {
+		return nil
+	}
+	switch loc.Size() {
+	case 2:
+		return int(loc.U16(0))
+	case 4:
+		return int(loc.U32(0))
+	default:
+	}
+	return nil
+}
+
+func help(topic string) {
+	tracer().Infof("help %v", topic)
+	t := strings.ToLower(topic)
+	switch t {
+	case "script", "scripts", "scriptList":
+		pterm.Info.Println("ScriptList / Script")
+		pterm.Println(`
+	ScriptList is a property of GSUB and GPOS. 
+	It consists of ScriptRecords:
+	+------------+----------------+
+	| Script Tag | Link to Script |
+	+------------+----------------+
+	ScriptList behaves as a map.
+
+	A Script table links to a default LangSys entry, and contains a list of LangSys records:
+	+--------------------------------+
+	| Link to LangSys record         |
+	+--------------+-----------------+
+	| Language Tag | Link to LangSys |
+	+--------------+-----------------+
+	Script behaves as a map, with entry 0 as the default link
+	`)
+	case "lang", "langsys", "langs", "language":
+		pterm.Info.Println("LangSys")
+		pterm.Println(`
+	LangSys is pointed to from a Script Record.
+	It links a language with features to activate. It does to using an index into the feature table.
+	+-----------------------------------+
+	| Infex of required feature or null |
+	+-----------------------------------+
+	| Index of feature 1                |
+	+-----------------------------------+
+	| Index of feature 2                |
+	+-----------------------------------+
+	| ...                               |
+	+-----------------------------------+
+	LangSys behaves as a list.
+	`)
+	default:
+		pterm.Info.Println("General Help, TODO")
+	}
+}
+
+func getOptArg(s []string, inx int) string {
+	if len(s) > inx {
+		return s[inx]
+	}
+	return ""
 }

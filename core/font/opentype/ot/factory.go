@@ -24,6 +24,7 @@ type Navigator interface {
 // NavList represents a sequence of—possibly unequal sized—items, addressable by
 // position.
 type NavList interface {
+	Name() string        // returns the name of the underlying OpenType table
 	Len() int            // number of items in the list
 	Get(int) NavLocation // bytes of entry #n
 	All() []NavLocation  // all entries as (possibly variable sized) byte segments
@@ -58,12 +59,11 @@ type TagRecordMap interface {
 }
 
 // NavigatorFactory creates a Navigator for a given OpenType object `obj` at location
-// `log`.
+// `loc`.
 func NavigatorFactory(obj string, loc NavLocation, base NavLocation) Navigator {
 	tracer().Debugf("navigator factory for %s", obj)
 	switch obj {
 	case "ScriptList":
-		//scriptRecords := parseTagRecordMap16(scripts.Bytes(), 0, scripts.Bytes(), "ScriptList", "Script")
 		scriptRecords := parseTagRecordMap16(loc.Bytes(), 0, loc.Bytes(), "ScriptList", "Script")
 		return linkAndMap{
 			tmap: scriptRecords,
@@ -71,8 +71,10 @@ func NavigatorFactory(obj string, loc NavLocation, base NavLocation) Navigator {
 	case "Script":
 		l, err := parseLink16(loc.Bytes(), 0, loc.Bytes(), "LangSys")
 		if err != nil {
-			return null(err)
+			//return null(err)
+			l = nullLink("no default script->langsys link")
 		}
+		tracer().Debugf("script table default langsys entry: %s", l.Name())
 		return linkAndMap{
 			link: l,
 			tmap: parseTagRecordMap16(loc.Bytes(), 2, loc.Bytes(), "Script", "LangSys"),
@@ -90,7 +92,7 @@ func NavigatorFactory(obj string, loc NavLocation, base NavLocation) Navigator {
 		if err != nil {
 			return null(err)
 		}
-		lookups, err := parseArray16(loc.Bytes(), 2)
+		lookups, err := parseArray16(loc.Bytes(), 2, "Feature", "Feature-Lookups")
 		if err != nil {
 			return null(err)
 		}
@@ -229,8 +231,13 @@ func (l list) List() NavList {
 }
 
 type otFields struct {
+	name    string
 	pattern []uint8
 	b       binarySegm
+}
+
+func (f otFields) Name() string {
+	return "fields"
 }
 
 func (f otFields) Len() int {

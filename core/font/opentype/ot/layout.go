@@ -542,14 +542,15 @@ type LookupList struct {
 	array
 	base         binarySegm
 	lookupsCache []Lookup
+	name         string
 	err          error
 }
 
-/*
-func (ll LookupList) Len() int {
-	return ll.length
+func (ll LookupList) Name() string {
+	return ll.name
 }
 
+/*
 func (ll LookupList) Get(i int) NavLocation {
 	if i < 0 || i >= ll.length {
 		return fontBinSegm{}
@@ -640,7 +641,7 @@ func viewLookup(b NavLocation) Lookup {
 	tracer().Debugf("Lookup has %d sub-tables", lookup.SubTableCount)
 	//
 	var err error
-	lookup.subTables, err = parseArray16(b.Bytes(), 4)
+	lookup.subTables, err = parseArray16(b.Bytes(), 4, "Lookup", "Lookup-Subtables")
 	if err != nil {
 		tracer().Errorf("corrupt Lookup table")
 		return Lookup{} // nothing sensible to to except to return empty table

@@ -755,7 +755,7 @@ func parseLangSys(b binarySegm, offset int, target string) (langSys, error) {
 	tracer().Debugf("parsing LangSys (%s)", target)
 	b = b[offset:]
 	lsys.mandatory, _ = b.u16(0)
-	features, err := parseArray16(b, 2)
+	features, err := parseArray16(b, 2, "LangSys", target)
 	if err != nil {
 		return lsys, err
 	}
@@ -779,7 +779,7 @@ func parseLookupList(lytt *LayoutTable, b binarySegm, err error) error {
 	b = b[lloffset:]
 	//
 	ll := LookupList{base: b}
-	ll.array, ll.err = parseArray16(b, 0)
+	ll.array, ll.err = parseArray16(b, 0, "Lookup", "Lookup-Subtales")
 	lytt.LookupList = ll
 	return nil
 }

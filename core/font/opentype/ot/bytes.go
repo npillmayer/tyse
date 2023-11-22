@@ -428,6 +428,8 @@ func (l32 link32) Navigate() Navigator {
 
 // array is a type for a linear sequence of equal-sized records.
 type array struct {
+	name       string
+	target     string
 	recordSize int
 	length     int
 	loc        binarySegm
@@ -454,15 +456,17 @@ func viewArray16(b binarySegm) array {
 	}
 }
 
-func parseArray16(b binarySegm, offset int) (array, error) {
+func parseArray16(b binarySegm, offset int, name, target string) (array, error) {
 	if len(b) < offset {
-		return array{}, errBufferBounds
+		return array{name: name, target: target}, errBufferBounds
 	}
 	n, err := b.u16(offset)
 	if err != nil {
 		return array{}, err
 	}
 	return array{
+		name:       name,
+		target:     target,
 		recordSize: 2,
 		length:     int(n),
 		loc:        b[offset+2:],
@@ -477,6 +481,10 @@ func viewArray(b binarySegm, recordSize int) array {
 		length:     N,
 		loc:        b,
 	}
+}
+
+func (a array) Name() string {
+	return a.name
 }
 
 // Size of array a in bytes.
@@ -559,7 +567,7 @@ func (va varArray) Get(i int, deep bool) (b NavLocation, err error) {
 			link := makeLink16(b.U16(0), base, "Sequence")
 			b = link.Jump()
 			if j+1 < va.indirections {
-				a, err = parseArray16(b.Bytes(), 0)
+				a, err = parseArray16(b.Bytes(), 0, "var-array", "var-array-entry")
 				tracer().Debugf("new a has size %d, is %v", a.length, binarySegm(a.loc.Bytes()[:20]).Glyphs())
 			}
 		}
@@ -724,6 +732,10 @@ func (mw mapWrapper) AsTagRecordMap() TagRecordMap {
 // u16List implements the NavList interface. It represents a list/array of
 // u16 values.
 type u16List []uint16
+
+func (u16l u16List) Name() string {
+	return "<unknown>"
+}
 
 func (u16l u16List) Len() int {
 	return len(u16l)
