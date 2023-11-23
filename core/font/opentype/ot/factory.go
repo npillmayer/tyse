@@ -36,9 +36,9 @@ type NavList interface {
 //
 // TagRecordMap is a special kind of NavMap.
 type NavMap interface {
+	Name() string
 	Lookup(uint32) NavLocation
 	LookupTag(Tag) NavLink
-	Name() string
 	IsTagRecordMap() bool
 	AsTagRecordMap() TagRecordMap
 }
@@ -54,7 +54,7 @@ type TagRecordMap interface {
 	Name() string           // OpenType specification name of this map
 	LookupTag(Tag) NavLink  // returns the link associated with a given tag
 	Tags() []Tag            // returns all the tags which the map uses as keys
-	Count() int             // number of entries in the map
+	Len() int               // number of entries in the map
 	Get(int) (Tag, NavLink) // get entry at position n
 }
 

@@ -732,10 +732,15 @@ func parseFeatureList(lytt *LayoutTable, b []byte, err error) error {
 	if err != nil {
 		return err
 	}
+	//lytt.FeatureList = array{}
 	lytt.FeatureList = tagRecordMap16{}
 	link := link16{base: b, offset: uint16(lytt.header.offsetFor(layoutFeatureSection))}
 	features := link.Jump() // now we stand at the FeatureList table
 	featureRecords := parseTagRecordMap16(features.Bytes(), 0, features.Bytes(), "FeatureList", "Feature")
+	//featureRecords, err := parseArray(features.Bytes(), 0, 6, "FeatureList", "Feature")
+	if err != nil {
+		return err
+	}
 	lytt.FeatureList = featureRecords
 	return nil
 }

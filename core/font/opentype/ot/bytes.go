@@ -456,6 +456,23 @@ func viewArray16(b binarySegm) array {
 	}
 }
 
+func parseArray(b binarySegm, offset int, recordSize int, name, target string) (array, error) {
+	if len(b) < offset {
+		return array{name: name, target: target}, errBufferBounds
+	}
+	n, err := b.u16(offset)
+	if err != nil {
+		return array{}, err
+	}
+	return array{
+		name:       name,
+		target:     target,
+		recordSize: recordSize,
+		length:     int(n),
+		loc:        b[offset+2:],
+	}, nil
+}
+
 func parseArray16(b binarySegm, offset int, name, target string) (array, error) {
 	if len(b) < offset {
 		return array{name: name, target: target}, errBufferBounds
@@ -658,7 +675,7 @@ func (m tagRecordMap16) Name() string {
 	return m.name
 }
 
-func (m tagRecordMap16) Count() int {
+func (m tagRecordMap16) Len() int {
 	return m.records.length
 }
 
@@ -690,7 +707,7 @@ func (mw mapWrapper) Name() string {
 	return mw.name
 }
 
-func (mw mapWrapper) Count() int {
+func (mw mapWrapper) Len() int {
 	return len(mw.m)
 }
 

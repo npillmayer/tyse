@@ -142,6 +142,7 @@ const (
 	LIST
 	MAP
 	SCRIPTS
+	FEATURES
 )
 
 func (intp *Intp) parseCommand(line string) (*Command, error) {
@@ -157,6 +158,7 @@ func (intp *Intp) parseCommand(line string) (*Command, error) {
 			command.op[i].code = NAVIGATE
 		default:
 			c := strings.Split(step, ":") // e.g.  "scripts:latn:tag" or "list:5:int" or "help:lang" or "map"
+			tracer().Infof("parse command = %v", c)
 			command.op[i].arg = getOptArg(c, 1)
 			command.op[i].format = getOptArg(c, 2)
 			switch strings.ToLower(c[0]) {
@@ -172,6 +174,9 @@ func (intp *Intp) parseCommand(line string) (*Command, error) {
 			case "scriptlist", "scripts":
 				command.op[i].code = SCRIPTS
 				tracer().Infof("script-list: looking for script '%s'", command.op[i].arg)
+			case "featurelist", "features":
+				command.op[i].code = FEATURES
+				tracer().Infof("feature-list")
 			default:
 				command.op[i].code = HELP
 			}
@@ -244,7 +249,7 @@ func (intp *Intp) execute(cmd *Command) (error, bool) {
 			} else if i, err := strconv.Atoi(c.arg); err == nil {
 				loc := l.Get(i)
 				size := loc.Size()
-				value := decodeLocation(loc)
+				value := decodeLocation(loc, l.Name())
 				switch value.(type) {
 				case int:
 					pterm.Printfln("%s list index %d holds number = %d", l.Name(), i, value)
@@ -277,6 +282,17 @@ func (intp *Intp) execute(cmd *Command) (error, bool) {
 				n.link = l
 			}
 			intp.stack = append(intp.stack, n)
+		case FEATURES:
+			f := intp.table.Self().AsGSub().FeatureList
+			if c.arg == "" {
+				tracer().Infof("%s table has %d entries", f.Name(), f.Len())
+			} else if i, err := strconv.Atoi(c.arg); err == nil {
+				tag, _ := f.Get(i)
+				//tag, lnk := f.Get(i)
+				pterm.Printfln("%s list index %d holds feature record = %v", f.Name(), i, tag)
+			} else {
+				pterm.Error.Printfln("List index not numeric: %v", c.arg)
+			}
 		}
 	}
 	return nil, false
@@ -329,7 +345,7 @@ func (intp *Intp) setLastPathNode(n pathNode) {
 	intp.stack[len(intp.stack)-1] = n
 }
 
-func decodeLocation(loc ot.NavLocation) interface{} {
+func decodeLocation(loc ot.NavLocation, name string) interface{} {
 	if loc == nil {
 		return nil
 	}
@@ -339,6 +355,15 @@ func decodeLocation(loc ot.NavLocation) interface{} {
 	case 4:
 		return int(loc.U32(0))
 	default:
+		switch name {
+		case "FeatureRecord":
+			tag := ot.Tag(loc.U32(0))
+			link := int(loc.U16(4))
+			return struct {
+				ot.Tag
+				int
+			}{tag, link}
+		}
 	}
 	return nil
 }

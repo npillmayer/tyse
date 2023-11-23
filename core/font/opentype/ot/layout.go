@@ -15,7 +15,8 @@ These tables use some of the same data formats.
 // OpenType specifies two such tables–GPOS and GSUB–which share some of their
 // structure.
 type LayoutTable struct {
-	ScriptList  Navigator
+	ScriptList Navigator
+	//FeatureList NavList
 	FeatureList TagRecordMap
 	LookupList  LookupList
 	header      *LayoutHeader
